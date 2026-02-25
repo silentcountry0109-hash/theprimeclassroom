@@ -31,17 +31,17 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 h-20 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 h-16 md:h-20 transition-all duration-300 ${
         scrolled
           ? "bg-white/90 backdrop-blur-lg border-b border-gray-100"
           : "bg-transparent"
       }`}
       data-testid="navbar"
     >
-      <div className="max-w-7xl mx-auto h-full flex items-center justify-between gap-4 px-6">
+      <div className="max-w-7xl mx-auto h-full flex items-center justify-between gap-4 px-4 md:px-6">
         <Link href="/">
           <span
-            className="font-serif text-2xl tracking-[0.15em] text-foreground cursor-pointer"
+            className="font-serif text-xl md:text-2xl tracking-[0.15em] text-foreground cursor-pointer"
             data-testid="link-home"
           >
             質數教室

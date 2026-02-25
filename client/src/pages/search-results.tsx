@@ -100,7 +100,7 @@ export default function SearchResults() {
   return (
     <div className="min-h-screen bg-washi">
       <Navbar />
-      <div className="pt-24 pb-16 px-4 md:px-6 max-w-6xl mx-auto">
+      <div className="pt-20 md:pt-24 pb-12 md:pb-16 px-4 md:px-6 max-w-6xl mx-auto">
         <div className="mb-6">
           <Link href="/">
             <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer mb-4 block" data-testid="link-back-home">
@@ -124,7 +124,7 @@ export default function SearchResults() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="lg:w-64 flex-shrink-0">
-            <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 sticky top-24">
+            <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 lg:sticky lg:top-24">
               <h3 className="text-sm font-semibold text-foreground tracking-wide">篩選條件</h3>
 
               <div>

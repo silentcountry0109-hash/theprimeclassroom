@@ -179,7 +179,7 @@ export default function ParentDashboard() {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === item.id
                     ? "border-tiffany text-tiffany"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-200"
@@ -251,37 +251,37 @@ function OverviewTab({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <button
           onClick={() => onNavigate("children")}
-          className="bg-white rounded-xl border border-gray-100 p-4 text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
+          className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
           data-testid="card-stat-children"
         >
-          <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center mb-3">
-            <Users className="w-5 h-5 text-tiffany" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-tiffany/10 flex items-center justify-center mb-2 sm:mb-3">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-tiffany" />
           </div>
-          <p className="text-2xl font-bold text-foreground">{children.length}</p>
+          <p className="text-xl sm:text-2xl font-bold text-foreground">{children.length}</p>
           <p className="text-xs text-muted-foreground">登記的孩子</p>
         </button>
 
         <button
           onClick={() => onNavigate("bookings")}
-          className="bg-white rounded-xl border border-gray-100 p-4 text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
+          className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
           data-testid="card-stat-upcoming"
         >
-          <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center mb-3">
-            <CalendarCheck className="w-5 h-5 text-tiffany" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-tiffany/10 flex items-center justify-center mb-2 sm:mb-3">
+            <CalendarCheck className="w-4 h-4 sm:w-5 sm:h-5 text-tiffany" />
           </div>
-          <p className="text-2xl font-bold text-foreground">{upcomingBookings.length}</p>
+          <p className="text-xl sm:text-2xl font-bold text-foreground">{upcomingBookings.length}</p>
           <p className="text-xs text-muted-foreground">即將上課</p>
         </button>
 
         <button
           onClick={() => onNavigate("bookings")}
-          className="bg-white rounded-xl border border-gray-100 p-4 text-left hover:border-gray-200 hover:shadow-sm transition-all group"
+          className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 text-left hover:border-gray-200 hover:shadow-sm transition-all group"
           data-testid="card-stat-completed"
         >
-          <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mb-3">
-            <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-green-50 flex items-center justify-center mb-2 sm:mb-3">
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
           </div>
-          <p className="text-2xl font-bold text-foreground">
+          <p className="text-xl sm:text-2xl font-bold text-foreground">
             {bookings.filter((b) => b.status === "completed").length}
           </p>
           <p className="text-xs text-muted-foreground">已完成課程</p>
@@ -289,11 +289,11 @@ function OverviewTab({
 
         <button
           onClick={() => onNavigate("book")}
-          className="bg-gradient-to-br from-tiffany/5 to-coral/5 rounded-xl border border-tiffany/20 p-4 text-left hover:shadow-sm transition-all group"
+          className="bg-gradient-to-br from-tiffany/5 to-coral/5 rounded-xl border border-tiffany/20 p-3 sm:p-4 text-left hover:shadow-sm transition-all group"
           data-testid="card-quick-book"
         >
-          <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center mb-3">
-            <Plus className="w-5 h-5 text-coral" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-coral/10 flex items-center justify-center mb-2 sm:mb-3">
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-coral" />
           </div>
           <p className="text-sm font-semibold text-foreground">預約新課程</p>
           <p className="text-xs text-muted-foreground">搜尋可用時段</p>

@@ -134,7 +134,7 @@ function HeroSection() {
 
   return (
     <section
-      className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-20 pb-16"
+      className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-16 md:pt-20 pb-12 md:pb-16"
       style={{ backgroundColor: "#FAF9F6" }}
     >
       <div
@@ -152,18 +152,18 @@ function HeroSection() {
         }}
       />
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        <span className="absolute top-[12%] left-[6%] text-8xl text-tiffany/[0.06] font-serif rotate-[-15deg]">+</span>
-        <span className="absolute top-[22%] right-[10%] text-7xl text-coral/[0.08] font-serif rotate-[20deg]">×</span>
-        <span className="absolute bottom-[35%] left-[12%] text-6xl text-tiffany/[0.05] font-serif rotate-[10deg]">÷</span>
-        <span className="absolute bottom-[18%] right-[6%] text-9xl text-tiffany/[0.05] font-serif rotate-[-8deg]">−</span>
-        <span className="absolute top-[50%] left-[3%] text-5xl text-coral/[0.06] font-serif rotate-[25deg]">∑</span>
-        <span className="absolute top-[65%] right-[4%] text-6xl text-tiffany/[0.04] font-serif rotate-[-20deg]">π</span>
-        <span className="absolute top-[35%] right-[25%] text-4xl text-tiffany/[0.05] font-serif rotate-[15deg]">∞</span>
-        <span className="absolute bottom-[45%] left-[30%] text-5xl text-coral/[0.05] font-serif rotate-[-10deg]">√</span>
+        <span className="absolute top-[12%] left-[6%] text-6xl md:text-8xl text-tiffany/[0.06] font-serif rotate-[-15deg]">+</span>
+        <span className="absolute top-[22%] right-[10%] text-5xl md:text-7xl text-coral/[0.08] font-serif rotate-[20deg]">×</span>
+        <span className="absolute bottom-[35%] left-[12%] text-5xl md:text-6xl text-tiffany/[0.05] font-serif rotate-[10deg] hidden sm:block">÷</span>
+        <span className="absolute bottom-[18%] right-[6%] text-7xl md:text-9xl text-tiffany/[0.05] font-serif rotate-[-8deg]">−</span>
+        <span className="absolute top-[50%] left-[3%] text-4xl md:text-5xl text-coral/[0.06] font-serif rotate-[25deg] hidden sm:block">∑</span>
+        <span className="absolute top-[65%] right-[4%] text-5xl md:text-6xl text-tiffany/[0.04] font-serif rotate-[-20deg] hidden sm:block">π</span>
+        <span className="absolute top-[35%] right-[25%] text-3xl md:text-4xl text-tiffany/[0.05] font-serif rotate-[15deg] hidden md:block">∞</span>
+        <span className="absolute bottom-[45%] left-[30%] text-4xl md:text-5xl text-coral/[0.05] font-serif rotate-[-10deg] hidden md:block">√</span>
       </div>
 
-      <div className="text-center max-w-4xl mx-auto z-10">
-        <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl tracking-[0.15em] text-foreground mb-4 overflow-hidden">
+      <div className="text-center max-w-4xl mx-auto z-10 px-2">
+        <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-[0.1em] sm:tracking-[0.15em] text-foreground mb-4 overflow-hidden">
           {titleChars.map((char, i) => (
             <motion.span
               key={i}
@@ -197,7 +197,7 @@ function HeroSection() {
           國小數學個別指導
         </motion.p>
         <motion.p
-          className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-14 leading-relaxed"
+          className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.2 }}
@@ -223,11 +223,11 @@ function HeroSection() {
           找到最適合孩子的數學老師，立即預約免費診斷
         </motion.p>
 
-        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-tiffany/15 shadow-[0_8px_40px_rgba(129,216,208,0.12)] p-2 md:p-3 relative">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl md:rounded-[2rem] border border-tiffany/15 shadow-[0_8px_40px_rgba(129,216,208,0.12)] p-2 md:p-3 relative">
           <div className="flex flex-col md:flex-row items-stretch">
-            <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50">
-              <div className="flex items-center gap-2 mb-1.5">
-                <MapPin className="w-4 h-4 text-tiffany" />
+            <div className="flex-1 px-3 md:px-4 py-2.5 md:py-3 md:border-r border-b md:border-b-0 border-gray-200/50">
+              <div className="flex items-center gap-2 mb-1">
+                <MapPin className="w-3.5 md:w-4 h-3.5 md:h-4 text-tiffany" />
                 <span className="text-xs font-medium text-muted-foreground tracking-wide">縣市</span>
               </div>
               <Select value={city} onValueChange={(val) => { setCity(val); setDistrict(""); }}>
@@ -242,9 +242,9 @@ function HeroSection() {
               </Select>
             </div>
 
-            <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Building2 className="w-4 h-4 text-tiffany" />
+            <div className="flex-1 px-3 md:px-4 py-2.5 md:py-3 md:border-r border-b md:border-b-0 border-gray-200/50">
+              <div className="flex items-center gap-2 mb-1">
+                <Building2 className="w-3.5 md:w-4 h-3.5 md:h-4 text-tiffany" />
                 <span className="text-xs font-medium text-muted-foreground tracking-wide">區/鄉鎮</span>
               </div>
               <Select value={district} onValueChange={setDistrict} disabled={!city}>
@@ -259,9 +259,9 @@ function HeroSection() {
               </Select>
             </div>
 
-            <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50 relative">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Clock className="w-4 h-4 text-tiffany" />
+            <div className="flex-1 px-3 md:px-4 py-2.5 md:py-3 md:border-r border-b md:border-b-0 border-gray-200/50 relative">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-3.5 md:w-4 h-3.5 md:h-4 text-tiffany" />
                 <span className="text-xs font-medium text-muted-foreground tracking-wide">時段</span>
               </div>
               <button
@@ -275,7 +275,7 @@ function HeroSection() {
                 <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showTimeFilter ? "rotate-180" : ""}`} />
               </button>
               {showTimeFilter && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-gray-100 shadow-xl p-4 z-[100] min-w-[280px]">
+                <div className="absolute top-full left-0 right-0 md:left-0 mt-2 bg-white rounded-xl border border-gray-100 shadow-xl p-4 z-[100] min-w-[240px] md:min-w-[280px] -mx-2 md:mx-0">
                   <p className="text-xs font-medium text-muted-foreground mb-2">星期</p>
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {Object.entries(DAY_LABELS).map(([val, label]) => (
@@ -353,19 +353,19 @@ function HeroSection() {
       </motion.div>
 
       <motion.div
-        className="flex items-center justify-center gap-3 mt-10 z-10"
+        className="flex items-center justify-center gap-3 mt-6 md:mt-10 z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.4, duration: 0.8 }}
       >
-        <div className="flex -space-x-3">
-          <img src={teacher1Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
-          <img src={teacher2Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
-          <img src={teacher3Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
-          <img src={teacher4Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
+        <div className="flex -space-x-2 md:-space-x-3">
+          <img src={teacher1Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover" />
+          <img src={teacher2Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover" />
+          <img src={teacher3Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover" />
+          <img src={teacher4Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover hidden sm:block" />
         </div>
         <div className="text-left">
-          <p className="text-sm font-semibold text-foreground">200+ 位家長推薦</p>
+          <p className="text-xs sm:text-sm font-semibold text-foreground">200+ 位家長推薦</p>
           <div className="flex items-center gap-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
@@ -389,8 +389,8 @@ function HeroSection() {
 function ClassroomShowcase() {
   return (
     <section className="relative">
-      <div className="max-w-7xl mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-10 md:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-center">
           <motion.div
             className="relative rounded-2xl shadow-lg"
             initial={{ opacity: 0, x: -30 }}
@@ -401,7 +401,7 @@ function ClassroomShowcase() {
             <img
               src={heroClassroomImg}
               alt="溫暖明亮的教室環境"
-              className="w-full h-[320px] md:h-[400px] object-cover rounded-2xl"
+              className="w-full h-[220px] sm:h-[320px] md:h-[400px] object-cover rounded-2xl"
             />
           </motion.div>
           <motion.div
@@ -473,10 +473,10 @@ function TeachingMethodSection() {
   ];
 
   return (
-    <section id="teaching" className="py-24 px-6 bg-white">
+    <section id="teaching" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-6xl mx-auto">
-        <motion.div className="text-center mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4" data-testid="text-teaching-title">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
             教學特色
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -484,23 +484,23 @@ function TeachingMethodSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
           {methods.map((method, i) => (
             <motion.div
               key={method.title}
-              className="group relative bg-washi rounded-2xl p-8 border border-transparent hover:border-tiffany/20 transition-all duration-300"
+              className="group relative bg-washi rounded-2xl p-5 md:p-8 border border-transparent hover:border-tiffany/20 transition-all duration-300"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
               data-testid={`card-teaching-method-${i}`}
             >
-              <div className="flex items-start gap-5">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${method.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
-                  <method.icon className={`w-7 h-7 ${method.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
+              <div className="flex items-start gap-4 md:gap-5">
+                <div className={`w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 ${method.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
+                  <method.icon className={`w-6 h-6 md:w-7 md:h-7 ${method.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-serif text-xl tracking-wide text-foreground mb-2">{method.title}</h3>
+                  <h3 className="font-serif text-lg md:text-xl tracking-wide text-foreground mb-1.5 md:mb-2">{method.title}</h3>
                   <p className="text-muted-foreground leading-relaxed text-sm">{method.description}</p>
                 </div>
               </div>
@@ -545,10 +545,10 @@ function TextbookSection() {
   ];
 
   return (
-    <section id="textbook" className="py-24 px-6 bg-washi">
+    <section id="textbook" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
-        <motion.div className="text-center mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4" data-testid="text-textbook-title">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-textbook-title">
             教材介紹
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -556,7 +556,7 @@ function TextbookSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -667,10 +667,10 @@ function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="py-24 px-6 bg-white">
+    <section id="features" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-6xl mx-auto">
-        <motion.div className="text-center mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             為什麼選擇質數教室
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -678,7 +678,7 @@ function FeaturesSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
           {features.map((feature, i) => (
             <motion.div
               key={feature.title}
@@ -743,10 +743,10 @@ function CoachesSection() {
   }, [isPaused, coaches.length, goNext]);
 
   return (
-    <section id="about" className="py-24 px-6 bg-washi">
+    <section id="about" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
-        <motion.div className="text-center mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             推薦師資
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -764,17 +764,17 @@ function CoachesSection() {
             <>
               <button
                 onClick={goPrev}
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute left-0 sm:left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-coaches-prev"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
               <button
                 onClick={goNext}
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-0 sm:right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-coaches-next"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </>
           )}
@@ -866,10 +866,10 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="py-24 px-6 bg-white">
+    <section className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-6xl mx-auto">
-        <motion.div className="text-center mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             如何開始
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -877,7 +877,7 @@ function ProcessSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
           {steps.map((step, i) => (
             <motion.div
               key={step.title}
@@ -936,10 +936,10 @@ function TestimonialsSection() {
   }, [isPaused, stories.length, goNext]);
 
   return (
-    <section id="testimonials" className="py-24 px-6 bg-washi">
+    <section id="testimonials" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-4xl mx-auto">
-        <motion.div className="text-center mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             家長好評
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -959,17 +959,17 @@ function TestimonialsSection() {
               <>
                 <button
                   onClick={goPrev}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute -left-1 sm:left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                   data-testid="button-testimonials-prev"
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
                 <button
                   onClick={goNext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute -right-1 sm:right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                   data-testid="button-testimonials-next"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </>
             )}
@@ -979,7 +979,7 @@ function TestimonialsSection() {
                 {stories[currentIndex] && (
                   <motion.div
                     key={stories[currentIndex].id}
-                    className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12"
+                    className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-8 md:p-12"
                     initial={{ opacity: 0, x: 80 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -80 }}
@@ -1073,10 +1073,10 @@ function FAQSection() {
   const categories = [...new Set(faqs.map((f) => f.category))];
 
   return (
-    <section id="faq" className="py-24 px-6 bg-white">
+    <section id="faq" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-3xl mx-auto">
-        <motion.div className="text-center mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             常見問題
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -1130,7 +1130,7 @@ function FAQSection() {
 function CTASection() {
   return (
     <section
-      className="py-24 px-6 relative"
+      className="py-14 md:py-24 px-4 md:px-6 relative"
       style={{
         backgroundColor: "#FAF9F6",
         backgroundImage: `
@@ -1141,7 +1141,7 @@ function CTASection() {
       }}
     >
       <div className="max-w-5xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -1151,7 +1151,7 @@ function CTASection() {
             <img
               src={parentChildImg}
               alt="家長與孩子一起學習"
-              className="w-full h-[300px] md:h-[360px] object-cover rounded-2xl shadow-lg"
+              className="w-full h-[220px] sm:h-[300px] md:h-[360px] object-cover rounded-2xl shadow-lg"
             />
           </motion.div>
           <motion.div
@@ -1161,7 +1161,7 @@ function CTASection() {
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: 0.15 }}
           >
-            <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
+            <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
               立即預約免費診斷
             </h2>
             <p className="text-muted-foreground mb-8 leading-relaxed">
@@ -1211,11 +1211,11 @@ function CTASection() {
 
 function FooterSection() {
   return (
-    <footer className="bg-foreground text-white/80 py-16 px-6">
+    <footer className="bg-foreground text-white/80 py-10 md:py-16 px-4 md:px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-          <div className="md:col-span-2">
-            <h3 className="font-serif text-2xl tracking-[0.15em] text-white mb-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 mb-8 md:mb-12">
+          <div className="col-span-2">
+            <h3 className="font-serif text-xl md:text-2xl tracking-[0.15em] text-white mb-3">
               質數教室
             </h3>
             <p className="text-sm text-white/50 mb-1 tracking-wide">

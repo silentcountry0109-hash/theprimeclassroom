@@ -156,7 +156,7 @@ export default function ClassroomDetail() {
     return (
       <div className="min-h-screen bg-washi">
         <Navbar />
-        <div className="pt-24 pb-16 px-4 md:px-6 max-w-5xl mx-auto space-y-6">
+        <div className="pt-20 md:pt-24 pb-12 md:pb-16 px-4 md:px-6 max-w-5xl mx-auto space-y-6">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-48 rounded-xl" />
           <Skeleton className="h-32 rounded-xl" />
@@ -170,7 +170,7 @@ export default function ClassroomDetail() {
     return (
       <div className="min-h-screen bg-washi">
         <Navbar />
-        <div className="pt-24 pb-16 px-6 text-center">
+        <div className="pt-20 md:pt-24 pb-12 md:pb-16 px-4 md:px-6 text-center">
           <div className="text-6xl mb-4 opacity-20">🏫</div>
           <h2 className="text-lg font-medium mb-4">找不到此教室</h2>
           <Link href="/search">
@@ -204,7 +204,7 @@ export default function ClassroomDetail() {
   return (
     <div className="min-h-screen bg-washi">
       <Navbar />
-      <div className="pt-24 pb-16 px-4 md:px-6 max-w-5xl mx-auto">
+      <div className="pt-20 md:pt-24 pb-12 md:pb-16 px-4 md:px-6 max-w-5xl mx-auto">
         <Link href="/search">
           <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer mb-6 block" data-testid="link-back-search">
             <ArrowLeft className="w-4 h-4" />
@@ -216,7 +216,7 @@ export default function ClassroomDetail() {
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-1">
               <div className="flex items-start gap-3 mb-3">
-                <h1 className="font-serif text-2xl md:text-3xl tracking-[0.08em] text-foreground" data-testid="text-franchise-name">
+                <h1 className="font-serif text-xl sm:text-2xl md:text-3xl tracking-[0.08em] text-foreground" data-testid="text-franchise-name">
                   {f.name}
                 </h1>
                 {(f.rating ?? 0) > 0 && (

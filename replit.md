@@ -156,6 +156,19 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - 年度績優校區 (tiffany styling)
 - 成績進步快速 (coral styling)
 
+## Mobile RWD
+- Mobile-first approach with `sm:`, `md:` breakpoints
+- Navbar: h-16 on mobile, h-20 on desktop; hamburger menu for mobile nav
+- All landing sections: py-14 md:py-24, px-4 md:px-6, text-2xl md:text-4xl for headings
+- Hero: text-4xl sm:text-5xl md:text-7xl, math symbols hidden on mobile, search bar vertical stacking with border-b dividers
+- Cards/grids: reduced padding (p-5 md:p-8), smaller gaps (gap-4 md:gap-8)
+- Process steps: grid-cols-2 on mobile (2x2), grid-cols-4 on desktop
+- Carousel nav buttons: w-8 h-8 sm:w-10 sm:h-10
+- Footer: grid-cols-2 on mobile, grid-cols-4 on desktop
+- Dashboard stat cards: p-3 sm:p-4, smaller icons on mobile
+- Dashboard tabs: text-xs sm:text-sm, px-3 sm:px-4
+- Search/detail pages: pt-20 md:pt-24 for navbar clearance
+
 ## Coach Photo Mapping (by name, not ID)
 - 林佳慧→teacher_1, 陳志明→teacher_2, 王雅琪→teacher_3
 - 張育銘→teacher_4, 李美玲→teacher_5, 黃建宏→teacher_6
