@@ -644,15 +644,21 @@ function LearningMapSection() {
             className="relative"
           >
             <div className="bg-white rounded-2xl border border-gray-100 p-5 md:p-8 shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
+              <motion.div
+                className="flex items-center gap-2 mb-6"
+                initial={{ opacity: 0, y: -10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
                 <div className="w-8 h-8 rounded-full bg-tiffany/10 flex items-center justify-center">
                   <Map className="w-4 h-4 text-tiffany" />
                 </div>
                 <span className="text-sm font-medium text-foreground">小明的學習地圖</span>
                 <span className="ml-auto text-xs text-tiffany bg-tiffany/10 px-2 py-0.5 rounded-full">小三</span>
-              </div>
+              </motion.div>
 
-              <div className="space-y-4">
+              <div className="space-y-0">
                 {[
                   { unit: "三位數加減", status: "completed", label: "已完成" },
                   { unit: "乘法基礎", status: "completed", label: "已完成" },
@@ -660,17 +666,53 @@ function LearningMapSection() {
                   { unit: "分數初步", status: "upcoming", label: "即將學習" },
                   { unit: "長度與重量", status: "upcoming", label: "即將學習" },
                 ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
+                  <motion.div
+                    key={i}
+                    className="flex items-center gap-3"
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.45, delay: 0.5 + i * 0.18, ease: "easeOut" }}
+                  >
                     <div className="flex flex-col items-center">
-                      <div className={`w-3.5 h-3.5 rounded-full border-2 ${
-                        item.status === "completed" ? "bg-tiffany border-tiffany" :
-                        item.status === "current" ? "bg-white border-coral ring-4 ring-coral/20" :
-                        "bg-gray-100 border-gray-300"
-                      }`} />
+                      <motion.div
+                        className={`w-3.5 h-3.5 rounded-full border-2 ${
+                          item.status === "completed" ? "bg-tiffany border-tiffany" :
+                          item.status === "current" ? "bg-white border-coral" :
+                          "bg-gray-100 border-gray-300"
+                        }`}
+                        initial={{ scale: 0 }}
+                        whileInView={{ scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 15,
+                          delay: 0.5 + i * 0.18,
+                        }}
+                        {...(item.status === "current" ? {
+                          animate: {
+                            boxShadow: [
+                              "0 0 0 0px rgba(255,183,178,0.3)",
+                              "0 0 0 8px rgba(255,183,178,0)",
+                            ],
+                          },
+                          transition: {
+                            boxShadow: { duration: 1.5, repeat: Infinity, ease: "easeOut" },
+                            scale: { type: "spring", stiffness: 300, damping: 15, delay: 0.5 + i * 0.18 },
+                          },
+                        } : {})}
+                      />
                       {i < 4 && (
-                        <div className={`w-0.5 h-6 ${
-                          item.status === "completed" ? "bg-tiffany/40" : "bg-gray-200"
-                        }`} />
+                        <motion.div
+                          className={`w-0.5 origin-top ${
+                            item.status === "completed" ? "bg-tiffany/40" : "bg-gray-200"
+                          }`}
+                          initial={{ height: 0 }}
+                          whileInView={{ height: 24 }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 0.3, delay: 0.65 + i * 0.18, ease: "easeOut" }}
+                        />
                       )}
                     </div>
                     <div className={`flex-1 flex items-center justify-between py-1 ${
@@ -678,20 +720,42 @@ function LearningMapSection() {
                       item.status === "completed" ? "text-muted-foreground" : "text-muted-foreground/60"
                     }`}>
                       <span className="text-sm">{item.unit}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        item.status === "completed" ? "bg-tiffany/10 text-tiffany" :
-                        item.status === "current" ? "bg-coral/10 text-coral" :
-                        "bg-gray-100 text-muted-foreground"
-                      }`}>{item.label}</span>
+                      <motion.span
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          item.status === "completed" ? "bg-tiffany/10 text-tiffany" :
+                          item.status === "current" ? "bg-coral/10 text-coral" :
+                          "bg-gray-100 text-muted-foreground"
+                        }`}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.3, delay: 0.7 + i * 0.18 }}
+                      >
+                        {item.label}
+                      </motion.span>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
 
-              <div className="mt-6 pt-4 border-t border-gray-100">
+              <motion.div
+                className="mt-6 pt-4 border-t border-gray-100"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 1.5 }}
+              >
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>學習進度</span>
-                  <span className="text-tiffany font-medium">2 / 5 單元完成</span>
+                  <motion.span
+                    className="text-tiffany font-medium"
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: 1.7 }}
+                  >
+                    2 / 5 單元完成
+                  </motion.span>
                 </div>
                 <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
                   <motion.div
@@ -699,10 +763,10 @@ function LearningMapSection() {
                     initial={{ width: 0 }}
                     whileInView={{ width: "40%" }}
                     viewport={{ once: true }}
-                    transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
+                    transition={{ duration: 1.2, delay: 1.6, ease: "easeOut" }}
                   />
                 </div>
-              </div>
+              </motion.div>
             </div>
 
             <div className="absolute -bottom-3 -right-3 w-20 h-20 bg-tiffany/5 rounded-full -z-10" />
