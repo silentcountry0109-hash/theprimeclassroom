@@ -810,36 +810,48 @@ function BookingFlowTab() {
               <button
                 key={f.id}
                 onClick={() => selectFranchise(f.id)}
-                className="w-full bg-white rounded-xl border border-gray-100 p-4 text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
+                className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
                 data-testid={`franchise-card-${f.id}`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-semibold text-foreground group-hover:text-tiffany transition-colors">
-                    {f.name}
-                  </h3>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground/40 group-hover:text-tiffany transition-colors" />
-                </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-2">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {f.city} {f.district}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <GraduationCap className="w-3.5 h-3.5" />
-                    {result.coachCount} 位老師
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-tiffany flex items-center gap-1">
-                    <CalendarCheck className="w-3.5 h-3.5" />
-                    {result.availableSlots} 個可預約時段
-                  </span>
-                  {(f.rating ?? 0) >= 4.5 && (
-                    <span className="text-xs text-amber-600 flex items-center gap-0.5">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      {f.rating?.toFixed(1)}
+                {f.photos && f.photos.length > 0 && (
+                  <div className="w-full h-36 overflow-hidden">
+                    <img
+                      src={f.photos[0]}
+                      alt={f.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      data-testid={`franchise-photo-${f.id}`}
+                    />
+                  </div>
+                )}
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-base font-semibold text-foreground group-hover:text-tiffany transition-colors">
+                      {f.name}
+                    </h3>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground/40 group-hover:text-tiffany transition-colors" />
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-2">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {f.city} {f.district}
                     </span>
-                  )}
+                    <span className="flex items-center gap-1">
+                      <GraduationCap className="w-3.5 h-3.5" />
+                      {result.coachCount} 位老師
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-tiffany flex items-center gap-1">
+                      <CalendarCheck className="w-3.5 h-3.5" />
+                      {result.availableSlots} 個可預約時段
+                    </span>
+                    {(f.rating ?? 0) >= 4.5 && (
+                      <span className="text-xs text-amber-600 flex items-center gap-0.5">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        {f.rating?.toFixed(1)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
             );
