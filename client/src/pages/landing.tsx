@@ -44,6 +44,10 @@ import {
   Repeat,
   Lightbulb,
   PenLine,
+  Map,
+  Compass,
+  Milestone,
+  Eye,
 } from "lucide-react";
 import type { Coach, Faq, SuccessStory } from "@shared/schema";
 
@@ -522,6 +526,156 @@ function TeachingMethodSection() {
             我們相信理解比分數更重要，當孩子真正理解了，分數自然會來
           </p>
         </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function LearningMapSection() {
+  const highlights = [
+    {
+      icon: Compass,
+      title: "清楚定位",
+      description: "孩子現在在哪個學習階段，一目瞭然",
+      color: "tiffany",
+    },
+    {
+      icon: BookOpen,
+      title: "學習單元",
+      description: "正在學什麼、接下來要學什麼，家長全程掌握",
+      color: "coral",
+    },
+    {
+      icon: Target,
+      title: "學習重點",
+      description: "每個單元的核心觀念與重點，清楚標示",
+      color: "tiffany",
+    },
+    {
+      icon: Eye,
+      title: "進度透明",
+      description: "老師、家長、孩子三方同步，學習不再是黑箱",
+      color: "coral",
+    },
+  ];
+
+  return (
+    <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
+      <div className="max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7 }}
+          >
+            <div className="inline-flex items-center gap-2 bg-tiffany/10 text-tiffany text-sm font-medium px-3 py-1.5 rounded-full mb-4">
+              <Map className="w-4 h-4" />
+              學習地圖領航
+            </div>
+            <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-4 md:mb-6" data-testid="text-learning-map-title">
+              讓學習的每一步<br className="hidden sm:block" />都扎實穩固
+            </h2>
+            <p className="text-muted-foreground leading-relaxed mb-6 md:mb-8">
+              我們會為每位學生與家長提供一份專屬的學習地圖。您會清楚知道孩子現在在哪個階段、正在學什麼單元、重點是什麼。不再盲目前進，讓學習地圖領航，孩子走的每一步都踏實有力。
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {highlights.map((item, i) => (
+                <motion.div
+                  key={item.title}
+                  className="flex items-start gap-3 p-3 rounded-xl bg-white border border-gray-100"
+                  initial={{ opacity: 0, y: 15 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: 0.2 + i * 0.1 }}
+                  data-testid={`card-learning-map-${i}`}
+                >
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${item.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
+                    <item.icon className={`w-4.5 h-4.5 ${item.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground mb-0.5">{item.title}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.15 }}
+            className="relative"
+          >
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 md:p-8 shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-8 h-8 rounded-full bg-tiffany/10 flex items-center justify-center">
+                  <Map className="w-4 h-4 text-tiffany" />
+                </div>
+                <span className="text-sm font-medium text-foreground">小明的學習地圖</span>
+                <span className="ml-auto text-xs text-tiffany bg-tiffany/10 px-2 py-0.5 rounded-full">小三</span>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { unit: "三位數加減", status: "completed", label: "已完成" },
+                  { unit: "乘法基礎", status: "completed", label: "已完成" },
+                  { unit: "除法概念", status: "current", label: "學習中" },
+                  { unit: "分數初步", status: "upcoming", label: "即將學習" },
+                  { unit: "長度與重量", status: "upcoming", label: "即將學習" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-3.5 h-3.5 rounded-full border-2 ${
+                        item.status === "completed" ? "bg-tiffany border-tiffany" :
+                        item.status === "current" ? "bg-white border-coral ring-4 ring-coral/20" :
+                        "bg-gray-100 border-gray-300"
+                      }`} />
+                      {i < 4 && (
+                        <div className={`w-0.5 h-6 ${
+                          item.status === "completed" ? "bg-tiffany/40" : "bg-gray-200"
+                        }`} />
+                      )}
+                    </div>
+                    <div className={`flex-1 flex items-center justify-between py-1 ${
+                      item.status === "current" ? "font-medium text-foreground" : 
+                      item.status === "completed" ? "text-muted-foreground" : "text-muted-foreground/60"
+                    }`}>
+                      <span className="text-sm">{item.unit}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        item.status === "completed" ? "bg-tiffany/10 text-tiffany" :
+                        item.status === "current" ? "bg-coral/10 text-coral" :
+                        "bg-gray-100 text-muted-foreground"
+                      }`}>{item.label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>學習進度</span>
+                  <span className="text-tiffany font-medium">2 / 5 單元完成</span>
+                </div>
+                <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-tiffany to-tiffany/70 rounded-full"
+                    initial={{ width: 0 }}
+                    whileInView={{ width: "40%" }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute -bottom-3 -right-3 w-20 h-20 bg-tiffany/5 rounded-full -z-10" />
+            <div className="absolute -top-3 -left-3 w-14 h-14 bg-coral/5 rounded-full -z-10" />
+          </motion.div>
+        </div>
       </div>
     </section>
   );
@@ -1312,6 +1466,7 @@ export default function LandingPage() {
       <HeroSection />
       <ClassroomShowcase />
       <TeachingMethodSection />
+      <LearningMapSection />
       <TextbookSection />
       <FeaturesSection />
       <CoachesSection />
