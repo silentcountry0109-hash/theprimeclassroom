@@ -124,7 +124,7 @@ export default function ParentDashboard() {
     );
   }
 
-  if (!user) {
+  if (!user || user.role !== "parent") {
     window.location.href = "/parent-login";
     return null;
   }
