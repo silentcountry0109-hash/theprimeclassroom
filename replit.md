@@ -36,7 +36,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 
 ## Landing Page Sections (top to bottom)
 1. Hero - Animated title reveal + search bar (city/district/time) + social proof
-2. ClassroomShowcase - Photo + text about learning environment
+2. BrandPhilosophy - 品牌與教學理念 (classroom photo + 4 philosophy cards + brand quote)
 3. TeachingMethod - 4 cards (螺旋式課程, 階梯式教學, 單元評測, 個別指導)
 4. LearningMap - 學習地圖 section with timeline mockup (left: description + 4 highlight cards, right: visual progress tracker)
 5. Textbook - 教材介紹 with grade progression and 4-step flow
