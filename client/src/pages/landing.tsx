@@ -129,15 +129,28 @@ function HeroSection() {
   return (
     <section
       className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-20 pb-16"
-      style={{
-        backgroundColor: "#FAF9F6",
-        backgroundImage: `
-          linear-gradient(rgba(129, 216, 208, 0.04) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(129, 216, 208, 0.04) 1px, transparent 1px)
-        `,
-        backgroundSize: "20px 20px",
-      }}
+      style={{ backgroundColor: "#FAF9F6" }}
     >
+      <div
+        className="absolute inset-0 pointer-events-none animate-grid-drift"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(129, 216, 208, 0.09) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(129, 216, 208, 0.09) 1px, transparent 1px)
+          `,
+          backgroundSize: "28px 28px",
+        }}
+      />
+      <div
+        className="absolute inset-0 pointer-events-none animate-grid-drift-reverse"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(129, 216, 208, 0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(129, 216, 208, 0.04) 1px, transparent 1px)
+          `,
+          backgroundSize: "56px 56px",
+        }}
+      />
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
         <span className="absolute top-[12%] left-[6%] text-8xl text-tiffany/[0.06] font-serif rotate-[-15deg]">+</span>
         <span className="absolute top-[22%] right-[10%] text-7xl text-coral/[0.08] font-serif rotate-[20deg]">×</span>
