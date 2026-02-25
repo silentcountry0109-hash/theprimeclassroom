@@ -312,7 +312,7 @@ function HeroSection() {
             <div className="flex items-center px-2 py-2">
               <Button
                 onClick={handleSearch}
-                className="rounded-full w-full md:w-auto px-8 py-6 text-base font-medium relative group"
+                className="rounded-full w-full md:w-auto px-8 py-3 text-sm font-medium relative group"
                 style={{ backgroundColor: "#81D8D0", color: "white" }}
                 data-testid="button-hero-search"
               >
@@ -961,7 +961,7 @@ function CTASection() {
             <div className="flex flex-col sm:flex-row items-center md:items-start gap-4">
               <Button
                 size="lg"
-                className="rounded-full px-10 py-6 text-base"
+                className="rounded-full px-8 py-3 text-sm"
                 style={{ backgroundColor: "#81D8D0", color: "white" }}
                 onClick={() => {
                   const el = document.querySelector("#hero-search");
@@ -973,7 +973,7 @@ function CTASection() {
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               <a href="/api/login" data-testid="link-login-cta">
-                <Button variant="outline" size="lg" className="rounded-full px-10 py-6 text-base">
+                <Button variant="outline" className="rounded-full px-8 py-3 text-sm">
                   家長登入
                 </Button>
               </a>
