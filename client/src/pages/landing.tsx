@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -93,6 +93,15 @@ const STUDENT_PHOTOS: Record<string, string> = {
   "小芳": studentGirl2,
 };
 
+const PARENT_TESTIMONIALS = [
+  { name: "陳媽媽", avatar: teacher1Img, child: "小宇三年級", quote: "孩子以前最怕數學，現在每週都期待上課！" },
+  { name: "林爸爸", avatar: teacher2Img, child: "小恩四年級", quote: "老師很有耐心，一對一教學效果真的很明顯。" },
+  { name: "王媽媽", avatar: teacher3Img, child: "小涵五年級", quote: "數學成績從 70 分進步到 95 分，太感動了！" },
+  { name: "張媽媽", avatar: teacher4Img, child: "小安二年級", quote: "質數教室讓孩子真正理解觀念，不是死背公式。" },
+  { name: "李爸爸", avatar: teacher5Img, child: "小芸六年級", quote: "升國中前的數學打底，選擇質數教室很放心。" },
+  { name: "黃媽媽", avatar: teacher6Img, child: "小翔三年級", quote: "老師會根據孩子的程度調整進度，很細心！" },
+];
+
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
 
 const fadeInUp = {
@@ -101,6 +110,114 @@ const fadeInUp = {
   viewport: { once: true },
   transition: { duration: 0.6, ease: "easeOut" },
 };
+
+function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const timer = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % PARENT_TESTIMONIALS.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isPaused]);
+
+  const current = PARENT_TESTIMONIALS[activeIndex];
+
+  const visibleAvatars = useMemo(() => {
+    const result = [];
+    for (let i = 0; i < 4; i++) {
+      const idx = (activeIndex + i) % PARENT_TESTIMONIALS.length;
+      result.push(PARENT_TESTIMONIALS[idx]);
+    }
+    return result;
+  }, [activeIndex]);
+
+  return (
+    <motion.div
+      className="flex flex-col items-center justify-center gap-2 mt-6 md:mt-10 z-10"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 1.4, duration: 0.8 }}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      data-testid="hero-testimonial-carousel"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex -space-x-2 md:-space-x-3">
+          {visibleAvatars.map((t, i) => (
+            <motion.img
+              key={`${activeIndex}-${i}`}
+              src={t.avatar}
+              alt={t.name}
+              className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover ${i === 3 ? "hidden sm:block" : ""}`}
+              initial={{ opacity: 0, scale: 0.7, x: -10 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: i * 0.05 }}
+            />
+          ))}
+        </div>
+        <div className="text-left">
+          <p className="text-xs sm:text-sm font-semibold text-foreground" data-testid="text-social-proof">{socialProofText}</p>
+          <div className="flex items-center gap-0.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+            ))}
+            <span className="text-xs text-muted-foreground ml-1">4.8 / 5</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative h-12 sm:h-10 w-full max-w-md overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeIndex}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.4 }}
+            className="absolute inset-0 flex items-center justify-center gap-2 px-4"
+          >
+            <Quote className="w-3 h-3 text-tiffany/50 flex-shrink-0 -mt-2 self-start" />
+            <p className="text-xs sm:text-sm text-muted-foreground text-center leading-relaxed">
+              {current.quote}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={activeIndex}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="text-[10px] sm:text-xs text-muted-foreground/70"
+          data-testid="text-testimonial-author"
+        >
+          — {current.name}（{current.child}）
+        </motion.p>
+      </AnimatePresence>
+
+      <div className="flex gap-1.5 mt-1">
+        {PARENT_TESTIMONIALS.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setActiveIndex(i)}
+            className={`transition-all duration-300 rounded-full ${
+              i === activeIndex
+                ? "w-5 h-1.5 bg-tiffany"
+                : "w-1.5 h-1.5 bg-gray-300 hover:bg-gray-400"
+            }`}
+            data-testid={`testimonial-dot-${i}`}
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+}
 
 function HeroSection() {
   const heroSubtitle = useSiteContent("hero.subtitle", "國小數學個別指導");
@@ -364,28 +481,7 @@ function HeroSection() {
 
       </motion.div>
 
-      <motion.div
-        className="flex items-center justify-center gap-3 mt-6 md:mt-10 z-10"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.4, duration: 0.8 }}
-      >
-        <div className="flex -space-x-2 md:-space-x-3">
-          <img src={teacher1Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover" />
-          <img src={teacher2Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover" />
-          <img src={teacher3Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover" />
-          <img src={teacher4Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover hidden sm:block" />
-        </div>
-        <div className="text-left">
-          <p className="text-xs sm:text-sm font-semibold text-foreground">{heroSocialProof}</p>
-          <div className="flex items-center gap-0.5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
-            ))}
-            <span className="text-xs text-muted-foreground ml-1">4.8 / 5</span>
-          </div>
-        </div>
-      </motion.div>
+      <HeroTestimonialCarousel socialProofText={heroSocialProof} />
 
       <motion.div
         className="absolute bottom-10 left-1/2 -translate-x-1/2"
