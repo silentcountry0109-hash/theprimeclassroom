@@ -208,12 +208,18 @@ function HeroSection() {
           The Prime
         </motion.p>
         <motion.p
-          className="text-base md:text-lg text-muted-foreground mb-2 tracking-wide"
+          className="text-base md:text-lg text-muted-foreground mb-2 tracking-wide relative inline-block"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          {heroSubtitle}
+          <span className="relative">
+            {heroSubtitle}
+            <span
+              className="absolute left-0 right-0 h-[6px] rounded-full"
+              style={{ backgroundColor: '#81D8D0', bottom: '2px', zIndex: -1 }}
+            />
+          </span>
         </motion.p>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
