@@ -216,8 +216,8 @@ function HeroSection() {
           <span className="relative">
             {heroSubtitle}
             <span
-              className="absolute left-0 right-0 h-[6px] rounded-full"
-              style={{ backgroundColor: '#81D8D0', bottom: '2px', zIndex: -1 }}
+              className="absolute h-[6px] rounded-full"
+              style={{ backgroundColor: '#81D8D0', bottom: '2px', zIndex: -1, left: '-8px', right: '-8px' }}
             />
           </span>
         </motion.p>
