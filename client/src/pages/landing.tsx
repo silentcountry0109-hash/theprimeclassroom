@@ -420,83 +420,74 @@ function BrandPhilosophySection() {
 
   return (
     <section className="relative bg-white">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-14 md:py-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-14 items-center">
-          <motion.div
-            className="relative"
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7 }}
-          >
-            <img
-              src={heroClassroomImg}
-              alt="質數教室的溫暖教學環境"
-              className="w-full h-[240px] sm:h-[340px] md:h-[440px] object-cover rounded-2xl shadow-lg"
-            />
-            <div className="absolute -bottom-4 -right-4 bg-white rounded-xl shadow-md border border-gray-100 px-4 py-3 hidden sm:flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-tiffany" />
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-24">
+        <motion.div className="text-center mb-10 md:mb-14" {...fadeInUp}>
+          <p className="text-sm text-tiffany font-medium tracking-widest mb-3">BRAND PHILOSOPHY</p>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-4" data-testid="text-brand-philosophy-title">
+            品牌與教學理念
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            The Prime 質數教室，專注國小數學個別指導。我們相信每個孩子都有獨特的學習節奏，不該被統一的進度框架限制。透過一對一的個別指導，讓每位孩子都能按照自己的步調，扎實地建立數學基礎。
+          </p>
+        </motion.div>
+
+        <motion.div
+          className="relative rounded-2xl overflow-hidden mb-10 md:mb-14"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+        >
+          <img
+            src={heroClassroomImg}
+            alt="質數教室的溫暖教學環境"
+            className="w-full h-[220px] sm:h-[300px] md:h-[400px] object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <GraduationCap className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground">國小數學個別指導</p>
-                <p className="text-xs text-muted-foreground">小一到小六・完整課程規劃</p>
+                <p className="text-white font-medium text-sm md:text-base">國小數學個別指導</p>
+                <p className="text-white/70 text-xs">小一到小六・完整課程規劃</p>
               </div>
             </div>
-          </motion.div>
+          </div>
+        </motion.div>
 
-          <motion.div
-            className="space-y-5 md:space-y-6"
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.15 }}
-          >
-            <div>
-              <p className="text-sm text-tiffany font-medium tracking-widest mb-2">BRAND PHILOSOPHY</p>
-              <h2 className="font-serif text-2xl md:text-3xl lg:text-4xl tracking-[0.1em] text-foreground mb-3" data-testid="text-brand-philosophy-title">
-                品牌與教學理念
-              </h2>
-              <p className="text-muted-foreground leading-relaxed">
-                The Prime 質數教室，專注國小數學個別指導。我們相信每個孩子都有獨特的學習節奏，不該被統一的進度框架限制。透過一對一的個別指導，讓每位孩子都能按照自己的步調，扎實地建立數學基礎。
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {philosophies.map((item, i) => (
-                <motion.div
-                  key={item.title}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-washi border border-transparent hover:border-tiffany/15 transition-colors"
-                  initial={{ opacity: 0, y: 15 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: 0.3 + i * 0.1 }}
-                  data-testid={`card-philosophy-${i}`}
-                >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${item.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
-                    <item.icon className={`w-4 h-4 ${item.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-0.5">{item.title}</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10 md:mb-14">
+          {philosophies.map((item, i) => (
             <motion.div
-              className="bg-gradient-to-r from-tiffany/5 to-coral/5 rounded-xl p-4 border border-tiffany/10"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
+              key={item.title}
+              className="text-center p-5 md:p-6 rounded-2xl bg-washi border border-transparent hover:border-tiffany/15 transition-colors"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.7 }}
+              transition={{ duration: 0.4, delay: 0.15 + i * 0.1 }}
+              data-testid={`card-philosophy-${i}`}
             >
-              <p className="text-sm text-foreground font-medium text-center">
-                「不是補習，是真正理解數學。當孩子真正理解了，分數自然會來。」
-              </p>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${item.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
+                <item.icon className={`w-5 h-5 ${item.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
+              </div>
+              <p className="text-sm font-semibold text-foreground mb-1.5">{item.title}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
             </motion.div>
-          </motion.div>
+          ))}
         </div>
+
+        <motion.div
+          className="bg-gradient-to-r from-tiffany/5 to-coral/5 rounded-2xl p-6 md:p-8 border border-tiffany/10 text-center max-w-2xl mx-auto"
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+        >
+          <p className="text-foreground font-medium text-base md:text-lg leading-relaxed">
+            「不是補習，是真正理解數學。<br className="hidden sm:block" />當孩子真正理解了，分數自然會來。」
+          </p>
+        </motion.div>
       </div>
     </section>
   );
