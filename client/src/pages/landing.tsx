@@ -38,6 +38,12 @@ import {
   CheckCircle,
   Sparkles,
   Building2,
+  BookOpen,
+  Layers,
+  BarChart3,
+  Repeat,
+  Lightbulb,
+  PenLine,
 } from "lucide-react";
 import type { Coach, Faq, SuccessStory } from "@shared/schema";
 
@@ -430,6 +436,203 @@ function ClassroomShowcase() {
                   <p className="text-xs text-muted-foreground">安心學習空間</p>
                 </div>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TeachingMethodSection() {
+  const methods = [
+    {
+      icon: Repeat,
+      title: "螺旋式課程",
+      description: "同一概念在不同階段反覆出現，每次加深難度，讓孩子自然內化數學觀念，不再死記硬背。",
+      color: "tiffany",
+    },
+    {
+      icon: Layers,
+      title: "階梯式教學",
+      description: "由淺入深，每一步都建立在前一步的基礎上，確保孩子穩紮穩打，不會因跳躍式進度而掉隊。",
+      color: "coral",
+    },
+    {
+      icon: BarChart3,
+      title: "單元評測",
+      description: "每個單元結束後進行評測，精準掌握孩子的學習狀態，找出需要加強的環節，即時調整教學方向。",
+      color: "tiffany",
+    },
+    {
+      icon: Users,
+      title: "個別指導・個別進度",
+      description: "每位孩子都有專屬的學習計畫與進度，老師依據評測結果量身打造最適合的學習路徑，讓吸收效率最大化。",
+      color: "coral",
+    },
+  ];
+
+  return (
+    <section id="teaching" className="py-24 px-6 bg-white">
+      <div className="max-w-6xl mx-auto">
+        <motion.div className="text-center mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4" data-testid="text-teaching-title">
+            教學特色
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            螺旋式課程、階梯式教學、搭配單元評測，個別指導、個別進度，為每個孩子量身打造吸收效率最好的學習規劃
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {methods.map((method, i) => (
+            <motion.div
+              key={method.title}
+              className="group relative bg-washi rounded-2xl p-8 border border-transparent hover:border-tiffany/20 transition-all duration-300"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              data-testid={`card-teaching-method-${i}`}
+            >
+              <div className="flex items-start gap-5">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${method.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
+                  <method.icon className={`w-7 h-7 ${method.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-serif text-xl tracking-wide text-foreground mb-2">{method.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed text-sm">{method.description}</p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          className="mt-12 bg-gradient-to-r from-tiffany/5 to-coral/5 rounded-2xl p-8 text-center border border-tiffany/10"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          <p className="text-foreground font-medium text-lg mb-1">
+            不是補習，是真正理解數學
+          </p>
+          <p className="text-muted-foreground text-sm">
+            我們相信理解比分數更重要，當孩子真正理解了，分數自然會來
+          </p>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function TextbookSection() {
+  const grades = [
+    { grade: "小一", books: ["第1冊", "第2冊"], color: "bg-tiffany/80" },
+    { grade: "小二", books: ["第3冊", "第4冊"], color: "bg-tiffany/70" },
+    { grade: "小三", books: ["第5冊", "第6冊"], color: "bg-tiffany/60" },
+    { grade: "小四", books: ["第7冊", "第8冊"], color: "bg-coral/50" },
+    { grade: "小五", books: ["第9冊", "第10冊"], color: "bg-coral/60" },
+    { grade: "小六", books: ["第11冊", "第12冊"], color: "bg-coral/70" },
+  ];
+
+  const structure = [
+    { icon: Lightbulb, label: "觀念", desc: "清楚建立核心概念" },
+    { icon: BookOpen, label: "範例", desc: "老師帶領示範解題" },
+    { icon: PenLine, label: "演練", desc: "即時動手練習鞏固" },
+    { icon: Target, label: "課後練習", desc: "回家複習加深記憶" },
+  ];
+
+  return (
+    <section id="textbook" className="py-24 px-6 bg-washi">
+      <div className="max-w-6xl mx-auto">
+        <motion.div className="text-center mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4" data-testid="text-textbook-title">
+            教材介紹
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            小一到小六共 12 冊，以一個單元一本教材，觀念、範例、演練、課後練習，由淺入深，紮實學習
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h3 className="font-serif text-xl tracking-wide text-foreground mb-6 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-tiffany" />
+              全套 12 冊教材
+            </h3>
+            <div className="space-y-3">
+              {grades.map((g, i) => (
+                <motion.div
+                  key={g.grade}
+                  className="flex items-center gap-4"
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: i * 0.08 }}
+                  data-testid={`row-textbook-grade-${i}`}
+                >
+                  <div className={`w-16 text-center py-2 rounded-lg text-white text-sm font-medium ${g.color}`}>
+                    {g.grade}
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    {g.books.map((b) => (
+                      <div key={b} className="flex-1 bg-white rounded-lg py-2.5 px-4 text-sm text-foreground border border-gray-100 text-center font-medium">
+                        {b}
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+          >
+            <h3 className="font-serif text-xl tracking-wide text-foreground mb-6 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-coral" />
+              每本教材結構
+            </h3>
+            <div className="relative">
+              {structure.map((step, i) => (
+                <motion.div
+                  key={step.label}
+                  className="flex items-start gap-4 relative pb-8 last:pb-0"
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: i * 0.1 }}
+                  data-testid={`step-textbook-structure-${i}`}
+                >
+                  {i < structure.length - 1 && (
+                    <div className="absolute left-6 top-12 w-0.5 h-[calc(100%-2rem)] bg-gradient-to-b from-tiffany/30 to-coral/30" />
+                  )}
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 z-10 ${i < 2 ? "bg-tiffany/10" : "bg-coral/10"}`}>
+                    <step.icon className={`w-6 h-6 ${i < 2 ? "text-tiffany" : "text-coral"}`} />
+                  </div>
+                  <div className="flex-1 bg-white rounded-xl p-4 border border-gray-100">
+                    <p className="font-medium text-foreground mb-0.5">{step.label}</p>
+                    <p className="text-sm text-muted-foreground">{step.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-6 bg-white rounded-xl p-5 border border-tiffany/15">
+              <p className="text-sm text-foreground font-medium mb-1">由淺入深的設計理念</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                每本教材從觀念建立開始，透過範例示範，再讓孩子親自演練，最後以課後練習鞏固。確保每個單元都能真正被理解、被吸收。
+              </p>
             </div>
           </motion.div>
         </div>
@@ -1030,13 +1233,18 @@ function FooterSection() {
             </h4>
             <ul className="space-y-2.5">
               <li>
-                <a href="#about" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-about">
-                  認識質數
+                <a href="#teaching" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-teaching">
+                  教學特色
                 </a>
               </li>
               <li>
-                <a href="#features" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-features">
-                  課程資訊
+                <a href="#textbook" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-textbook">
+                  教材介紹
+                </a>
+              </li>
+              <li>
+                <a href="#about" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-about">
+                  認識質數
                 </a>
               </li>
               <li>
@@ -1103,6 +1311,8 @@ export default function LandingPage() {
       <Navbar />
       <HeroSection />
       <ClassroomShowcase />
+      <TeachingMethodSection />
+      <TextbookSection />
       <FeaturesSection />
       <CoachesSection />
       <ProcessSection />
