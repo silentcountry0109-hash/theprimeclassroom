@@ -12,7 +12,7 @@ import {
   type User,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   getCoaches(): Promise<Coach[]>;
@@ -88,6 +88,17 @@ export interface IStorage {
     totalSlots: number;
     totalBookings: number;
     confirmedBookings: number;
+  }>;
+  getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
+    totalSlots: number;
+    totalBookings: number;
+    confirmedBookings: number;
+    cancelledBookings: number;
+    totalSeats: number;
+    bookedSeats: number;
+    occupancyRate: number;
+    dailyStats: Array<{ date: string; slots: number; bookings: number; bookedSeats: number; totalSeats: number }>;
+    coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; bookedSeats: number }>;
   }>;
 }
 
@@ -551,6 +562,83 @@ export class DatabaseStorage implements IStorage {
       totalBookings,
       confirmedBookings,
     };
+  }
+
+  async getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string) {
+    const slotsInRange = await db
+      .select({
+        id: timeSlots.id,
+        date: timeSlots.date,
+        coachId: timeSlots.coachId,
+        maxSeats: timeSlots.maxSeats,
+        bookedSeats: timeSlots.bookedSeats,
+      })
+      .from(timeSlots)
+      .where(
+        and(
+          eq(timeSlots.franchiseId, franchiseId),
+          gte(timeSlots.date, startDate),
+          lte(timeSlots.date, endDate),
+        )
+      );
+
+    const slotIds = slotsInRange.map((s) => s.id);
+    let bookingRows: Array<{ slotId: number; status: string }> = [];
+    if (slotIds.length > 0) {
+      bookingRows = await db
+        .select({ slotId: bookings.slotId, status: bookings.status })
+        .from(bookings)
+        .where(inArray(bookings.slotId, slotIds));
+    }
+
+    const totalSlots = slotsInRange.length;
+    const totalBookings = bookingRows.length;
+    const confirmedBookings = bookingRows.filter((b) => b.status === "confirmed").length;
+    const cancelledBookings = bookingRows.filter((b) => b.status === "cancelled").length;
+    const totalSeats = slotsInRange.reduce((sum, s) => sum + s.maxSeats, 0);
+    const bookedSeats = slotsInRange.reduce((sum, s) => sum + s.bookedSeats, 0);
+    const occupancyRate = totalSeats > 0 ? Math.round((bookedSeats / totalSeats) * 100) : 0;
+
+    const dailyMap = new Map<string, { slots: number; bookings: number; bookedSeats: number; totalSeats: number }>();
+    for (const slot of slotsInRange) {
+      const d = dailyMap.get(slot.date) || { slots: 0, bookings: 0, bookedSeats: 0, totalSeats: 0 };
+      d.slots++;
+      d.totalSeats += slot.maxSeats;
+      d.bookedSeats += slot.bookedSeats;
+      dailyMap.set(slot.date, d);
+    }
+    for (const b of bookingRows) {
+      const slot = slotsInRange.find((s) => s.id === b.slotId);
+      if (slot) {
+        const d = dailyMap.get(slot.date);
+        if (d) d.bookings++;
+      }
+    }
+    const dailyStats = Array.from(dailyMap.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const franchiseCoaches = await db.select({ id: coaches.id, name: coaches.name }).from(coaches).where(eq(coaches.franchiseId, franchiseId));
+    const coachMap = new Map<number, { coachId: number; coachName: string; slots: number; bookings: number; bookedSeats: number }>();
+    for (const c of franchiseCoaches) {
+      coachMap.set(c.id, { coachId: c.id, coachName: c.name, slots: 0, bookings: 0, bookedSeats: 0 });
+    }
+    for (const slot of slotsInRange) {
+      if (slot.coachId && coachMap.has(slot.coachId)) {
+        const c = coachMap.get(slot.coachId)!;
+        c.slots++;
+        c.bookedSeats += slot.bookedSeats;
+      }
+    }
+    for (const b of bookingRows) {
+      const slot = slotsInRange.find((s) => s.id === b.slotId);
+      if (slot?.coachId && coachMap.has(slot.coachId)) {
+        coachMap.get(slot.coachId)!.bookings++;
+      }
+    }
+    const coachStats = Array.from(coachMap.values());
+
+    return { totalSlots, totalBookings, confirmedBookings, cancelledBookings, totalSeats, bookedSeats, occupancyRate, dailyStats, coachStats };
   }
 }
 

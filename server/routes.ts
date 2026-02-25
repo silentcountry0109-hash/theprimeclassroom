@@ -662,6 +662,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/franchise-admin/stats/date-range", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate required" });
+      const stats = await storage.getFranchiseStatsByDateRange(req.franchiseId, startDate as string, endDate as string);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch date range stats" });
+    }
+  });
+
   app.get("/api/franchise-admin/coaches", isFranchiseAdmin, async (req: any, res) => {
     try {
       const coachList = await storage.getCoachesByFranchise(req.franchiseId);

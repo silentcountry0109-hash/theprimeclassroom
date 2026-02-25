@@ -53,6 +53,10 @@ import {
   FileText,
   Users,
   Image as ImageIcon,
+  TrendingUp,
+  Calendar,
+  Percent,
+  ChevronRight,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -101,6 +105,7 @@ export default function FranchiseAdminDashboard() {
 
   const menuItems = [
     { id: "overview", label: "分校總覽", icon: BarChart3 },
+    { id: "statistics", label: "統計分析", icon: TrendingUp },
     { id: "info", label: "分校資訊", icon: Building2 },
     { id: "coaches", label: "師資管理", icon: GraduationCap },
     { id: "timeslots", label: "時段管理", icon: Clock },
@@ -157,6 +162,7 @@ export default function FranchiseAdminDashboard() {
           </header>
           <main className="flex-1 overflow-auto p-6">
             {activeTab === "overview" && <OverviewTab />}
+            {activeTab === "statistics" && <StatisticsTab />}
             {activeTab === "info" && <FranchiseInfoTab />}
             {activeTab === "coaches" && <CoachesTab />}
             {activeTab === "timeslots" && <TimeSlotsTab />}
@@ -211,6 +217,215 @@ function OverviewTab() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+interface DateRangeStats {
+  totalSlots: number;
+  totalBookings: number;
+  confirmedBookings: number;
+  cancelledBookings: number;
+  totalSeats: number;
+  bookedSeats: number;
+  occupancyRate: number;
+  dailyStats: Array<{ date: string; slots: number; bookings: number; bookedSeats: number; totalSeats: number }>;
+  coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; bookedSeats: number }>;
+}
+
+function StatisticsTab() {
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  const formatDate = (d: Date) => d.toISOString().split("T")[0];
+
+  const [startDate, setStartDate] = useState(formatDate(weekAgo));
+  const [endDate, setEndDate] = useState(formatDate(today));
+  const [preset, setPreset] = useState("week");
+
+  const applyPreset = (key: string) => {
+    setPreset(key);
+    const now = new Date();
+    let s = new Date(now);
+    if (key === "week") { s.setDate(now.getDate() - 6); }
+    else if (key === "2weeks") { s.setDate(now.getDate() - 13); }
+    else if (key === "month") { s.setMonth(now.getMonth() - 1); }
+    else if (key === "3months") { s.setMonth(now.getMonth() - 3); }
+    setStartDate(formatDate(s));
+    setEndDate(formatDate(now));
+  };
+
+  const { data: stats, isLoading } = useQuery<DateRangeStats>({
+    queryKey: ["/api/franchise-admin/stats/date-range", startDate, endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/franchise-admin/stats/date-range?startDate=${startDate}&endDate=${endDate}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const maxDailySeats = stats?.dailyStats ? Math.max(...stats.dailyStats.map((d) => d.totalSeats), 1) : 1;
+
+  const presets = [
+    { key: "week", label: "近 7 天" },
+    { key: "2weeks", label: "近 14 天" },
+    { key: "month", label: "近 1 個月" },
+    { key: "3months", label: "近 3 個月" },
+  ];
+
+  return (
+    <div className="max-w-5xl space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground mb-1">統計分析</h1>
+        <p className="text-sm text-muted-foreground">選擇時間區間，檢視分校營運數據</p>
+      </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex gap-2">
+            {presets.map((p) => (
+              <Button
+                key={p.key}
+                variant={preset === p.key ? "default" : "outline"}
+                size="sm"
+                onClick={() => applyPreset(p.key)}
+                data-testid={`stats-preset-${p.key}`}
+              >
+                {p.label}
+              </Button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <div>
+              <Label className="text-xs text-muted-foreground">開始日期</Label>
+              <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPreset(""); }} className="w-40" data-testid="stats-start-date" />
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground mt-5" />
+            <div>
+              <Label className="text-xs text-muted-foreground">結束日期</Label>
+              <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPreset(""); }} className="w-40" data-testid="stats-end-date" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-md" />)}
+        </div>
+      ) : stats ? (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: "開課時段", value: stats.totalSlots, icon: Clock, color: "bg-tiffany/10 text-tiffany", sub: `${stats.totalSeats} 個座位` },
+              { label: "預約數", value: stats.totalBookings, icon: CalendarCheck, color: "bg-coral/10 text-coral", sub: `已確認 ${stats.confirmedBookings}` },
+              { label: "取消數", value: stats.cancelledBookings, icon: Users, color: "bg-amber-warm text-amber-700", sub: stats.totalBookings > 0 ? `取消率 ${Math.round((stats.cancelledBookings / stats.totalBookings) * 100)}%` : "無預約" },
+              { label: "座位使用率", value: `${stats.occupancyRate}%`, icon: Percent, color: "bg-tiffany/10 text-tiffany", sub: `${stats.bookedSeats} / ${stats.totalSeats} 座位` },
+            ].map((card) => (
+              <div key={card.label} className="bg-white rounded-md border border-gray-100 p-5" data-testid={`stats-card-${card.label}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${card.color}`}>
+                    <card.icon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{card.value}</p>
+                    <p className="text-xs text-muted-foreground">{card.label}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 pl-15">{card.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {stats.dailyStats.length > 0 && (
+            <div className="bg-white rounded-md border border-gray-100 p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-tiffany" />每日座位使用
+              </h3>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {stats.dailyStats.map((day) => {
+                  const rate = day.totalSeats > 0 ? Math.round((day.bookedSeats / day.totalSeats) * 100) : 0;
+                  const barWidth = day.totalSeats > 0 ? (day.bookedSeats / maxDailySeats) * 100 : 0;
+                  const dateObj = new Date(day.date + "T00:00:00");
+                  const weekday = ["日", "一", "二", "三", "四", "五", "六"][dateObj.getDay()];
+                  return (
+                    <div key={day.date} className="flex items-center gap-3" data-testid={`stats-daily-${day.date}`}>
+                      <div className="w-28 text-xs text-muted-foreground shrink-0">
+                        {day.date.slice(5)} ({weekday})
+                      </div>
+                      <div className="flex-1 h-6 bg-gray-50 rounded-full overflow-hidden relative">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${barWidth}%`,
+                            backgroundColor: rate >= 80 ? "#81D8D0" : rate >= 50 ? "#FFB7B2" : "#e5e7eb",
+                          }}
+                        />
+                      </div>
+                      <div className="w-24 text-right shrink-0">
+                        <span className="text-xs font-medium text-foreground">{day.bookedSeats}/{day.totalSeats}</span>
+                        <span className="text-xs text-muted-foreground ml-1">({rate}%)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-50 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-tiffany inline-block" />80%↑</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-coral inline-block" />50-79%</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-200 inline-block" />50%↓</span>
+              </div>
+            </div>
+          )}
+
+          {stats.coachStats.length > 0 && (
+            <div className="bg-white rounded-md border border-gray-100 p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-tiffany" />老師授課統計
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left">
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground">老師</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">時段數</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">預約數</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">已用座位</th>
+                      <th className="py-2 text-xs font-medium text-muted-foreground text-center">使用率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.coachStats.map((coach) => {
+                      const maxSeats = coach.slots * 5;
+                      const coachRate = maxSeats > 0 ? Math.round((coach.bookedSeats / maxSeats) * 100) : 0;
+                      return (
+                        <tr key={coach.coachId} className="border-b border-gray-50" data-testid={`stats-coach-${coach.coachId}`}>
+                          <td className="py-3 pr-4 font-medium text-foreground">{coach.coachName}</td>
+                          <td className="py-3 pr-4 text-center text-muted-foreground">{coach.slots}</td>
+                          <td className="py-3 pr-4 text-center text-muted-foreground">{coach.bookings}</td>
+                          <td className="py-3 pr-4 text-center text-muted-foreground">{coach.bookedSeats}</td>
+                          <td className="py-3 text-center">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${coachRate >= 80 ? "bg-tiffany/10 text-tiffany" : coachRate >= 50 ? "bg-coral/10 text-coral" : "bg-gray-100 text-muted-foreground"}`}>
+                              {coachRate}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {stats.totalSlots === 0 && (
+            <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+              <BarChart3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">此時間區間尚無開課資料</p>
+            </div>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }
