@@ -329,6 +329,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteChild(id: number): Promise<void> {
+    const childBookings = await db.select().from(bookings).where(eq(bookings.childId, id));
+    for (const booking of childBookings) {
+      if (booking.status === "confirmed") {
+        await db
+          .update(timeSlots)
+          .set({ bookedSeats: sql`GREATEST(${timeSlots.bookedSeats} - 1, 0)` })
+          .where(eq(timeSlots.id, booking.slotId));
+      }
+    }
+    await db.delete(bookings).where(eq(bookings.childId, id));
     await db.delete(children).where(eq(children.id, id));
   }
 
@@ -418,6 +428,7 @@ export class DatabaseStorage implements IStorage {
   async cancelBooking(id: number): Promise<void> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) throw new Error("預約不存在");
+    if (booking.status !== "confirmed") throw new Error("此預約無法取消");
 
     await db
       .update(bookings)
@@ -426,7 +437,7 @@ export class DatabaseStorage implements IStorage {
 
     await db
       .update(timeSlots)
-      .set({ bookedSeats: sql`${timeSlots.bookedSeats} - 1` })
+      .set({ bookedSeats: sql`GREATEST(${timeSlots.bookedSeats} - 1, 0)` })
       .where(eq(timeSlots.id, booking.slotId));
   }
 

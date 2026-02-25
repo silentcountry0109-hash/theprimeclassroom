@@ -314,7 +314,13 @@ export async function registerRoutes(
 
   app.delete("/api/children/:id", isCredentialOrAuth, async (req: any, res) => {
     try {
-      await storage.deleteChild(parseInt(req.params.id));
+      const userId = req.currentUser.id;
+      const kids = await storage.getChildrenByParent(userId);
+      const childId = parseInt(req.params.id);
+      if (!kids.find((k: any) => k.id === childId)) {
+        return res.status(403).json({ message: "無權限刪除此孩子" });
+      }
+      await storage.deleteChild(childId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete child" });
@@ -334,6 +340,10 @@ export async function registerRoutes(
   app.post("/api/bookings", isCredentialOrAuth, async (req: any, res) => {
     try {
       const userId = req.currentUser.id;
+      const kids = await storage.getChildrenByParent(userId);
+      if (!kids.find((k: any) => k.id === req.body.childId)) {
+        return res.status(403).json({ message: "無權限為此孩子預約" });
+      }
       const booking = await storage.createBooking({
         slotId: req.body.slotId,
         childId: req.body.childId,
@@ -347,7 +357,17 @@ export async function registerRoutes(
 
   app.patch("/api/bookings/:id/cancel", isCredentialOrAuth, async (req: any, res) => {
     try {
-      await storage.cancelBooking(parseInt(req.params.id));
+      const userId = req.currentUser.id;
+      const bookingId = parseInt(req.params.id);
+      const userBookings = await storage.getBookingsByParent(userId);
+      const target = userBookings.find((b: any) => b.id === bookingId);
+      if (!target) {
+        return res.status(403).json({ message: "無權限取消此預約" });
+      }
+      if (target.status !== "confirmed") {
+        return res.status(400).json({ message: "此預約無法取消" });
+      }
+      await storage.cancelBooking(bookingId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to cancel booking" });
