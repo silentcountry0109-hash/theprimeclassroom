@@ -9,9 +9,10 @@ import LandingPage from "@/pages/landing";
 import ParentDashboard from "@/pages/parent-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import FranchiseAdminDashboard from "@/pages/franchise-admin";
+import FranchiseLogin from "@/pages/franchise-login";
+import HqLogin from "@/pages/hq-login";
 import SearchResults from "@/pages/search-results";
 import ClassroomDetail from "@/pages/classroom-detail";
-import type { User } from "@shared/models/auth";
 
 function LoadingScreen() {
   return (
@@ -47,13 +48,6 @@ function HomePage() {
   }
 
   if (user) {
-    const typedUser = user as User;
-    if (typedUser.role === "admin") {
-      return <AdminDashboard />;
-    }
-    if (typedUser.role === "franchise_admin") {
-      return <FranchiseAdminDashboard />;
-    }
     return <ParentDashboard />;
   }
 
@@ -67,6 +61,8 @@ function Router() {
       <Route path="/search" component={SearchResults} />
       <Route path="/classroom/:id" component={ClassroomDetail} />
       <Route path="/dashboard" component={ParentDashboard} />
+      <Route path="/franchise-login" component={FranchiseLogin} />
+      <Route path="/hq-login" component={HqLogin} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/franchise-admin" component={FranchiseAdminDashboard} />
       <Route component={NotFound} />

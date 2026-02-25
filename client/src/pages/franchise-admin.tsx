@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -77,7 +77,7 @@ interface FranchiseBooking {
 }
 
 export default function FranchiseAdminDashboard() {
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
   if (authLoading) {
@@ -88,8 +88,8 @@ export default function FranchiseAdminDashboard() {
     );
   }
 
-  if (!user) {
-    window.location.href = "/api/login";
+  if (!user || user.role !== "franchise_admin") {
+    window.location.href = "/franchise-login";
     return null;
   }
 
@@ -130,7 +130,7 @@ export default function FranchiseAdminDashboard() {
               </SidebarGroupContent>
             </SidebarGroup>
             <div className="mt-auto p-4">
-              <SidebarMenuButton onClick={() => logout()} className="w-full justify-start text-muted-foreground" data-testid="franchise-button-logout">
+              <SidebarMenuButton onClick={() => { logout(); window.location.href = "/franchise-login"; }} className="w-full justify-start text-muted-foreground" data-testid="franchise-button-logout">
                 <LogOut className="w-4 h-4" />
                 <span>登出</span>
               </SidebarMenuButton>

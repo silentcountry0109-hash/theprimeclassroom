@@ -1,6 +1,8 @@
 import { db } from "./db";
 import { franchises, coaches, faqs, successStories, timeSlots } from "@shared/schema";
-import { sql } from "drizzle-orm";
+import { users } from "@shared/models/auth";
+import { sql, eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 export async function seedDatabase() {
   try {
@@ -377,6 +379,21 @@ export async function seedDatabase() {
     }
 
     await db.insert(timeSlots).values(slotData);
+
+    const [existingAdmin] = await db.select().from(users).where(eq(users.username, "admin"));
+    if (!existingAdmin) {
+      const hash = await bcrypt.hash("admin123", 10);
+      await db.insert(users).values({
+        id: "hq-admin-001",
+        email: "admin@primemath.tw",
+        firstName: "系統",
+        lastName: "管理員",
+        role: "admin",
+        username: "admin",
+        passwordHash: hash,
+      });
+      console.log("Default admin account created (username: admin)");
+    }
 
     console.log("Database seeded successfully!");
   } catch (error) {

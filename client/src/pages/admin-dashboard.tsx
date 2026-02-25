@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,7 @@ import {
   ChevronUp,
   UserCog,
   Shield,
+  Lock,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot } from "@shared/schema";
@@ -72,7 +73,7 @@ interface AdminStats {
 }
 
 export default function AdminDashboard() {
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
   if (authLoading) {
@@ -83,8 +84,8 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!user) {
-    window.location.href = "/api/login";
+  if (!user || user.role !== "admin") {
+    window.location.href = "/hq-login";
     return null;
   }
 
@@ -139,7 +140,7 @@ export default function AdminDashboard() {
 
             <div className="mt-auto p-4">
               <SidebarMenuButton
-                onClick={() => logout()}
+                onClick={() => { logout(); window.location.href = "/hq-login"; }}
                 className="w-full justify-start text-muted-foreground"
                 data-testid="admin-button-logout"
               >
@@ -1188,9 +1189,12 @@ function TimeSlotsTab() {
 function UsersTab() {
   const { toast } = useToast();
   const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [showCredentialDialog, setShowCredentialDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newRole, setNewRole] = useState("parent");
   const [newFranchiseId, setNewFranchiseId] = useState<number>(0);
+  const [credUsername, setCredUsername] = useState("");
+  const [credPassword, setCredPassword] = useState("");
 
   const { data: userList = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -1213,11 +1217,36 @@ function UsersTab() {
     },
   });
 
+  const createCredentialMutation = useMutation({
+    mutationFn: async ({ userId, username, password }: { userId: string; username: string; password: string }) => {
+      const res = await apiRequest("POST", "/api/admin/create-credential-account", { userId, username, password });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "登入帳號已建立" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setShowCredentialDialog(false);
+      setSelectedUser(null);
+      setCredUsername("");
+      setCredPassword("");
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "建立帳號失敗", variant: "destructive" });
+    },
+  });
+
   const openRoleDialog = (u: User) => {
     setSelectedUser(u);
     setNewRole(u.role || "parent");
     setNewFranchiseId(u.franchiseId || 0);
     setShowRoleDialog(true);
+  };
+
+  const openCredentialDialog = (u: User) => {
+    setSelectedUser(u);
+    setCredUsername(u.username || "");
+    setCredPassword("");
+    setShowCredentialDialog(true);
   };
 
   const roleLabels: Record<string, { label: string; color: string }> = {
@@ -1271,11 +1300,21 @@ function UsersTab() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{u.email || "無 Email"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {u.email || "無 Email"}
+                    {u.username && <span className="ml-2 text-tiffany">帳號: {u.username}</span>}
+                  </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => openRoleDialog(u)} data-testid={`button-edit-user-role-${u.id}`}>
-                  <Shield className="w-3.5 h-3.5 mr-1" />權限
-                </Button>
+                <div className="flex items-center gap-2">
+                  {(u.role === "admin" || u.role === "franchise_admin") && (
+                    <Button variant="outline" size="sm" onClick={() => openCredentialDialog(u)} data-testid={`button-set-credential-${u.id}`}>
+                      <Lock className="w-3.5 h-3.5 mr-1" />{u.username ? "改密碼" : "設帳號"}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => openRoleDialog(u)} data-testid={`button-edit-user-role-${u.id}`}>
+                    <Shield className="w-3.5 h-3.5 mr-1" />權限
+                  </Button>
+                </div>
               </div>
             );
           })}
@@ -1333,6 +1372,65 @@ function UsersTab() {
               data-testid="button-submit-user-role"
             >
               {updateRoleMutation.isPending ? "更新中..." : "確認更新"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCredentialDialog} onOpenChange={(open) => { if (!open) { setSelectedUser(null); setCredUsername(""); setCredPassword(""); } setShowCredentialDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>設定登入帳號密碼</DialogTitle>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4 py-4">
+              <div className="bg-gray-50 rounded-md p-3">
+                <p className="text-sm font-medium">{selectedUser.firstName || ""} {selectedUser.lastName || ""}</p>
+                <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  角色: {roleLabels[selectedUser.role || "parent"]?.label}
+                  {selectedUser.role === "franchise_admin" && selectedUser.franchiseId && ` - ${getFranchiseName(selectedUser.franchiseId)}`}
+                </p>
+              </div>
+              <div>
+                <Label>登入帳號</Label>
+                <Input
+                  value={credUsername}
+                  onChange={(e) => setCredUsername(e.target.value)}
+                  placeholder="設定登入帳號"
+                  className="mt-1.5"
+                  data-testid="input-credential-username"
+                />
+              </div>
+              <div>
+                <Label>{selectedUser.username ? "新密碼" : "密碼"}</Label>
+                <Input
+                  type="password"
+                  value={credPassword}
+                  onChange={(e) => setCredPassword(e.target.value)}
+                  placeholder="設定密碼（至少 6 個字元）"
+                  className="mt-1.5"
+                  data-testid="input-credential-password"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCredentialDialog(false)}>取消</Button>
+            <Button
+              onClick={() => {
+                if (selectedUser && credUsername && credPassword) {
+                  createCredentialMutation.mutate({
+                    userId: selectedUser.id,
+                    username: credUsername,
+                    password: credPassword,
+                  });
+                }
+              }}
+              disabled={createCredentialMutation.isPending || !credUsername || credPassword.length < 6}
+              data-testid="button-submit-credential"
+            >
+              {createCredentialMutation.isPending ? "建立中..." : "確認設定"}
             </Button>
           </DialogFooter>
         </DialogContent>

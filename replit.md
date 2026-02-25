@@ -68,12 +68,20 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - bookings (parent-child-slot reservations)
 - faqs, success_stories, announcements (CMS content)
 
+## Authentication
+- Parents: Replit Auth (OIDC) via /api/login
+- Admin & Franchise Admin: Credential-based login (username/password)
+  - HQ admin login page: /hq-login (hidden, no links on public site)
+  - Franchise admin login page: /franchise-login (linked in footer only)
+  - Credentials set by HQ admin via 帳號管理 tab
+  - Default admin: username=admin, password=admin123
+
 ## User Roles
 - `parent` (default) - Manage children, book sessions
 - `admin` (總部管理員) - Full CMS management, franchise CRUD, user role management
 - `franchise_admin` (分校主任) - Manage own franchise info, coaches, time slots, view bookings
   - Linked to a specific franchise via `users.franchiseId`
-  - HQ admin assigns this role via 帳號管理 tab
+  - HQ admin assigns this role + sets credentials via 帳號管理 tab
 
 ## API Routes
 ### Public

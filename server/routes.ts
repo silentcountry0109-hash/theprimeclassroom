@@ -4,21 +4,42 @@ import { storage } from "./storage";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { seedDatabase } from "./seed";
+import bcrypt from "bcryptjs";
+import { users } from "@shared/models/auth";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+
+function getSessionUserId(req: any): string | null {
+  if (req.session?.credentialUserId) return req.session.credentialUserId;
+  if (req.isAuthenticated?.() && req.user?.claims?.sub) return req.user.claims.sub;
+  return null;
+}
+
+const isCredentialOrAuth: RequestHandler = async (req: any, res, next) => {
+  const userId = getSessionUserId(req);
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  const user = await authStorage.getUser(userId);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  req.currentUser = user;
+  next();
+};
 
 const isAdmin: RequestHandler = async (req: any, res, next) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-  const userId = req.user.claims.sub;
+  const userId = getSessionUserId(req);
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const user = await authStorage.getUser(userId);
   if (!user || user.role !== "admin") return res.status(403).json({ message: "Forbidden" });
+  req.currentUser = user;
   next();
 };
 
 const isFranchiseAdmin: RequestHandler = async (req: any, res, next) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-  const userId = req.user.claims.sub;
+  const userId = getSessionUserId(req);
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const user = await authStorage.getUser(userId);
   if (!user || user.role !== "franchise_admin" || !user.franchiseId) return res.status(403).json({ message: "Forbidden" });
   req.franchiseId = user.franchiseId;
+  req.currentUser = user;
   next();
 };
 
@@ -30,6 +51,79 @@ export async function registerRoutes(
   registerAuthRoutes(app);
 
   await seedDatabase();
+
+  app.post("/api/credential-login", async (req: any, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: "請輸入帳號和密碼" });
+      }
+      const [user] = await db.select().from(users).where(eq(users.username, username));
+      if (!user || !user.passwordHash) {
+        return res.status(401).json({ message: "帳號或密碼錯誤" });
+      }
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ message: "帳號或密碼錯誤" });
+      }
+      if (user.role !== "admin" && user.role !== "franchise_admin") {
+        return res.status(403).json({ message: "此帳號無管理權限" });
+      }
+      req.session.credentialUserId = user.id;
+      req.session.save(() => {
+        const { passwordHash: _, ...safeUser } = user;
+        res.json(safeUser);
+      });
+    } catch (error) {
+      res.status(500).json({ message: "登入失敗" });
+    }
+  });
+
+  app.get("/api/credential-user", async (req: any, res) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const user = await authStorage.getUser(userId);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const { passwordHash: _, ...safeUser } = user as any;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/credential-logout", (req: any, res) => {
+    req.session.credentialUserId = null;
+    req.session.save(() => {
+      res.json({ success: true });
+    });
+  });
+
+  app.post("/api/admin/create-credential-account", isAdmin, async (req: any, res) => {
+    try {
+      const { userId, username, password } = req.body;
+      if (!userId || !username || !password) {
+        return res.status(400).json({ message: "缺少必要欄位" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+      }
+      const existing = await db.select().from(users).where(eq(users.username, username));
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "此帳號名稱已被使用" });
+      }
+      const hash = await bcrypt.hash(password, 10);
+      const [updated] = await db.update(users)
+        .set({ username, passwordHash: hash, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "找不到使用者" });
+      const { passwordHash: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(500).json({ message: "建立帳號失敗" });
+    }
+  });
 
   app.get("/api/coaches", async (_req, res) => {
     try {
@@ -168,7 +262,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/stats", isAuthenticated, async (_req, res) => {
+  app.get("/api/admin/stats", isAdmin, async (_req, res) => {
     try {
       const stats = await storage.getAdminStats();
       res.json(stats);
@@ -177,7 +271,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/faqs", isAuthenticated, async (_req, res) => {
+  app.get("/api/admin/faqs", isAdmin, async (_req, res) => {
     try {
       const faqList = await storage.getAllFaqs();
       res.json(faqList);
@@ -186,7 +280,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/faqs", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/faqs", isAdmin, async (req, res) => {
     try {
       const faq = await storage.createFaq({
         question: req.body.question,
@@ -201,7 +295,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/faqs/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/faqs/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteFaq(parseInt(req.params.id));
       res.json({ success: true });
@@ -210,7 +304,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/success-stories", isAuthenticated, async (_req, res) => {
+  app.get("/api/admin/success-stories", isAdmin, async (_req, res) => {
     try {
       const stories = await storage.getAllSuccessStories();
       res.json(stories);
@@ -219,7 +313,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/success-stories", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/success-stories", isAdmin, async (req, res) => {
     try {
       const story = await storage.createSuccessStory({
         studentName: req.body.studentName,
@@ -236,7 +330,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/success-stories/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/success-stories/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteSuccessStory(parseInt(req.params.id));
       res.json({ success: true });
@@ -245,7 +339,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/franchises", isAuthenticated, async (_req, res) => {
+  app.get("/api/admin/franchises", isAdmin, async (_req, res) => {
     try {
       const franchiseList = await storage.getAllFranchises();
       res.json(franchiseList);
@@ -281,7 +375,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/coaches", isAuthenticated, async (_req, res) => {
+  app.get("/api/admin/coaches", isAdmin, async (_req, res) => {
     try {
       const coachList = await storage.getAllCoaches();
       res.json(coachList);
@@ -290,7 +384,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/coaches", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/coaches", isAdmin, async (req, res) => {
     try {
       const coach = await storage.createCoach(req.body);
       res.json(coach);
@@ -299,7 +393,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/coaches/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/coaches/:id", isAdmin, async (req, res) => {
     try {
       const coach = await storage.updateCoach(parseInt(req.params.id), req.body);
       res.json(coach);
@@ -308,7 +402,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/coaches/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/coaches/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteCoach(parseInt(req.params.id));
       res.json({ success: true });
@@ -317,7 +411,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/franchises/:id/coaches", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/franchises/:id/coaches", isAdmin, async (req, res) => {
     try {
       const coachList = await storage.getCoachesByFranchise(parseInt(req.params.id));
       res.json(coachList);
@@ -326,7 +420,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/franchises/:id/slots", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/franchises/:id/slots", isAdmin, async (req, res) => {
     try {
       const slotList = await storage.getSlotsByFranchise(parseInt(req.params.id));
       res.json(slotList);
@@ -335,7 +429,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/time-slots", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/time-slots", isAdmin, async (req, res) => {
     try {
       const slot = await storage.createSlot(req.body);
       res.json(slot);
@@ -344,7 +438,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/time-slots/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/time-slots/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteSlot(parseInt(req.params.id));
       res.json({ success: true });
@@ -353,7 +447,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/announcements", isAuthenticated, async (_req, res) => {
+  app.get("/api/admin/announcements", isAdmin, async (_req, res) => {
     try {
       const announcementList = await storage.getAnnouncements();
       res.json(announcementList);
@@ -362,7 +456,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/announcements", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/announcements", isAdmin, async (req, res) => {
     try {
       const announcement = await storage.createAnnouncement({
         title: req.body.title,
@@ -376,7 +470,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/announcements/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/announcements/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteAnnouncement(parseInt(req.params.id));
       res.json({ success: true });

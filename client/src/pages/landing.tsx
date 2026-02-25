@@ -1048,6 +1048,11 @@ function FooterSection() {
                   常見問題
                 </a>
               </li>
+              <li>
+                <a href="/franchise-login" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-franchise-login">
+                  分校登入
+                </a>
+              </li>
             </ul>
           </div>
 
