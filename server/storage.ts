@@ -49,11 +49,14 @@ export interface IStorage {
 
   searchSlots(city?: string, grade?: string): Promise<any[]>;
   getSlotsByFranchise(franchiseId: number): Promise<TimeSlot[]>;
+  getSlot(id: number): Promise<TimeSlot | undefined>;
+  findSlot(franchiseId: number, coachId: number | null, date: string, startTime: string, endTime: string): Promise<TimeSlot | undefined>;
   createSlot(slot: InsertTimeSlot): Promise<TimeSlot>;
   deleteSlot(id: number): Promise<void>;
 
   getBookingsByParent(parentId: string): Promise<any[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
+  hasExistingBooking(slotId: number, childId: number): Promise<boolean>;
   cancelBooking(id: number): Promise<void>;
 
   getFaqs(): Promise<Faq[]>;
@@ -369,6 +372,26 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(timeSlots).where(eq(timeSlots.franchiseId, franchiseId));
   }
 
+  async getSlot(id: number): Promise<TimeSlot | undefined> {
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, id));
+    return slot;
+  }
+
+  async findSlot(franchiseId: number, coachId: number | null, date: string, startTime: string, endTime: string): Promise<TimeSlot | undefined> {
+    const conditions = [
+      eq(timeSlots.franchiseId, franchiseId),
+      eq(timeSlots.date, date),
+      eq(timeSlots.startTime, startTime),
+      eq(timeSlots.endTime, endTime),
+      eq(timeSlots.isActive, true),
+    ];
+    if (coachId !== null) {
+      conditions.push(eq(timeSlots.coachId, coachId));
+    }
+    const [slot] = await db.select().from(timeSlots).where(and(...conditions));
+    return slot;
+  }
+
   async createSlot(slot: InsertTimeSlot): Promise<TimeSlot> {
     const [created] = await db.insert(timeSlots).values(slot).returning();
     return created;
@@ -416,6 +439,18 @@ export class DatabaseStorage implements IStorage {
     if (!slot) throw new Error("時段不存在");
     if (slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿");
 
+    const existing = await db
+      .select()
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.slotId, booking.slotId),
+          eq(bookings.childId, booking.childId),
+          eq(bookings.status, "confirmed")
+        )
+      );
+    if (existing.length > 0) throw new Error("此孩子已預約過此時段，無法重複預約");
+
     await db
       .update(timeSlots)
       .set({ bookedSeats: slot.bookedSeats + 1 })
@@ -423,6 +458,20 @@ export class DatabaseStorage implements IStorage {
 
     const [created] = await db.insert(bookings).values(booking).returning();
     return created;
+  }
+
+  async hasExistingBooking(slotId: number, childId: number): Promise<boolean> {
+    const existing = await db
+      .select()
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.slotId, slotId),
+          eq(bookings.childId, childId),
+          eq(bookings.status, "confirmed")
+        )
+      );
+    return existing.length > 0;
   }
 
   async cancelBooking(id: number): Promise<void> {

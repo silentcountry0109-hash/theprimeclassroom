@@ -409,6 +409,14 @@ function OverviewTab({
   );
 }
 
+interface RecurringSlotInfo {
+  weekOffset: number;
+  date: string;
+  slotId: number | null;
+  available: number;
+  alreadyBooked: boolean;
+}
+
 function BookingFlowTab() {
   const { toast } = useToast();
   const [step, setStep] = useState<"search" | "detail" | "confirm">("search");
@@ -418,6 +426,10 @@ function BookingFlowTab() {
   const [bookingSlot, setBookingSlot] = useState<SlotWithCoach | null>(null);
   const [selectedChild, setSelectedChild] = useState("");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showRecurringDialog, setShowRecurringDialog] = useState(false);
+  const [recurringSlots, setRecurringSlots] = useState<RecurringSlotInfo[]>([]);
+  const [selectedRecurringSlots, setSelectedRecurringSlots] = useState<Set<number>>(new Set());
+  const [recurringLoading, setRecurringLoading] = useState(false);
 
   const districts = city ? TAIWAN_DISTRICTS[city] || [] : [];
 
@@ -453,10 +465,34 @@ function BookingFlowTab() {
       const res = await apiRequest("POST", "/api/bookings", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "預約成功！", description: "您的課程已確認預約" });
       queryClient.invalidateQueries({ queryKey: ["/api/franchises", selectedFranchiseId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+
+      if (bookingSlot && selectedChild) {
+        try {
+          setRecurringLoading(true);
+          const res = await fetch(
+            `/api/bookings/recurring-slots?slotId=${bookingSlot.id}&weeks=4&childId=${selectedChild}`,
+            { credentials: "include" }
+          );
+          if (res.ok) {
+            const slots: RecurringSlotInfo[] = await res.json();
+            const availableSlots = slots.filter((s) => s.slotId && s.available > 0 && !s.alreadyBooked);
+            if (availableSlots.length > 0) {
+              setRecurringSlots(slots);
+              setSelectedRecurringSlots(new Set(availableSlots.map((s) => s.slotId!)));
+              setShowRecurringDialog(true);
+              setRecurringLoading(false);
+              return;
+            }
+          }
+        } catch {
+        }
+        setRecurringLoading(false);
+      }
+
       setBookingSlot(null);
       setSelectedChild("");
       setStep("detail");
@@ -465,6 +501,54 @@ function BookingFlowTab() {
       toast({ title: "預約失敗", description: error.message, variant: "destructive" });
     },
   });
+
+  const recurringMutation = useMutation({
+    mutationFn: async (data: { slotIds: number[]; childId: number }) => {
+      const res = await apiRequest("POST", "/api/bookings/recurring", data);
+      return res.json();
+    },
+    onSuccess: (data: { results: Array<{ slotId: number; success: boolean; message?: string }> }) => {
+      const successCount = data.results.filter((r) => r.success).length;
+      const failCount = data.results.filter((r) => !r.success).length;
+      if (successCount > 0) {
+        toast({
+          title: `成功預約 ${successCount} 週課程`,
+          description: failCount > 0 ? `${failCount} 個時段無法預約` : "週期性排課完成",
+        });
+      }
+      if (failCount > 0 && successCount === 0) {
+        toast({ title: "預約失敗", description: "所有時段皆無法預約", variant: "destructive" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/franchises", selectedFranchiseId, "detail"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      setShowRecurringDialog(false);
+      setRecurringSlots([]);
+      setSelectedRecurringSlots(new Set());
+      setBookingSlot(null);
+      setSelectedChild("");
+      setStep("detail");
+    },
+    onError: (error: Error) => {
+      toast({ title: "週期預約失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleRecurringConfirm = () => {
+    if (selectedRecurringSlots.size === 0 || !selectedChild) return;
+    recurringMutation.mutate({
+      slotIds: Array.from(selectedRecurringSlots),
+      childId: parseInt(selectedChild),
+    });
+  };
+
+  const handleRecurringSkip = () => {
+    setShowRecurringDialog(false);
+    setRecurringSlots([]);
+    setSelectedRecurringSlots(new Set());
+    setBookingSlot(null);
+    setSelectedChild("");
+    setStep("detail");
+  };
 
   const selectFranchise = (id: number) => {
     setSelectedFranchiseId(id);
@@ -604,13 +688,104 @@ function BookingFlowTab() {
           <Button
             className="flex-1 rounded-full"
             onClick={confirmBooking}
-            disabled={!selectedChild || bookMutation.isPending}
+            disabled={!selectedChild || bookMutation.isPending || recurringLoading}
             style={{ backgroundColor: "#81D8D0", color: "white" }}
             data-testid="button-confirm-booking"
           >
-            {bookMutation.isPending ? "預約中..." : "確認預約"}
+            {bookMutation.isPending ? "預約中..." : recurringLoading ? "處理中..." : "確認預約"}
           </Button>
         </div>
+
+        <Dialog open={showRecurringDialog} onOpenChange={(open) => { if (!open) handleRecurringSkip(); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <CalendarCheck className="w-5 h-5 text-tiffany" />
+                週期性排課
+              </DialogTitle>
+              <DialogDescription>
+                {bookingSlot && (
+                  <span>
+                    每週{["日", "一", "二", "三", "四", "五", "六"][new Date(bookingSlot.date + "T00:00:00").getDay()]}
+                    {" "}{bookingSlot.startTime}-{bookingSlot.endTime}，是否同時預約未來幾週？
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-60 overflow-y-auto py-2">
+              {recurringSlots.map((rs) => {
+                const dateObj = new Date(rs.date + "T00:00:00");
+                const weekday = ["日", "一", "二", "三", "四", "五", "六"][dateObj.getDay()];
+                const canSelect = rs.slotId !== null && rs.available > 0 && !rs.alreadyBooked;
+                const isSelected = rs.slotId !== null && selectedRecurringSlots.has(rs.slotId);
+                return (
+                  <button
+                    key={rs.weekOffset}
+                    disabled={!canSelect}
+                    onClick={() => {
+                      if (!rs.slotId) return;
+                      setSelectedRecurringSlots((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(rs.slotId!)) next.delete(rs.slotId!);
+                        else next.add(rs.slotId!);
+                        return next;
+                      });
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg border text-left transition-all ${
+                      !canSelect
+                        ? "opacity-50 cursor-not-allowed border-gray-100 bg-gray-50"
+                        : isSelected
+                        ? "border-tiffany/40 bg-tiffany/5"
+                        : "border-gray-100 bg-white hover:border-gray-200"
+                    }`}
+                    data-testid={`recurring-slot-week-${rs.weekOffset}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center ${
+                        isSelected ? "bg-tiffany border-tiffany" : "border-gray-300"
+                      }`}>
+                        {isSelected && <CheckCircle2 className="w-4 h-4 text-white" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          第 {rs.weekOffset} 週 - {rs.date.slice(5)} ({weekday})
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {bookingSlot?.startTime}-{bookingSlot?.endTime}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {rs.alreadyBooked ? (
+                        <span className="text-xs text-amber-600">已預約</span>
+                      ) : rs.slotId === null ? (
+                        <span className="text-xs text-muted-foreground">未開課</span>
+                      ) : rs.available <= 0 ? (
+                        <span className="text-xs text-red-500">已額滿</span>
+                      ) : (
+                        <span className="text-xs text-tiffany">餘 {rs.available}</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <DialogFooter className="flex gap-2 sm:gap-2">
+              <Button variant="outline" onClick={handleRecurringSkip} className="flex-1 rounded-full" data-testid="button-skip-recurring">
+                不用了
+              </Button>
+              <Button
+                onClick={handleRecurringConfirm}
+                disabled={selectedRecurringSlots.size === 0 || recurringMutation.isPending}
+                className="flex-1 rounded-full"
+                style={{ backgroundColor: "#81D8D0", color: "white" }}
+                data-testid="button-confirm-recurring"
+              >
+                {recurringMutation.isPending ? "預約中..." : `預約 ${selectedRecurringSlots.size} 週`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }

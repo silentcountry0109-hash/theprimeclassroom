@@ -363,6 +363,66 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/bookings/recurring", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const { slotIds, childId } = req.body;
+      if (!Array.isArray(slotIds) || !childId) {
+        return res.status(400).json({ message: "缺少必要參數" });
+      }
+      const kids = await storage.getChildrenByParent(userId);
+      if (!kids.find((k: any) => k.id === childId)) {
+        return res.status(403).json({ message: "無權限為此孩子預約" });
+      }
+      const results: { slotId: number; success: boolean; message?: string }[] = [];
+      for (const slotId of slotIds) {
+        try {
+          await storage.createBooking({ slotId, childId, parentId: userId });
+          results.push({ slotId, success: true });
+        } catch (err: any) {
+          results.push({ slotId, success: false, message: err.message });
+        }
+      }
+      res.json({ results });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to create recurring bookings" });
+    }
+  });
+
+  app.get("/api/bookings/recurring-slots", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const slotId = parseInt(req.query.slotId as string);
+      const weeks = Math.min(parseInt(req.query.weeks as string) || 4, 12);
+      const childId = parseInt(req.query.childId as string);
+      const slot = await storage.getSlot(slotId);
+      if (!slot) return res.status(404).json({ message: "時段不存在" });
+
+      const results: Array<{ weekOffset: number; date: string; slotId: number | null; available: number; alreadyBooked: boolean }> = [];
+      const baseDate = new Date(slot.date + "T00:00:00");
+
+      for (let w = 1; w <= weeks; w++) {
+        const futureDate = new Date(baseDate);
+        futureDate.setDate(futureDate.getDate() + 7 * w);
+        const dateStr = futureDate.toISOString().split("T")[0];
+        const matchingSlot = await storage.findSlot(slot.franchiseId, slot.coachId, dateStr, slot.startTime, slot.endTime);
+        let alreadyBooked = false;
+        if (matchingSlot && childId) {
+          alreadyBooked = await storage.hasExistingBooking(matchingSlot.id, childId);
+        }
+        results.push({
+          weekOffset: w,
+          date: dateStr,
+          slotId: matchingSlot?.id || null,
+          available: matchingSlot ? matchingSlot.maxSeats - matchingSlot.bookedSeats : 0,
+          alreadyBooked,
+        });
+      }
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to find recurring slots" });
+    }
+  });
+
   app.patch("/api/bookings/:id/cancel", isCredentialOrAuth, async (req: any, res) => {
     try {
       const userId = req.currentUser.id;

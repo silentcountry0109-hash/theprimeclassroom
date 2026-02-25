@@ -135,13 +135,13 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - 公告管理: Announcements CRUD
 
 ## Franchise Admin Dashboard (/franchise-admin)
-- 分校總覽: Stats (coaches, slots, bookings, confirmed)
-- 統計分析: Date-range analytics (presets: 7/14/30/90 days, custom date picker)
+- 分校總覽: Stats (coaches, slots, bookings, confirmed) + date-range analytics merged in
   - KPI cards: 開課時段, 預約數, 取消數, 座位使用率
   - Daily bar chart: per-day seat usage with color coding (80%↑ tiffany, 50-79% coral, <50% gray)
   - Coach table: per-coach slots, bookings, booked seats, usage rate
   - API: GET /api/franchise-admin/stats/date-range?startDate=&endDate=
-- 分校資訊: Edit own franchise description, phone, tags, nearby schools
+- Sidebar name format: `{city} {district without 區}教室` (e.g. "台北市 信義教室")
+- 分校資訊: Edit own franchise description, phone, tags, nearby schools + photo management
 - 師資管理: CRUD coaches for own franchise only
 - 時段管理: CRUD time slots for own franchise only
 - 預約管理: View bookings for own franchise (child name, grade, school, date/time, status)
@@ -149,7 +149,10 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 ## Parent Dashboard UX (/dashboard or / when logged in)
 - Top tab navigation (mobile-friendly) instead of sidebar
 - **首頁 (Overview)**: Stats cards (children, upcoming, completed, quick-book), upcoming bookings timeline, onboarding prompt when no children
-- **預約課程 (Book)**: 3-step inline flow — search classrooms → select time slot → select child & confirm
+- **預約課程 (Book)**: 3-step inline flow — search classrooms → select time slot → select child & confirm → recurring weekly dialog
+  - Duplicate booking prevention: backend rejects same child + same slot if confirmed booking exists
+  - Recurring booking: after successful booking, dialog offers same weekday/time for next 4 weeks
+  - API: POST /api/bookings/recurring (batch book multiple slots), GET /api/bookings/recurring-slots (find matching future slots)
 - **我的孩子 (Children)**: Child cards with booking stats per child, AlertDialog confirmation on delete
 - **預約紀錄 (Bookings)**: Filter tabs (全部/即將上課/已完成/已取消) with counts, AlertDialog confirmation on cancel
 - Confirmation dialogs (AlertDialog) for all destructive actions (delete child, cancel booking)
