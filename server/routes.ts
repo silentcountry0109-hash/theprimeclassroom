@@ -229,19 +229,109 @@ export async function registerRoutes(
 
   app.get("/api/admin/franchises", isAuthenticated, async (_req, res) => {
     try {
-      const franchiseList = await storage.getFranchises();
+      const franchiseList = await storage.getAllFranchises();
       res.json(franchiseList);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch franchises" });
     }
   });
 
+  app.post("/api/admin/franchises", isAuthenticated, async (req, res) => {
+    try {
+      const franchise = await storage.createFranchise(req.body);
+      res.json(franchise);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create franchise" });
+    }
+  });
+
+  app.patch("/api/admin/franchises/:id", isAuthenticated, async (req, res) => {
+    try {
+      const franchise = await storage.updateFranchise(parseInt(req.params.id), req.body);
+      res.json(franchise);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update franchise" });
+    }
+  });
+
+  app.delete("/api/admin/franchises/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteFranchise(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete franchise" });
+    }
+  });
+
   app.get("/api/admin/coaches", isAuthenticated, async (_req, res) => {
     try {
-      const coachList = await storage.getCoaches();
+      const coachList = await storage.getAllCoaches();
       res.json(coachList);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch coaches" });
+    }
+  });
+
+  app.post("/api/admin/coaches", isAuthenticated, async (req, res) => {
+    try {
+      const coach = await storage.createCoach(req.body);
+      res.json(coach);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create coach" });
+    }
+  });
+
+  app.patch("/api/admin/coaches/:id", isAuthenticated, async (req, res) => {
+    try {
+      const coach = await storage.updateCoach(parseInt(req.params.id), req.body);
+      res.json(coach);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update coach" });
+    }
+  });
+
+  app.delete("/api/admin/coaches/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteCoach(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete coach" });
+    }
+  });
+
+  app.get("/api/admin/franchises/:id/coaches", isAuthenticated, async (req, res) => {
+    try {
+      const coachList = await storage.getCoachesByFranchise(parseInt(req.params.id));
+      res.json(coachList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch coaches" });
+    }
+  });
+
+  app.get("/api/admin/franchises/:id/slots", isAuthenticated, async (req, res) => {
+    try {
+      const slotList = await storage.getSlotsByFranchise(parseInt(req.params.id));
+      res.json(slotList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch slots" });
+    }
+  });
+
+  app.post("/api/admin/time-slots", isAuthenticated, async (req, res) => {
+    try {
+      const slot = await storage.createSlot(req.body);
+      res.json(slot);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create time slot" });
+    }
+  });
+
+  app.delete("/api/admin/time-slots/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteSlot(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete time slot" });
     }
   });
 

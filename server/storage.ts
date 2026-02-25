@@ -14,12 +14,19 @@ import { eq, and, sql, desc, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getCoaches(): Promise<Coach[]>;
+  getAllCoaches(): Promise<Coach[]>;
   getCoach(id: number): Promise<Coach | undefined>;
+  getCoachesByFranchise(franchiseId: number): Promise<Coach[]>;
   createCoach(coach: InsertCoach): Promise<Coach>;
+  updateCoach(id: number, data: Partial<InsertCoach>): Promise<Coach>;
+  deleteCoach(id: number): Promise<void>;
 
   getFranchises(): Promise<Franchise[]>;
+  getAllFranchises(): Promise<Franchise[]>;
   getFranchise(id: number): Promise<Franchise | undefined>;
   createFranchise(franchise: InsertFranchise): Promise<Franchise>;
+  updateFranchise(id: number, data: Partial<InsertFranchise>): Promise<Franchise>;
+  deleteFranchise(id: number): Promise<void>;
 
   searchFranchises(filters: {
     city?: string;
@@ -41,6 +48,7 @@ export interface IStorage {
   searchSlots(city?: string, grade?: string): Promise<any[]>;
   getSlotsByFranchise(franchiseId: number): Promise<TimeSlot[]>;
   createSlot(slot: InsertTimeSlot): Promise<TimeSlot>;
+  deleteSlot(id: number): Promise<void>;
 
   getBookingsByParent(parentId: string): Promise<any[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
@@ -87,9 +95,17 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(coaches).where(eq(coaches.isCertified, true));
   }
 
+  async getAllCoaches(): Promise<Coach[]> {
+    return db.select().from(coaches);
+  }
+
   async getCoach(id: number): Promise<Coach | undefined> {
     const [coach] = await db.select().from(coaches).where(eq(coaches.id, id));
     return coach;
+  }
+
+  async getCoachesByFranchise(franchiseId: number): Promise<Coach[]> {
+    return db.select().from(coaches).where(eq(coaches.franchiseId, franchiseId));
   }
 
   async createCoach(coach: InsertCoach): Promise<Coach> {
@@ -97,8 +113,22 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async updateCoach(id: number, data: Partial<InsertCoach>): Promise<Coach> {
+    const [updated] = await db.update(coaches).set(data).where(eq(coaches.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCoach(id: number): Promise<void> {
+    await db.update(timeSlots).set({ coachId: null }).where(eq(timeSlots.coachId, id));
+    await db.delete(coaches).where(eq(coaches.id, id));
+  }
+
   async getFranchises(): Promise<Franchise[]> {
     return db.select().from(franchises).where(eq(franchises.isActive, true));
+  }
+
+  async getAllFranchises(): Promise<Franchise[]> {
+    return db.select().from(franchises);
   }
 
   async getFranchise(id: number): Promise<Franchise | undefined> {
@@ -109,6 +139,22 @@ export class DatabaseStorage implements IStorage {
   async createFranchise(franchise: InsertFranchise): Promise<Franchise> {
     const [created] = await db.insert(franchises).values(franchise).returning();
     return created;
+  }
+
+  async updateFranchise(id: number, data: Partial<InsertFranchise>): Promise<Franchise> {
+    const [updated] = await db.update(franchises).set(data).where(eq(franchises.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFranchise(id: number): Promise<void> {
+    const slotsToDelete = await db.select({ id: timeSlots.id }).from(timeSlots).where(eq(timeSlots.franchiseId, id));
+    if (slotsToDelete.length > 0) {
+      const slotIds = slotsToDelete.map((s) => s.id);
+      await db.delete(bookings).where(inArray(bookings.slotId, slotIds));
+      await db.delete(timeSlots).where(eq(timeSlots.franchiseId, id));
+    }
+    await db.delete(coaches).where(eq(coaches.franchiseId, id));
+    await db.delete(franchises).where(eq(franchises.id, id));
   }
 
   async searchFranchises(filters: {
@@ -290,6 +336,11 @@ export class DatabaseStorage implements IStorage {
   async createSlot(slot: InsertTimeSlot): Promise<TimeSlot> {
     const [created] = await db.insert(timeSlots).values(slot).returning();
     return created;
+  }
+
+  async deleteSlot(id: number): Promise<void> {
+    await db.delete(bookings).where(eq(bookings.slotId, id));
+    await db.delete(timeSlots).where(eq(timeSlots.id, id));
   }
 
   async getBookingsByParent(parentId: string): Promise<any[]> {

@@ -86,7 +86,19 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 ### Admin
 - GET /api/admin/stats
 - CRUD: /api/admin/faqs, /api/admin/success-stories, /api/admin/announcements
-- GET /api/admin/franchises, /api/admin/coaches
+- CRUD: /api/admin/franchises (GET all, POST create, PATCH/:id update, DELETE/:id)
+- CRUD: /api/admin/coaches (GET all, POST create, PATCH/:id update, DELETE/:id)
+- GET /api/admin/franchises/:id/coaches, GET /api/admin/franchises/:id/slots
+- POST /api/admin/time-slots, DELETE /api/admin/time-slots/:id
+
+## Admin Dashboard Tabs
+- 總覽: Stats cards (students, coaches, franchises, bookings)
+- 常見問題: FAQ CRUD
+- 成功案例: Success stories CRUD
+- 加盟分校: Full franchise CRUD (name, city/district, address, phone, tags, nearbySchools, rating, reviewCount, isActive toggle)
+- 老師管理: Full coach CRUD (name, franchise assignment, bio, specialties, rating, certified toggle)
+- 時段管理: Per-franchise time slot management (select franchise → view/add/delete slots with date, time, coach assignment)
+- 公告管理: Announcements CRUD
 
 ## Franchise Tags
 - 家長好評推薦 (amber styling)
