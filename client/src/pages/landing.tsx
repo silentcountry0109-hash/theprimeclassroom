@@ -140,26 +140,26 @@ function HeroSection() {
       <div
         className="absolute inset-0 pointer-events-none animate-grid-h"
         style={{
-          backgroundImage: "linear-gradient(rgba(129, 216, 208, 0.09) 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(rgba(129, 216, 208, 0.18) 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }}
       />
       <div
         className="absolute inset-0 pointer-events-none animate-grid-v"
         style={{
-          backgroundImage: "linear-gradient(90deg, rgba(129, 216, 208, 0.09) 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(90deg, rgba(129, 216, 208, 0.18) 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }}
       />
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        <span className="absolute top-[12%] left-[6%] text-6xl md:text-8xl text-tiffany/[0.06] font-serif rotate-[-15deg]">+</span>
-        <span className="absolute top-[22%] right-[10%] text-5xl md:text-7xl text-coral/[0.08] font-serif rotate-[20deg]">×</span>
-        <span className="absolute bottom-[35%] left-[12%] text-5xl md:text-6xl text-tiffany/[0.05] font-serif rotate-[10deg] hidden sm:block">÷</span>
-        <span className="absolute bottom-[18%] right-[6%] text-7xl md:text-9xl text-tiffany/[0.05] font-serif rotate-[-8deg]">−</span>
-        <span className="absolute top-[50%] left-[3%] text-4xl md:text-5xl text-coral/[0.06] font-serif rotate-[25deg] hidden sm:block">∑</span>
-        <span className="absolute top-[65%] right-[4%] text-5xl md:text-6xl text-tiffany/[0.04] font-serif rotate-[-20deg] hidden sm:block">π</span>
-        <span className="absolute top-[35%] right-[25%] text-3xl md:text-4xl text-tiffany/[0.05] font-serif rotate-[15deg] hidden md:block">∞</span>
-        <span className="absolute bottom-[45%] left-[30%] text-4xl md:text-5xl text-coral/[0.05] font-serif rotate-[-10deg] hidden md:block">√</span>
+        <span className="absolute top-[12%] left-[6%] text-6xl md:text-8xl text-tiffany/[0.14] font-serif rotate-[-15deg]">+</span>
+        <span className="absolute top-[22%] right-[10%] text-5xl md:text-7xl text-coral/[0.18] font-serif rotate-[20deg]">×</span>
+        <span className="absolute bottom-[35%] left-[12%] text-5xl md:text-6xl text-tiffany/[0.12] font-serif rotate-[10deg] hidden sm:block">÷</span>
+        <span className="absolute bottom-[18%] right-[6%] text-7xl md:text-9xl text-tiffany/[0.12] font-serif rotate-[-8deg]">−</span>
+        <span className="absolute top-[50%] left-[3%] text-4xl md:text-5xl text-coral/[0.14] font-serif rotate-[25deg] hidden sm:block">∑</span>
+        <span className="absolute top-[65%] right-[4%] text-5xl md:text-6xl text-tiffany/[0.10] font-serif rotate-[-20deg] hidden sm:block">π</span>
+        <span className="absolute top-[35%] right-[25%] text-3xl md:text-4xl text-tiffany/[0.12] font-serif rotate-[15deg] hidden md:block">∞</span>
+        <span className="absolute bottom-[45%] left-[30%] text-4xl md:text-5xl text-coral/[0.12] font-serif rotate-[-10deg] hidden md:block">√</span>
       </div>
 
       <div className="text-center max-w-4xl mx-auto z-10 px-2">
