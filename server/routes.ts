@@ -1193,11 +1193,9 @@ export async function registerRoutes(
   async function checkAndPromoteGrades() {
     try {
       const now = new Date();
-      const taipeiOffset = 8 * 60;
-      const taipeiTime = new Date(now.getTime() + (taipeiOffset + now.getTimezoneOffset()) * 60000);
-      const month = taipeiTime.getMonth() + 1;
-      const day = taipeiTime.getDate();
-      const year = taipeiTime.getFullYear();
+      const month = now.getMonth() + 1;
+      const day = now.getDate();
+      const year = now.getFullYear();
 
       if (month === 7 && day === 1) {
         const record = await storage.getSiteContent("system.lastGradePromotion");
