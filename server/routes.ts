@@ -445,6 +445,58 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/bookings/calendar.ics", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const userBookings = await storage.getBookingsByParent(userId);
+      const confirmed = userBookings.filter((b: any) => b.status === "confirmed");
+
+      const lines: string[] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//質數教室//TW",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "X-WR-CALNAME:質數教室課程",
+        "X-WR-TIMEZONE:Asia/Taipei",
+      ];
+
+      for (const b of confirmed) {
+        const dateClean = (b.slotDate || "").replace(/-/g, "");
+        const startClean = (b.slotStartTime || "").replace(/:/g, "");
+        const endClean = (b.slotEndTime || "").replace(/:/g, "");
+        const dtStart = `${dateClean}T${startClean}00`;
+        const dtEnd = `${dateClean}T${endClean}00`;
+        const uid = `booking-${b.id}@primemath.tw`;
+        const summary = `質數教室 - ${b.childName || ""}`;
+        const location = b.franchiseName || "";
+        const description = `老師：${b.coachName || ""}\\n孩子：${b.childName || ""}\\n教室：${location}`;
+
+        lines.push("BEGIN:VEVENT");
+        lines.push(`UID:${uid}`);
+        lines.push(`DTSTART;TZID=Asia/Taipei:${dtStart}`);
+        lines.push(`DTEND;TZID=Asia/Taipei:${dtEnd}`);
+        lines.push(`SUMMARY:${summary}`);
+        lines.push(`LOCATION:${location}`);
+        lines.push(`DESCRIPTION:${description}`);
+        lines.push("BEGIN:VALARM");
+        lines.push("TRIGGER:-PT6H");
+        lines.push("ACTION:DISPLAY");
+        lines.push("DESCRIPTION:質數教室課程即將開始（6小時後）");
+        lines.push("END:VALARM");
+        lines.push("END:VEVENT");
+      }
+
+      lines.push("END:VCALENDAR");
+
+      res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+      res.setHeader("Content-Disposition", "attachment; filename=prime-math-bookings.ics");
+      res.send(lines.join("\r\n"));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate calendar" });
+    }
+  });
+
   app.get("/api/admin/stats", isAdmin, async (_req, res) => {
     try {
       const stats = await storage.getAdminStats();

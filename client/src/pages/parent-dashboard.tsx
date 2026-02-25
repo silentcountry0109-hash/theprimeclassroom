@@ -46,6 +46,7 @@ import {
   Home,
   Users,
   CalendarCheck,
+  CalendarPlus,
   LogOut,
   Plus,
   Minus,
@@ -1390,6 +1391,33 @@ function BookingsTab() {
   const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "completed" | "cancelled">("all");
   const [cancelTarget, setCancelTarget] = useState<BookingWithDetails | null>(null);
 
+  const today = useMemo(() => {
+    const d = new Date();
+    return d.toISOString().split("T")[0];
+  }, []);
+  const defaultEnd = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().split("T")[0];
+  }, []);
+  const [dateFrom, setDateFrom] = useState(today);
+  const [dateTo, setDateTo] = useState(defaultEnd);
+
+  const quickRanges = [
+    { label: "7 天", days: 7 },
+    { label: "14 天", days: 14 },
+    { label: "30 天", days: 30 },
+    { label: "90 天", days: 90 },
+  ];
+
+  const setQuickRange = (days: number) => {
+    const from = new Date();
+    const to = new Date();
+    to.setDate(to.getDate() + days);
+    setDateFrom(from.toISOString().split("T")[0]);
+    setDateTo(to.toISOString().split("T")[0]);
+  };
+
   const { data: bookings = [], isLoading } = useQuery<BookingWithDetails[]>({
     queryKey: ["/api/bookings"],
   });
@@ -1408,14 +1436,21 @@ function BookingsTab() {
     },
   });
 
-  const filtered = statusFilter === "all" ? bookings : bookings.filter((b) => b.status === statusFilter);
+  const dateFiltered = useMemo(() => {
+    return bookings.filter((b) => {
+      if (!b.slotDate) return true;
+      return b.slotDate >= dateFrom && b.slotDate <= dateTo;
+    });
+  }, [bookings, dateFrom, dateTo]);
+
+  const filtered = statusFilter === "all" ? dateFiltered : dateFiltered.filter((b) => b.status === statusFilter);
 
   const statusCounts = useMemo(() => ({
-    all: bookings.length,
-    confirmed: bookings.filter((b) => b.status === "confirmed").length,
-    completed: bookings.filter((b) => b.status === "completed").length,
-    cancelled: bookings.filter((b) => b.status === "cancelled").length,
-  }), [bookings]);
+    all: dateFiltered.length,
+    confirmed: dateFiltered.filter((b) => b.status === "confirmed").length,
+    completed: dateFiltered.filter((b) => b.status === "completed").length,
+    cancelled: dateFiltered.filter((b) => b.status === "cancelled").length,
+  }), [dateFiltered]);
 
   const sorted = [...filtered].sort((a, b) => {
     const dateA = `${a.slotDate} ${a.slotStartTime}`;
@@ -1438,11 +1473,82 @@ function BookingsTab() {
     { id: "cancelled" as const, label: "已取消" },
   ];
 
+  const handleCalendarSync = () => {
+    const link = document.createElement("a");
+    link.href = "/api/bookings/calendar.ics";
+    link.download = "prime-math-bookings.ics";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({
+      title: "行事曆檔案已下載",
+      description: "請開啟 .ics 檔案加入手機行事曆，每堂課會在開始前 6 小時提醒。若取消課程，需手動刪除行事曆中的排程。",
+    });
+  };
+
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">預約紀錄</h2>
-        <p className="text-sm text-muted-foreground">查看和管理所有預約</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">預約紀錄</h2>
+          <p className="text-sm text-muted-foreground">查看和管理所有預約</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCalendarSync}
+          className="flex items-center gap-1.5 text-tiffany border-tiffany/30 hover:bg-tiffany/5 shrink-0"
+          data-testid="button-calendar-sync"
+        >
+          <CalendarPlus className="w-4 h-4" />
+          <span className="hidden sm:inline">加入行事曆</span>
+        </Button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <CalendarDays className="w-3.5 h-3.5" />
+          <span>時間區間</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-8 text-xs w-[130px]"
+              data-testid="input-date-from"
+            />
+            <span className="text-xs text-muted-foreground">~</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-8 text-xs w-[130px]"
+              data-testid="input-date-to"
+            />
+          </div>
+          <div className="flex gap-1">
+            {quickRanges.map((r) => (
+              <button
+                key={r.days}
+                onClick={() => setQuickRange(r.days)}
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                  (() => {
+                    const checkTo = new Date();
+                    checkTo.setDate(checkTo.getDate() + r.days);
+                    return dateFrom === today && dateTo === checkTo.toISOString().split("T")[0];
+                  })()
+                    ? "bg-tiffany/10 text-tiffany border-tiffany/30"
+                    : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany/30"
+                }`}
+                data-testid={`button-range-${r.days}`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1477,10 +1583,10 @@ function BookingsTab() {
         <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
           <CalendarCheck className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
           <h3 className="text-sm font-semibold text-foreground mb-1">
-            {statusFilter === "all" ? "尚無預約" : "沒有符合條件的預約"}
+            {statusFilter === "all" ? "此區間內尚無預約" : "沒有符合條件的預約"}
           </h3>
           <p className="text-xs text-muted-foreground">
-            {statusFilter === "all" ? "搜尋教室開始預約課程" : "切換篩選條件查看其他預約"}
+            {statusFilter === "all" ? "調整時間區間或搜尋教室開始預約課程" : "切換篩選條件或調整時間區間"}
           </p>
         </div>
       ) : (
@@ -1574,6 +1680,13 @@ function BookingsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <div className="bg-amber-50/50 rounded-xl border border-amber-200/50 p-3">
+        <p className="text-xs text-amber-700 leading-relaxed">
+          <AlertCircle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+          行事曆同步說明：點擊「加入行事曆」會下載 .ics 檔案，開啟後可匯入手機行事曆。每堂課會在開始前 6 小時發送提醒。若取消課程，手機行事曆中的排程需手動刪除。每次下載會包含所有已確認的課程。
+        </p>
+      </div>
     </div>
   );
 }
