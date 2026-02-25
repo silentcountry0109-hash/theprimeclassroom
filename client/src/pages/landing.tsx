@@ -912,7 +912,21 @@ function CoachesSection() {
   const gap = 24;
   const step = cardWidth + gap;
 
-  const maxIndex = Math.max(0, coaches.length - 1);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+
+  const visibleCards = containerWidth > 0 ? Math.floor((containerWidth + gap) / step) : 3;
+  const maxIndex = Math.max(0, coaches.length - visibleCards);
 
   const goNext = useCallback(() => {
     setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
@@ -923,10 +937,10 @@ function CoachesSection() {
   }, [maxIndex]);
 
   useEffect(() => {
-    if (isPaused || coaches.length <= 3) return;
+    if (isPaused || maxIndex <= 0) return;
     const interval = setInterval(goNext, 4000);
     return () => clearInterval(interval);
-  }, [isPaused, coaches.length, goNext]);
+  }, [isPaused, maxIndex, goNext]);
 
   return (
     <section id="about" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
@@ -946,7 +960,7 @@ function CoachesSection() {
           onMouseLeave={() => setIsPaused(false)}
           ref={containerRef}
         >
-          {coaches.length > 3 && (
+          {maxIndex > 0 && (
             <>
               <button
                 onClick={goPrev}
@@ -1003,9 +1017,9 @@ function CoachesSection() {
             )}
           </div>
 
-          {coaches.length > 3 && (
+          {maxIndex > 0 && (
             <div className="flex items-center justify-center gap-2 mt-6">
-              {coaches.map((_, i) => (
+              {Array.from({ length: maxIndex + 1 }).map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrentIndex(i)}
