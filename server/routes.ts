@@ -1173,5 +1173,48 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/promote-grades", isAdmin, async (_req, res) => {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const record = await storage.getSiteContent("system.lastGradePromotion");
+      const lastYear = record ? parseInt(record.value) : 0;
+      if (lastYear >= year) {
+        return res.json({ message: `今年 (${year}) 已經升級過了`, promoted: 0 });
+      }
+      const count = await storage.promoteAllGrades();
+      await storage.upsertSiteContent("system.lastGradePromotion", String(year));
+      res.json({ message: `成功升級 ${count} 位學生`, promoted: count, year });
+    } catch (error) {
+      res.status(500).json({ message: "升級失敗" });
+    }
+  });
+
+  async function checkAndPromoteGrades() {
+    try {
+      const now = new Date();
+      const taipeiOffset = 8 * 60;
+      const taipeiTime = new Date(now.getTime() + (taipeiOffset + now.getTimezoneOffset()) * 60000);
+      const month = taipeiTime.getMonth() + 1;
+      const day = taipeiTime.getDate();
+      const year = taipeiTime.getFullYear();
+
+      if (month === 7 && day === 1) {
+        const record = await storage.getSiteContent("system.lastGradePromotion");
+        const lastYear = record ? parseInt(record.value) : 0;
+        if (lastYear < year) {
+          const count = await storage.promoteAllGrades();
+          await storage.upsertSiteContent("system.lastGradePromotion", String(year));
+          console.log(`[Grade Promotion] ${year}/7/1: ${count} students promoted.`);
+        }
+      }
+    } catch (error) {
+      console.error("[Grade Promotion] Error:", error);
+    }
+  }
+
+  checkAndPromoteGrades();
+  setInterval(checkAndPromoteGrades, 60 * 60 * 1000);
+
   return httpServer;
 }

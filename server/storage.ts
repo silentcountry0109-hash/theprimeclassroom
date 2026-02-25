@@ -120,6 +120,7 @@ export interface IStorage {
   getAllSiteContent(): Promise<SiteContent[]>;
   getSiteContent(sectionKey: string): Promise<SiteContent | undefined>;
   upsertSiteContent(sectionKey: string, value: string): Promise<SiteContent>;
+  promoteAllGrades(): Promise<number>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -864,6 +865,13 @@ export class DatabaseStorage implements IStorage {
     }
     const [created] = await db.insert(siteContent).values({ sectionKey, value }).returning();
     return created;
+  }
+  async promoteAllGrades(): Promise<number> {
+    const result = await db.update(children)
+      .set({ grade: sql`${children.grade} + 1` })
+      .where(lte(children.grade, 6))
+      .returning();
+    return result.length;
   }
 }
 

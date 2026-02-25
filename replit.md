@@ -113,6 +113,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - GET/POST/DELETE /api/children
 - GET/POST /api/bookings, PATCH /api/bookings/:id/cancel
 - GET /api/bookings/calendar.ics (downloads ICS file with all confirmed bookings, 6hr reminder alarm)
+- POST /api/admin/promote-grades (manual grade promotion, once per year)
 - GET /api/products (public, active only)
 - GET/POST/PATCH/DELETE /api/cart (shopping cart CRUD)
 - POST /api/orders (create order from cart items)
