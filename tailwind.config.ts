@@ -100,24 +100,24 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "line-h": {
+        "grid-h": {
           "0%": { clipPath: "inset(0 100% 0 0)" },
-          "40%": { clipPath: "inset(0 0 0 0)" },
-          "60%": { clipPath: "inset(0 0 0 0)" },
+          "45%": { clipPath: "inset(0 0 0 0)" },
+          "55%": { clipPath: "inset(0 0 0 0)" },
           "100%": { clipPath: "inset(0 0 0 100%)" },
         },
-        "line-v": {
+        "grid-v": {
           "0%": { clipPath: "inset(0 0 100% 0)" },
-          "40%": { clipPath: "inset(0 0 0 0)" },
-          "60%": { clipPath: "inset(0 0 0 0)" },
+          "45%": { clipPath: "inset(0 0 0 0)" },
+          "55%": { clipPath: "inset(0 0 0 0)" },
           "100%": { clipPath: "inset(100% 0 0 0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "line-h": "line-h 7s ease-in-out infinite",
-        "line-v": "line-v 7s ease-in-out infinite",
+        "grid-h": "grid-h 10s ease-in-out infinite",
+        "grid-v": "grid-v 14s ease-in-out infinite",
       },
     },
   },
