@@ -395,6 +395,35 @@ export async function seedDatabase() {
       console.log("Default admin account created (username: admin)");
     }
 
+    const franchiseAccounts = [
+      { username: "daan", name: "大安", franchise: insertedFranchises[0] },
+      { username: "xinyi", name: "信義", franchise: insertedFranchises[1] },
+      { username: "zhongshan", name: "中山", franchise: insertedFranchises[2] },
+      { username: "banqiao", name: "板橋", franchise: insertedFranchises[3] },
+      { username: "yonghe", name: "永和", franchise: insertedFranchises[4] },
+      { username: "zhongli", name: "中壢", franchise: insertedFranchises[5] },
+      { username: "taoyuan", name: "桃園", franchise: insertedFranchises[6] },
+      { username: "xitun", name: "西屯", franchise: insertedFranchises[7] },
+    ];
+
+    for (const acct of franchiseAccounts) {
+      const [existing] = await db.select().from(users).where(eq(users.username, acct.username));
+      if (!existing) {
+        const hash = await bcrypt.hash("prime123", 10);
+        await db.insert(users).values({
+          id: `franchise-admin-${acct.username}`,
+          email: `${acct.username}@primemath.tw`,
+          firstName: acct.name,
+          lastName: "主任",
+          role: "franchise_admin",
+          franchiseId: acct.franchise.id,
+          username: acct.username,
+          passwordHash: hash,
+        });
+      }
+    }
+    console.log("Franchise admin accounts created");
+
     console.log("Database seeded successfully!");
   } catch (error) {
     console.error("Error seeding database:", error);

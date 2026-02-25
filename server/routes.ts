@@ -134,7 +134,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "密碼至少需要 6 個字元" });
       }
       const existing = await db.select().from(users).where(eq(users.username, username));
-      if (existing.length > 0) {
+      if (existing.length > 0 && existing[0].id !== userId) {
         return res.status(400).json({ message: "此帳號名稱已被使用" });
       }
       const hash = await bcrypt.hash(password, 10);
@@ -147,6 +147,38 @@ export async function registerRoutes(
       res.json(safeUser);
     } catch (error) {
       res.status(500).json({ message: "建立帳號失敗" });
+    }
+  });
+
+  app.post("/api/admin/create-franchise-director", isAdmin, async (req: any, res) => {
+    try {
+      const { franchiseId, username, password, firstName, lastName } = req.body;
+      if (!franchiseId || !username || !password) {
+        return res.status(400).json({ message: "缺少必要欄位" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+      }
+      const existing = await db.select().from(users).where(eq(users.username, username));
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "此帳號名稱已被使用" });
+      }
+      const franchise = await storage.getFranchise(franchiseId);
+      if (!franchise) return res.status(404).json({ message: "找不到此分校" });
+      const hash = await bcrypt.hash(password, 10);
+      const [newUser] = await db.insert(users).values({
+        email: `${username}@primemath.tw`,
+        firstName: firstName || franchise.name.replace("質數數學 ", "").replace("教室", ""),
+        lastName: lastName || "主任",
+        role: "franchise_admin",
+        franchiseId,
+        username,
+        passwordHash: hash,
+      }).returning();
+      const { passwordHash: _, ...safeUser } = newUser;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(500).json({ message: "建立主任帳號失敗" });
     }
   });
 
@@ -320,6 +352,15 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/admin/faqs/:id", isAdmin, async (req, res) => {
+    try {
+      const faq = await storage.updateFaq(parseInt(req.params.id), req.body);
+      res.json(faq);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update FAQ" });
+    }
+  });
+
   app.delete("/api/admin/faqs/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteFaq(parseInt(req.params.id));
@@ -352,6 +393,15 @@ export async function registerRoutes(
       res.json(story);
     } catch (error) {
       res.status(500).json({ message: "Failed to create story" });
+    }
+  });
+
+  app.patch("/api/admin/success-stories/:id", isAdmin, async (req, res) => {
+    try {
+      const story = await storage.updateSuccessStory(parseInt(req.params.id), req.body);
+      res.json(story);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update story" });
     }
   });
 
@@ -508,6 +558,15 @@ export async function registerRoutes(
       res.json(announcement);
     } catch (error) {
       res.status(500).json({ message: "Failed to create announcement" });
+    }
+  });
+
+  app.patch("/api/admin/announcements/:id", isAdmin, async (req, res) => {
+    try {
+      const announcement = await storage.updateAnnouncement(parseInt(req.params.id), req.body);
+      res.json(announcement);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update announcement" });
     }
   });
 

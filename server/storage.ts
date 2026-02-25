@@ -59,15 +59,18 @@ export interface IStorage {
   getFaqs(): Promise<Faq[]>;
   getAllFaqs(): Promise<Faq[]>;
   createFaq(faq: InsertFaq): Promise<Faq>;
+  updateFaq(id: number, data: Partial<InsertFaq>): Promise<Faq>;
   deleteFaq(id: number): Promise<void>;
 
   getSuccessStories(): Promise<SuccessStory[]>;
   getAllSuccessStories(): Promise<SuccessStory[]>;
   createSuccessStory(story: InsertSuccessStory): Promise<SuccessStory>;
+  updateSuccessStory(id: number, data: Partial<InsertSuccessStory>): Promise<SuccessStory>;
   deleteSuccessStory(id: number): Promise<void>;
 
   getAnnouncements(): Promise<Announcement[]>;
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  updateAnnouncement(id: number, data: Partial<InsertAnnouncement>): Promise<Announcement>;
   deleteAnnouncement(id: number): Promise<void>;
 
   getAdminStats(): Promise<{
@@ -429,6 +432,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async updateFaq(id: number, data: Partial<InsertFaq>): Promise<Faq> {
+    const [updated] = await db.update(faqs).set(data).where(eq(faqs.id, id)).returning();
+    return updated;
+  }
+
   async deleteFaq(id: number): Promise<void> {
     await db.delete(faqs).where(eq(faqs.id, id));
   }
@@ -446,6 +454,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async updateSuccessStory(id: number, data: Partial<InsertSuccessStory>): Promise<SuccessStory> {
+    const [updated] = await db.update(successStories).set(data).where(eq(successStories.id, id)).returning();
+    return updated;
+  }
+
   async deleteSuccessStory(id: number): Promise<void> {
     await db.delete(successStories).where(eq(successStories.id, id));
   }
@@ -457,6 +470,11 @@ export class DatabaseStorage implements IStorage {
   async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
     const [created] = await db.insert(announcements).values(announcement).returning();
     return created;
+  }
+
+  async updateAnnouncement(id: number, data: Partial<InsertAnnouncement>): Promise<Announcement> {
+    const [updated] = await db.update(announcements).set(data).where(eq(announcements.id, id)).returning();
+    return updated;
   }
 
   async deleteAnnouncement(id: number): Promise<void> {

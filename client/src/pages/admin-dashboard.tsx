@@ -59,6 +59,8 @@ import {
   UserCog,
   Shield,
   Lock,
+  UserPlus,
+  KeyRound,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot } from "@shared/schema";
@@ -250,7 +252,8 @@ function OverviewTab() {
 
 function FaqsTab() {
   const { toast } = useToast();
-  const [showAdd, setShowAdd] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [editingFaq, setEditingFaq] = useState<Faq | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [category, setCategory] = useState("");
@@ -259,30 +262,28 @@ function FaqsTab() {
     queryKey: ["/api/admin/faqs"],
   });
 
-  const addMutation = useMutation({
-    mutationFn: async (data: {
-      question: string;
-      answer: string;
-      category: string;
-    }) => {
+  const openAdd = () => { setEditingFaq(null); setQuestion(""); setAnswer(""); setCategory(""); setShowDialog(true); };
+  const openEdit = (faq: Faq) => { setEditingFaq(faq); setQuestion(faq.question); setAnswer(faq.answer); setCategory(faq.category || ""); setShowDialog(true); };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: { question: string; answer: string; category: string }) => {
+      if (editingFaq) {
+        const res = await apiRequest("PATCH", `/api/admin/faqs/${editingFaq.id}`, data);
+        return res.json();
+      }
       const res = await apiRequest("POST", "/api/admin/faqs", data);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "FAQ 已新增" });
+      toast({ title: editingFaq ? "FAQ 已更新" : "FAQ 已新增" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/faqs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/faqs"] });
-      setShowAdd(false);
-      setQuestion("");
-      setAnswer("");
-      setCategory("");
+      setShowDialog(false);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/admin/faqs/${id}`);
-    },
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/admin/faqs/${id}`); },
     onSuccess: () => {
       toast({ title: "已刪除" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/faqs"] });
@@ -295,106 +296,67 @@ function FaqsTab() {
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-foreground">常見問題管理</h1>
-          <p className="text-sm text-muted-foreground">管理官網 FAQ 內容</p>
+          <p className="text-sm text-muted-foreground">管理官網 FAQ 內容，編輯後前台即時更新</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-faq">
-          <Plus className="w-4 h-4 mr-1.5" />
-          新增 FAQ
+        <Button onClick={openAdd} className="rounded-full" data-testid="button-add-faq">
+          <Plus className="w-4 h-4 mr-1.5" />新增 FAQ
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-md" />
-          ))}
-        </div>
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
       ) : (
         <div className="space-y-3">
           {faqs.map((faq) => (
-            <div
-              key={faq.id}
-              className="bg-white rounded-md border border-gray-100 p-4"
-              data-testid={`admin-faq-${faq.id}`}
-            >
+            <div key={faq.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`admin-faq-${faq.id}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs text-tiffany font-medium">
-                    {faq.category}
-                  </span>
-                  <p className="text-sm font-medium text-foreground mt-1">
-                    {faq.question}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {faq.answer}
-                  </p>
+                  <span className="text-xs text-tiffany font-medium">{faq.category}</span>
+                  <p className="text-sm font-medium text-foreground mt-1">{faq.question}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{faq.answer}</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => deleteMutation.mutate(faq.id)}
-                  data-testid={`button-delete-faq-${faq.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" onClick={() => openEdit(faq)} data-testid={`button-edit-faq-${faq.id}`}>
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此 FAQ？")) deleteMutation.mutate(faq.id); }} data-testid={`button-delete-faq-${faq.id}`}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) setEditingFaq(null); setShowDialog(open); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新增常見問題</DialogTitle>
+            <DialogTitle>{editingFaq ? "編輯常見問題" : "新增常見問題"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <Label>分類</Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger data-testid="select-faq-category">
-                  <SelectValue placeholder="選擇分類" />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-faq-category"><SelectValue placeholder="選擇分類" /></SelectTrigger>
                 <SelectContent>
-                  {["關於課程", "關於費用", "關於老師", "關於預約"].map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
+                  {["關於課程", "關於費用", "關於老師", "關於預約"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>問題</Label>
-              <Input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="輸入問題"
-                data-testid="input-faq-question"
-              />
+              <Input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="輸入問題" data-testid="input-faq-question" />
             </div>
             <div>
               <Label>答案</Label>
-              <Textarea
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="輸入答案"
-                data-testid="input-faq-answer"
-              />
+              <Textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="輸入答案" rows={4} data-testid="input-faq-answer" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)}>
-              取消
-            </Button>
-            <Button
-              onClick={() =>
-                addMutation.mutate({ question, answer, category })
-              }
-              disabled={!question || !answer || !category || addMutation.isPending}
-              data-testid="button-submit-faq"
-            >
-              {addMutation.isPending ? "新增中..." : "確認新增"}
+            <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
+            <Button onClick={() => saveMutation.mutate({ question, answer, category })} disabled={!question || !answer || !category || saveMutation.isPending} data-testid="button-submit-faq">
+              {saveMutation.isPending ? "儲存中..." : editingFaq ? "更新" : "新增"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -405,39 +367,42 @@ function FaqsTab() {
 
 function StoriesTab() {
   const { toast } = useToast();
-  const [showAdd, setShowAdd] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [editingStory, setEditingStory] = useState<SuccessStory | null>(null);
   const [studentName, setStudentName] = useState("");
   const [testimonial, setTestimonial] = useState("");
   const [grade, setGrade] = useState("");
+  const [parentName, setParentName] = useState("");
 
   const { data: stories = [], isLoading } = useQuery<SuccessStory[]>({
     queryKey: ["/api/admin/success-stories"],
   });
 
-  const addMutation = useMutation({
-    mutationFn: async (data: {
-      studentName: string;
-      testimonial: string;
-      grade?: number;
-    }) => {
+  const openAdd = () => { setEditingStory(null); setStudentName(""); setTestimonial(""); setGrade(""); setParentName(""); setShowDialog(true); };
+  const openEdit = (s: SuccessStory) => {
+    setEditingStory(s); setStudentName(s.studentName); setTestimonial(s.testimonial);
+    setGrade(s.grade?.toString() || ""); setParentName(s.parentName || ""); setShowDialog(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: { studentName: string; testimonial: string; grade?: number; parentName?: string }) => {
+      if (editingStory) {
+        const res = await apiRequest("PATCH", `/api/admin/success-stories/${editingStory.id}`, data);
+        return res.json();
+      }
       const res = await apiRequest("POST", "/api/admin/success-stories", data);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "案例已新增" });
+      toast({ title: editingStory ? "案例已更新" : "案例已新增" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/success-stories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/success-stories"] });
-      setShowAdd(false);
-      setStudentName("");
-      setTestimonial("");
-      setGrade("");
+      setShowDialog(false);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/admin/success-stories/${id}`);
-    },
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/admin/success-stories/${id}`); },
     onSuccess: () => {
       toast({ title: "已刪除" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/success-stories"] });
@@ -450,114 +415,80 @@ function StoriesTab() {
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-foreground">成功案例</h1>
-          <p className="text-sm text-muted-foreground">管理家長好評與推薦</p>
+          <p className="text-sm text-muted-foreground">管理家長好評與推薦，編輯後前台即時更新</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-story">
-          <Plus className="w-4 h-4 mr-1.5" />
-          新增案例
+        <Button onClick={openAdd} className="rounded-full" data-testid="button-add-story">
+          <Plus className="w-4 h-4 mr-1.5" />新增案例
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-md" />
-          ))}
-        </div>
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-md" />)}</div>
       ) : (
         <div className="space-y-3">
           {stories.map((story) => (
-            <div
-              key={story.id}
-              className="bg-white rounded-md border border-gray-100 p-4"
-              data-testid={`admin-story-${story.id}`}
-            >
+            <div key={story.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`admin-story-${story.id}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <p className="text-sm font-medium text-foreground">
-                      {story.studentName}
-                    </p>
-                    {story.grade && (
-                      <span className="text-xs bg-amber-warm text-foreground/70 px-2 py-0.5 rounded-full">
-                        {story.grade}年級
-                      </span>
-                    )}
+                    <p className="text-sm font-medium text-foreground">{story.studentName}</p>
+                    {story.parentName && <span className="text-xs text-muted-foreground">({story.parentName})</span>}
+                    {story.grade && <span className="text-xs bg-amber-warm text-foreground/70 px-2 py-0.5 rounded-full">{story.grade}年級</span>}
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {story.testimonial}
-                  </p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{story.testimonial}</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => deleteMutation.mutate(story.id)}
-                  data-testid={`button-delete-story-${story.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" onClick={() => openEdit(story)} data-testid={`button-edit-story-${story.id}`}>
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此案例？")) deleteMutation.mutate(story.id); }} data-testid={`button-delete-story-${story.id}`}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) setEditingStory(null); setShowDialog(open); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新增成功案例</DialogTitle>
+            <DialogTitle>{editingStory ? "編輯成功案例" : "新增成功案例"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label>學生姓名</Label>
-              <Input
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                placeholder="學生姓名"
-                data-testid="input-story-name"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>學生姓名</Label>
+                <Input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="學生姓名" data-testid="input-story-name" />
+              </div>
+              <div>
+                <Label>家長稱呼</Label>
+                <Input value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="如：王媽媽" data-testid="input-story-parent" />
+              </div>
             </div>
             <div>
               <Label>年級</Label>
               <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger data-testid="select-story-grade">
-                  <SelectValue placeholder="選擇年級" />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-story-grade"><SelectValue placeholder="選擇年級" /></SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 4, 5, 6].map((g) => (
-                    <SelectItem key={g} value={g.toString()}>
-                      {g}年級
-                    </SelectItem>
-                  ))}
+                  {[1, 2, 3, 4, 5, 6].map((g) => <SelectItem key={g} value={g.toString()}>{g}年級</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>感言</Label>
-              <Textarea
-                value={testimonial}
-                onChange={(e) => setTestimonial(e.target.value)}
-                placeholder="家長或學生的推薦感言"
-                data-testid="input-story-testimonial"
-              />
+              <Textarea value={testimonial} onChange={(e) => setTestimonial(e.target.value)} placeholder="家長或學生的推薦感言" rows={4} data-testid="input-story-testimonial" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)}>
-              取消
-            </Button>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
             <Button
-              onClick={() =>
-                addMutation.mutate({
-                  studentName,
-                  testimonial,
-                  grade: grade ? parseInt(grade) : undefined,
-                })
-              }
-              disabled={!studentName || !testimonial || addMutation.isPending}
+              onClick={() => saveMutation.mutate({ studentName, testimonial, grade: grade ? parseInt(grade) : undefined, parentName: parentName || undefined })}
+              disabled={!studentName || !testimonial || saveMutation.isPending}
               data-testid="button-submit-story"
             >
-              {addMutation.isPending ? "新增中..." : "確認新增"}
+              {saveMutation.isPending ? "儲存中..." : editingStory ? "更新" : "新增"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -569,6 +500,11 @@ function StoriesTab() {
 function FranchisesTab() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
+  const [showDirectorDialog, setShowDirectorDialog] = useState(false);
+  const [directorFranchise, setDirectorFranchise] = useState<Franchise | null>(null);
+  const [dirUsername, setDirUsername] = useState("");
+  const [dirPassword, setDirPassword] = useState("");
+  const [dirFirstName, setDirFirstName] = useState("");
   const [editingFranchise, setEditingFranchise] = useState<Franchise | null>(null);
   const [formData, setFormData] = useState({
     name: "", city: "", district: "", address: "", phone: "", description: "",
@@ -579,6 +515,38 @@ function FranchisesTab() {
 
   const { data: franchises = [], isLoading } = useQuery<Franchise[]>({
     queryKey: ["/api/admin/franchises"],
+  });
+
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const getDirector = (franchiseId: number) => {
+    return allUsers.find((u) => u.role === "franchise_admin" && u.franchiseId === franchiseId);
+  };
+
+  const openDirectorDialog = (f: Franchise) => {
+    setDirectorFranchise(f);
+    setDirUsername("");
+    setDirPassword("");
+    setDirFirstName(f.name.replace("質數數學 ", "").replace("教室", ""));
+    setShowDirectorDialog(true);
+  };
+
+  const createDirectorMutation = useMutation({
+    mutationFn: async (data: { franchiseId: number; username: string; password: string; firstName: string }) => {
+      const res = await apiRequest("POST", "/api/admin/create-franchise-director", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "主任帳號已建立" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setShowDirectorDialog(false);
+      setDirectorFranchise(null);
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "建立帳號失敗", variant: "destructive" });
+    },
   });
 
   const resetForm = () => {
@@ -689,8 +657,21 @@ function FranchisesTab() {
                       <School className="w-3 h-3" />鄰近：{f.nearbySchools.join("、")}
                     </p>
                   )}
+                  {(() => {
+                    const director = getDirector(f.id);
+                    return director ? (
+                      <p className="text-xs text-tiffany mt-1 flex items-center gap-1">
+                        <KeyRound className="w-3 h-3" />
+                        主任：{director.firstName} {director.lastName}（帳號：{director.username}）
+                      </p>
+                    ) : (
+                      <p className="text-xs text-coral mt-1 flex items-center gap-1">
+                        <UserPlus className="w-3 h-3" />尚未開設主任帳號
+                      </p>
+                    );
+                  })()}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                   {f.rating != null && f.rating > 0 && (
                     <div className="text-right mr-2">
                       <div className="flex items-center gap-1">
@@ -699,6 +680,11 @@ function FranchisesTab() {
                       </div>
                       <p className="text-xs text-muted-foreground">{f.reviewCount} 則</p>
                     </div>
+                  )}
+                  {!getDirector(f.id) && (
+                    <Button variant="outline" size="sm" onClick={() => openDirectorDialog(f)} data-testid={`button-create-director-${f.id}`}>
+                      <UserPlus className="w-3.5 h-3.5 mr-1" />開設主任帳號
+                    </Button>
                   )}
                   <Switch
                     checked={f.isActive}
@@ -822,6 +808,54 @@ function FranchisesTab() {
               data-testid="button-submit-franchise"
             >
               {saveMutation.isPending ? "儲存中..." : editingFranchise ? "更新" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDirectorDialog} onOpenChange={(open) => { if (!open) { setDirectorFranchise(null); setDirUsername(""); setDirPassword(""); } setShowDirectorDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>開設分校主任帳號</DialogTitle>
+          </DialogHeader>
+          {directorFranchise && (
+            <div className="space-y-4 py-4">
+              <div className="bg-tiffany/5 rounded-md p-3 border border-tiffany/20">
+                <p className="text-sm font-medium text-foreground">{directorFranchise.name}</p>
+                <p className="text-xs text-muted-foreground">{directorFranchise.city} {directorFranchise.district} · {directorFranchise.address}</p>
+              </div>
+              <div>
+                <Label>主任姓名</Label>
+                <Input value={dirFirstName} onChange={(e) => setDirFirstName(e.target.value)} placeholder="姓名" className="mt-1.5" data-testid="input-director-name" />
+              </div>
+              <div>
+                <Label>登入帳號 *</Label>
+                <Input value={dirUsername} onChange={(e) => setDirUsername(e.target.value)} placeholder="設定帳號（英文）" className="mt-1.5" data-testid="input-director-username" />
+              </div>
+              <div>
+                <Label>登入密碼 *</Label>
+                <Input type="password" value={dirPassword} onChange={(e) => setDirPassword(e.target.value)} placeholder="設定密碼（至少 6 個字元）" className="mt-1.5" data-testid="input-director-password" />
+              </div>
+              <p className="text-xs text-muted-foreground">主任帳號建立後，可從網站首頁底部的「分校管理」進入分校管理後台</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDirectorDialog(false)}>取消</Button>
+            <Button
+              onClick={() => {
+                if (directorFranchise && dirUsername && dirPassword) {
+                  createDirectorMutation.mutate({
+                    franchiseId: directorFranchise.id,
+                    username: dirUsername,
+                    password: dirPassword,
+                    firstName: dirFirstName,
+                  });
+                }
+              }}
+              disabled={createDirectorMutation.isPending || !dirUsername || dirPassword.length < 6}
+              data-testid="button-submit-director"
+            >
+              {createDirectorMutation.isPending ? "建立中..." : "建立帳號"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1441,7 +1475,8 @@ function UsersTab() {
 
 function AnnouncementsTab() {
   const { toast } = useToast();
-  const [showAdd, setShowAdd] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [type, setType] = useState("info");
@@ -1450,29 +1485,27 @@ function AnnouncementsTab() {
     queryKey: ["/api/admin/announcements"],
   });
 
-  const addMutation = useMutation({
-    mutationFn: async (data: {
-      title: string;
-      content: string;
-      type: string;
-    }) => {
+  const openAdd = () => { setEditingAnn(null); setTitle(""); setContent(""); setType("info"); setShowDialog(true); };
+  const openEdit = (ann: Announcement) => { setEditingAnn(ann); setTitle(ann.title); setContent(ann.content || ""); setType(ann.type || "info"); setShowDialog(true); };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: { title: string; content: string; type: string }) => {
+      if (editingAnn) {
+        const res = await apiRequest("PATCH", `/api/admin/announcements/${editingAnn.id}`, data);
+        return res.json();
+      }
       const res = await apiRequest("POST", "/api/admin/announcements", data);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "公告已發布" });
+      toast({ title: editingAnn ? "公告已更新" : "公告已發布" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/announcements"] });
-      setShowAdd(false);
-      setTitle("");
-      setContent("");
-      setType("info");
+      setShowDialog(false);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/admin/announcements/${id}`);
-    },
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/admin/announcements/${id}`); },
     onSuccess: () => {
       toast({ title: "已刪除" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/announcements"] });
@@ -1486,18 +1519,13 @@ function AnnouncementsTab() {
           <h1 className="text-xl font-semibold text-foreground">公告管理</h1>
           <p className="text-sm text-muted-foreground">發布全系統通知</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-announcement">
-          <Plus className="w-4 h-4 mr-1.5" />
-          發布公告
+        <Button onClick={openAdd} className="rounded-full" data-testid="button-add-announcement">
+          <Plus className="w-4 h-4 mr-1.5" />發布公告
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-md" />
-          ))}
-        </div>
+        <div className="space-y-3">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
       ) : announcements.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-md border border-gray-100">
           <Megaphone className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
@@ -1506,77 +1534,46 @@ function AnnouncementsTab() {
       ) : (
         <div className="space-y-3">
           {announcements.map((ann) => (
-            <div
-              key={ann.id}
-              className="bg-white rounded-md border border-gray-100 p-4"
-              data-testid={`admin-announcement-${ann.id}`}
-            >
+            <div key={ann.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`admin-announcement-${ann.id}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <p className="text-sm font-medium text-foreground">
-                      {ann.title}
-                    </p>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        ann.type === "important"
-                          ? "bg-coral/10 text-coral"
-                          : ann.type === "promotion"
-                          ? "bg-amber-warm text-amber-700"
-                          : "bg-tiffany/10 text-tiffany"
-                      }`}
-                    >
-                      {ann.type === "important"
-                        ? "重要"
-                        : ann.type === "promotion"
-                        ? "優惠"
-                        : "一般"}
+                    <p className="text-sm font-medium text-foreground">{ann.title}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${ann.type === "important" ? "bg-coral/10 text-coral" : ann.type === "promotion" ? "bg-amber-warm text-amber-700" : "bg-tiffany/10 text-tiffany"}`}>
+                      {ann.type === "important" ? "重要" : ann.type === "promotion" ? "優惠" : "一般"}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {ann.content}
-                  </p>
-                  <p className="text-xs text-muted-foreground/60 mt-2">
-                    {ann.createdAt
-                      ? new Date(ann.createdAt).toLocaleDateString("zh-TW")
-                      : ""}
-                  </p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{ann.content}</p>
+                  <p className="text-xs text-muted-foreground/60 mt-2">{ann.createdAt ? new Date(ann.createdAt).toLocaleDateString("zh-TW") : ""}</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => deleteMutation.mutate(ann.id)}
-                  data-testid={`button-delete-announcement-${ann.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" onClick={() => openEdit(ann)} data-testid={`button-edit-announcement-${ann.id}`}>
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此公告？")) deleteMutation.mutate(ann.id); }} data-testid={`button-delete-announcement-${ann.id}`}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) setEditingAnn(null); setShowDialog(open); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>發布公告</DialogTitle>
+            <DialogTitle>{editingAnn ? "編輯公告" : "發布公告"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <Label>標題</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="公告標題"
-                data-testid="input-announcement-title"
-              />
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="公告標題" data-testid="input-announcement-title" />
             </div>
             <div>
               <Label>類型</Label>
               <Select value={type} onValueChange={setType}>
-                <SelectTrigger data-testid="select-announcement-type">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-announcement-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="info">一般</SelectItem>
                   <SelectItem value="important">重要</SelectItem>
@@ -1586,24 +1583,13 @@ function AnnouncementsTab() {
             </div>
             <div>
               <Label>內容</Label>
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="公告內容"
-                data-testid="input-announcement-content"
-              />
+              <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="公告內容" rows={4} data-testid="input-announcement-content" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)}>
-              取消
-            </Button>
-            <Button
-              onClick={() => addMutation.mutate({ title, content, type })}
-              disabled={!title || !content || addMutation.isPending}
-              data-testid="button-submit-announcement"
-            >
-              {addMutation.isPending ? "發布中..." : "發布"}
+            <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
+            <Button onClick={() => saveMutation.mutate({ title, content, type })} disabled={!title || !content || saveMutation.isPending} data-testid="button-submit-announcement">
+              {saveMutation.isPending ? "儲存中..." : editingAnn ? "更新" : "發布"}
             </Button>
           </DialogFooter>
         </DialogContent>
