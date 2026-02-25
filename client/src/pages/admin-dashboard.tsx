@@ -61,9 +61,13 @@ import {
   Lock,
   UserPlus,
   KeyRound,
+  ShoppingBag,
+  Package,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot } from "@shared/schema";
+import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS } from "@shared/constants";
 
@@ -102,6 +106,7 @@ export default function AdminDashboard() {
     { id: "timeslots", label: "時段管理", icon: Clock },
     { id: "users", label: "帳號管理", icon: UserCog },
     { id: "announcements", label: "公告管理", icon: Megaphone },
+    { id: "shop", label: "商城管理", icon: ShoppingBag },
   ];
 
   return (
@@ -169,6 +174,7 @@ export default function AdminDashboard() {
             {activeTab === "timeslots" && <TimeSlotsTab />}
             {activeTab === "users" && <UsersTab />}
             {activeTab === "announcements" && <AnnouncementsTab />}
+            {activeTab === "shop" && <ShopManagementTab />}
           </main>
         </div>
       </div>
@@ -1594,6 +1600,391 @@ function AnnouncementsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+interface OrderWithUser extends Order {
+  userName?: string;
+}
+
+function ShopManagementTab() {
+  const { toast } = useToast();
+  const [section, setSection] = useState<"products" | "orders">("products");
+  const [showProductDialog, setShowProductDialog] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [productForm, setProductForm] = useState({
+    name: "", description: "", category: "教材", price: 0, discountPrice: null as number | null,
+    stock: 0, isActive: true, imageUrl: "",
+  });
+
+  const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: ["/api/admin/products"],
+  });
+
+  const { data: allOrders = [], isLoading: ordersLoading } = useQuery<OrderWithUser[]>({
+    queryKey: ["/api/admin/orders"],
+  });
+
+  const resetProductForm = () => {
+    setProductForm({ name: "", description: "", category: "教材", price: 0, discountPrice: null, stock: 0, isActive: true, imageUrl: "" });
+    setEditingProduct(null);
+  };
+
+  const openAddProduct = () => { resetProductForm(); setShowProductDialog(true); };
+  const openEditProduct = (p: Product) => {
+    setEditingProduct(p);
+    setProductForm({
+      name: p.name, description: p.description || "", category: p.category,
+      price: p.price, discountPrice: p.discountPrice, stock: p.stock,
+      isActive: p.isActive, imageUrl: p.imageUrl || "",
+    });
+    setShowProductDialog(true);
+  };
+
+  const saveProductMutation = useMutation({
+    mutationFn: async (data: typeof productForm) => {
+      const payload = { ...data, discountPrice: data.discountPrice || null };
+      if (editingProduct) {
+        const res = await apiRequest("PATCH", `/api/admin/products/${editingProduct.id}`, payload);
+        return res.json();
+      }
+      const res = await apiRequest("POST", "/api/admin/products", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: editingProduct ? "商品已更新" : "商品已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setShowProductDialog(false);
+      resetProductForm();
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "儲存失敗", variant: "destructive" });
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/admin/products/${id}`); },
+    onSuccess: () => {
+      toast({ title: "商品已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+  });
+
+  const toggleProductActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/products/${id}`, { isActive });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+  });
+
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/orders/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "訂單狀態已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+    },
+  });
+
+  const formatPrice = (price: number) => `NT$ ${price.toLocaleString()}`;
+
+  const statusLabels: Record<string, { label: string; color: string }> = {
+    pending: { label: "待處理", color: "bg-amber-warm text-amber-700" },
+    paid: { label: "已付款", color: "bg-tiffany/10 text-tiffany" },
+    shipped: { label: "已出貨", color: "bg-blue-100 text-blue-700" },
+    completed: { label: "已完成", color: "bg-green-100 text-green-700" },
+    cancelled: { label: "已取消", color: "bg-coral/10 text-coral" },
+  };
+
+  const statusOptions = ["pending", "paid", "shipped", "completed", "cancelled"];
+
+  return (
+    <div className="max-w-5xl">
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground" data-testid="text-shop-management-title">商城管理</h1>
+          <p className="text-sm text-muted-foreground">管理教材教具商品與訂單</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant={section === "products" ? "default" : "outline"}
+            onClick={() => setSection("products")}
+            data-testid="button-section-products"
+          >
+            <Package className="w-4 h-4 mr-1.5" />商品管理
+          </Button>
+          <Button
+            variant={section === "orders" ? "default" : "outline"}
+            onClick={() => setSection("orders")}
+            data-testid="button-section-orders"
+          >
+            <ShoppingBag className="w-4 h-4 mr-1.5" />訂單管理
+          </Button>
+        </div>
+      </div>
+
+      {section === "products" && (
+        <div>
+          <div className="flex items-center justify-end mb-4">
+            <Button onClick={openAddProduct} className="rounded-full" data-testid="button-add-product">
+              <Plus className="w-4 h-4 mr-1.5" />新增商品
+            </Button>
+          </div>
+
+          {productsLoading ? (
+            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}</div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+              <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">尚無商品</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-md border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <th className="text-left p-3 font-medium text-muted-foreground">商品名稱</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground">分類</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground">售價</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground">折扣價</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground">庫存</th>
+                      <th className="text-center p-3 font-medium text-muted-foreground">狀態</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => (
+                      <tr key={product.id} className="border-b border-gray-50 last:border-0" data-testid={`admin-product-row-${product.id}`}>
+                        <td className="p-3">
+                          <div className="flex items-center gap-3">
+                            {product.imageUrl ? (
+                              <img src={product.imageUrl} alt={product.name} className="w-10 h-10 rounded-md object-cover" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center">
+                                <Package className="w-5 h-5 text-gray-400" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate" data-testid={`text-product-name-${product.id}`}>{product.name}</p>
+                              {product.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{product.description}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${product.category === "教材" ? "bg-tiffany/10 text-tiffany" : "bg-amber-warm text-amber-700"}`} data-testid={`text-product-category-${product.id}`}>
+                            {product.category}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right" data-testid={`text-product-price-${product.id}`}>{formatPrice(product.price)}</td>
+                        <td className="p-3 text-right text-coral" data-testid={`text-product-discount-${product.id}`}>
+                          {product.discountPrice ? formatPrice(product.discountPrice) : "-"}
+                        </td>
+                        <td className="p-3 text-right" data-testid={`text-product-stock-${product.id}`}>{product.stock}</td>
+                        <td className="p-3 text-center">
+                          <Switch
+                            checked={product.isActive}
+                            onCheckedChange={(checked) => toggleProductActiveMutation.mutate({ id: product.id, isActive: checked })}
+                            data-testid={`switch-product-active-${product.id}`}
+                          />
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="outline" size="icon" onClick={() => openEditProduct(product)} data-testid={`button-edit-product-${product.id}`}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此商品？")) deleteProductMutation.mutate(product.id); }} data-testid={`button-delete-product-${product.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {section === "orders" && (
+        <div>
+          {ordersLoading ? (
+            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
+          ) : allOrders.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+              <ShoppingBag className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">尚無訂單</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {allOrders.map((order) => {
+                const st = statusLabels[order.status] || statusLabels.pending;
+                return (
+                  <div key={order.id} className="bg-white rounded-md border border-gray-100" data-testid={`admin-order-${order.id}`}>
+                    <div
+                      className="p-4 flex items-center gap-4 cursor-pointer"
+                      onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                      data-testid={`button-toggle-order-${order.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-sm font-medium text-foreground" data-testid={`text-order-id-${order.id}`}>訂單 #{order.id}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${st.color}`} data-testid={`text-order-status-${order.id}`}>{st.label}</span>
+                          {order.userName && <span className="text-xs text-muted-foreground" data-testid={`text-order-user-${order.id}`}>{order.userName}</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className="text-sm font-semibold text-foreground" data-testid={`text-order-total-${order.id}`}>{formatPrice(order.totalAmount)}</span>
+                          <span className="text-xs text-muted-foreground" data-testid={`text-order-date-${order.id}`}>
+                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString("zh-TW") : ""}
+                          </span>
+                          {order.note && <span className="text-xs text-muted-foreground">備註：{order.note}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Select
+                          value={order.status}
+                          onValueChange={(v) => updateOrderStatusMutation.mutate({ id: order.id, status: v })}
+                        >
+                          <SelectTrigger className="w-[120px]" data-testid={`select-order-status-${order.id}`} onClick={(e) => e.stopPropagation()}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.map((s) => (
+                              <SelectItem key={s} value={s}>{statusLabels[s]?.label || s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {expandedOrder === order.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                    </div>
+
+                    {expandedOrder === order.id && (
+                      <OrderItemsDetail orderId={order.id} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <Dialog open={showProductDialog} onOpenChange={(open) => { if (!open) resetProductForm(); setShowProductDialog(open); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingProduct ? "編輯商品" : "新增商品"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>商品名稱 *</Label>
+              <Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} placeholder="輸入商品名稱" data-testid="input-product-name" />
+            </div>
+            <div>
+              <Label>商品描述</Label>
+              <Textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} placeholder="商品描述" rows={3} data-testid="input-product-description" />
+            </div>
+            <div>
+              <Label>分類 *</Label>
+              <Select value={productForm.category} onValueChange={(v) => setProductForm({ ...productForm, category: v })}>
+                <SelectTrigger data-testid="select-product-category"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="教材">教材</SelectItem>
+                  <SelectItem value="教具">教具</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>售價 (TWD) *</Label>
+                <Input type="number" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: parseInt(e.target.value) || 0 })} data-testid="input-product-price" />
+              </div>
+              <div>
+                <Label>折扣價 (TWD)</Label>
+                <Input type="number" min="0" value={productForm.discountPrice ?? ""} onChange={(e) => setProductForm({ ...productForm, discountPrice: e.target.value ? parseInt(e.target.value) : null })} placeholder="選填" data-testid="input-product-discount-price" />
+              </div>
+            </div>
+            <div>
+              <Label>庫存數量</Label>
+              <Input type="number" min="0" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: parseInt(e.target.value) || 0 })} data-testid="input-product-stock" />
+            </div>
+            <div>
+              <Label>商品圖片 URL</Label>
+              <Input value={productForm.imageUrl} onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })} placeholder="https://..." data-testid="input-product-image" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Label>上架狀態</Label>
+              <Switch checked={productForm.isActive} onCheckedChange={(checked) => setProductForm({ ...productForm, isActive: checked })} data-testid="switch-product-dialog-active" />
+              <span className="text-sm text-muted-foreground">{productForm.isActive ? "上架中" : "已下架"}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetProductForm(); setShowProductDialog(false); }}>取消</Button>
+            <Button
+              onClick={() => saveProductMutation.mutate(productForm)}
+              disabled={!productForm.name || !productForm.price || saveProductMutation.isPending}
+              data-testid="button-submit-product"
+            >
+              {saveProductMutation.isPending ? "儲存中..." : editingProduct ? "更新" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function OrderItemsDetail({ orderId }: { orderId: number }) {
+  const { data: orderDetail } = useQuery<{ order: Order; items: OrderItem[] }>({
+    queryKey: ["/api/admin/orders", orderId],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${orderId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch order details");
+      return res.json();
+    },
+  });
+
+  if (!orderDetail?.items) {
+    return (
+      <div className="px-4 pb-4">
+        <Skeleton className="h-12 rounded-md" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 pb-4 border-t border-gray-100">
+      <table className="w-full text-sm mt-3">
+        <thead>
+          <tr className="text-xs text-muted-foreground">
+            <th className="text-left pb-2">商品</th>
+            <th className="text-right pb-2">單價</th>
+            <th className="text-right pb-2">數量</th>
+            <th className="text-right pb-2">小計</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orderDetail.items.map((item) => (
+            <tr key={item.id} className="border-t border-gray-50" data-testid={`order-item-row-${item.id}`}>
+              <td className="py-2 text-foreground" data-testid={`text-order-item-name-${item.id}`}>{item.productName}</td>
+              <td className="py-2 text-right text-muted-foreground">NT$ {item.unitPrice.toLocaleString()}</td>
+              <td className="py-2 text-right text-muted-foreground">{item.quantity}</td>
+              <td className="py-2 text-right font-medium">NT$ {(item.unitPrice * item.quantity).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

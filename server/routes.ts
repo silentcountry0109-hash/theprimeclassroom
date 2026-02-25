@@ -878,5 +878,194 @@ export async function registerRoutes(
     }
   });
 
+  // ========== Shop: Products (Public) ==========
+  app.get("/api/products", async (_req, res) => {
+    try {
+      const productList = await storage.getActiveProducts();
+      res.json(productList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  // ========== Shop: Cart (Parent) ==========
+  app.get("/api/cart", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const items = await storage.getCartItems(userId);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch cart" });
+    }
+  });
+
+  app.post("/api/cart", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const { productId, quantity } = req.body;
+      if (!productId || !quantity || quantity < 1) {
+        return res.status(400).json({ message: "請提供商品和數量" });
+      }
+      const product = await storage.getProduct(productId);
+      if (!product || !product.isActive) {
+        return res.status(404).json({ message: "商品不存在或已下架" });
+      }
+      const item = await storage.addToCart(req.currentUser.id, productId, quantity);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ message: "加入購物車失敗" });
+    }
+  });
+
+  app.patch("/api/cart/:id", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const { quantity } = req.body;
+      if (!quantity || quantity < 1) {
+        return res.status(400).json({ message: "數量不正確" });
+      }
+      const item = await storage.updateCartQuantity(parseInt(req.params.id), quantity);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ message: "更新購物車失敗" });
+    }
+  });
+
+  app.delete("/api/cart/:id", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      await storage.removeFromCart(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "移除商品失敗" });
+    }
+  });
+
+  // ========== Shop: Orders (Parent) ==========
+  app.post("/api/orders", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const { items, note } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "請至少選擇一項商品" });
+      }
+      const order = await storage.createOrder(req.currentUser.id, items, note);
+      res.json(order);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "下單失敗" });
+    }
+  });
+
+  app.get("/api/orders", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const orderList = await storage.getOrders(req.currentUser.id);
+      res.json(orderList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  app.get("/api/orders/:id", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const order = await storage.getOrder(parseInt(req.params.id));
+      if (!order) return res.status(404).json({ message: "訂單不存在" });
+      const items = await storage.getOrderItems(order.id);
+      res.json({ ...order, items });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch order" });
+    }
+  });
+
+  // ========== Shop: Admin Product Management ==========
+  app.get("/api/admin/products", isAdmin, async (_req, res) => {
+    try {
+      const productList = await storage.getAllProducts();
+      res.json(productList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.post("/api/admin/products", isAdmin, upload.single("image"), async (req: any, res) => {
+    try {
+      const { name, description, price, discountPrice, category, stock, isActive, sortOrder } = req.body;
+      if (!name || !price || !category) {
+        return res.status(400).json({ message: "請填寫商品名稱、價格和分類" });
+      }
+      const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+      const product = await storage.createProduct({
+        name,
+        description: description || null,
+        price: parseInt(price),
+        discountPrice: discountPrice ? parseInt(discountPrice) : null,
+        category,
+        imageUrl,
+        stock: stock ? parseInt(stock) : 0,
+        isActive: isActive === "true" || isActive === true,
+        sortOrder: sortOrder ? parseInt(sortOrder) : 0,
+      });
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ message: "新增商品失敗" });
+    }
+  });
+
+  app.patch("/api/admin/products/:id", isAdmin, upload.single("image"), async (req: any, res) => {
+    try {
+      const data: any = {};
+      const { name, description, price, discountPrice, category, stock, isActive, sortOrder } = req.body;
+      if (name !== undefined) data.name = name;
+      if (description !== undefined) data.description = description || null;
+      if (price !== undefined) data.price = parseInt(price);
+      if (discountPrice !== undefined) data.discountPrice = discountPrice ? parseInt(discountPrice) : null;
+      if (category !== undefined) data.category = category;
+      if (stock !== undefined) data.stock = parseInt(stock);
+      if (isActive !== undefined) data.isActive = isActive === "true" || isActive === true;
+      if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
+      if (req.file) data.imageUrl = `/uploads/${req.file.filename}`;
+      const product = await storage.updateProduct(parseInt(req.params.id), data);
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ message: "更新商品失敗" });
+    }
+  });
+
+  app.delete("/api/admin/products/:id", isAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteProduct(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "刪除商品失敗" });
+    }
+  });
+
+  // ========== Shop: Admin Order Management ==========
+  app.get("/api/admin/orders", isAdmin, async (_req, res) => {
+    try {
+      const orderList = await storage.getOrders();
+      res.json(orderList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  app.get("/api/admin/orders/:id", isAdmin, async (req: any, res) => {
+    try {
+      const order = await storage.getOrder(parseInt(req.params.id));
+      if (!order) return res.status(404).json({ message: "訂單不存在" });
+      const items = await storage.getOrderItems(order.id);
+      res.json({ ...order, items });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch order" });
+    }
+  });
+
+  app.patch("/api/admin/orders/:id/status", isAdmin, async (req: any, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ message: "請提供狀態" });
+      const order = await storage.updateOrderStatus(parseInt(req.params.id), status);
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ message: "更新訂單狀態失敗" });
+    }
+  });
+
   return httpServer;
 }

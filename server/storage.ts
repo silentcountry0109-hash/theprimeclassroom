@@ -1,5 +1,6 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
+  products, cartItems, orders, orderItems,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -9,6 +10,10 @@ import {
   type Faq, type InsertFaq,
   type SuccessStory, type InsertSuccessStory,
   type Announcement, type InsertAnnouncement,
+  type Product, type InsertProduct,
+  type CartItem, type InsertCartItem,
+  type Order, type InsertOrder,
+  type OrderItem, type InsertOrderItem,
   type User,
 } from "@shared/schema";
 import { db } from "./db";
@@ -92,6 +97,25 @@ export interface IStorage {
     totalBookings: number;
     confirmedBookings: number;
   }>;
+  getAllProducts(): Promise<Product[]>;
+  getActiveProducts(): Promise<Product[]>;
+  getProduct(id: number): Promise<Product | undefined>;
+  createProduct(data: InsertProduct): Promise<Product>;
+  updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product>;
+  deleteProduct(id: number): Promise<void>;
+
+  getCartItems(userId: string): Promise<(CartItem & { product: Product })[]>;
+  addToCart(userId: string, productId: number, quantity: number): Promise<CartItem>;
+  updateCartQuantity(cartItemId: number, quantity: number): Promise<CartItem>;
+  removeFromCart(cartItemId: number): Promise<void>;
+  clearCart(userId: string): Promise<void>;
+
+  createOrder(userId: string, items: { productId: number; quantity: number }[], note?: string): Promise<Order>;
+  getOrders(userId?: string): Promise<(Order & { userName?: string })[]>;
+  getOrder(id: number): Promise<Order | undefined>;
+  getOrderItems(orderId: number): Promise<OrderItem[]>;
+  updateOrderStatus(id: number, status: string): Promise<Order>;
+
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
     totalBookings: number;
@@ -699,6 +723,120 @@ export class DatabaseStorage implements IStorage {
     const coachStats = Array.from(coachMap.values());
 
     return { totalSlots, totalBookings, confirmedBookings, cancelledBookings, totalSeats, bookedSeats, occupancyRate, dailyStats, coachStats };
+  }
+
+  async getAllProducts(): Promise<Product[]> {
+    return db.select().from(products).orderBy(products.sortOrder, products.id);
+  }
+
+  async getActiveProducts(): Promise<Product[]> {
+    return db.select().from(products).where(eq(products.isActive, true)).orderBy(products.sortOrder, products.id);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
+  }
+
+  async createProduct(data: InsertProduct): Promise<Product> {
+    const [product] = await db.insert(products).values(data).returning();
+    return product;
+  }
+
+  async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
+    const [product] = await db.update(products).set(data).where(eq(products.id, id)).returning();
+    return product;
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
+  }
+
+  async getCartItems(userId: string): Promise<(CartItem & { product: Product })[]> {
+    const rows = await db
+      .select({ cartItem: cartItems, product: products })
+      .from(cartItems)
+      .innerJoin(products, eq(cartItems.productId, products.id))
+      .where(eq(cartItems.userId, userId))
+      .orderBy(desc(cartItems.createdAt));
+    return rows.map((r) => ({ ...r.cartItem, product: r.product }));
+  }
+
+  async addToCart(userId: string, productId: number, quantity: number): Promise<CartItem> {
+    const [existing] = await db
+      .select()
+      .from(cartItems)
+      .where(and(eq(cartItems.userId, userId), eq(cartItems.productId, productId)));
+    if (existing) {
+      const [updated] = await db
+        .update(cartItems)
+        .set({ quantity: existing.quantity + quantity })
+        .where(eq(cartItems.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [item] = await db.insert(cartItems).values({ userId, productId, quantity }).returning();
+    return item;
+  }
+
+  async updateCartQuantity(cartItemId: number, quantity: number): Promise<CartItem> {
+    const [item] = await db.update(cartItems).set({ quantity }).where(eq(cartItems.id, cartItemId)).returning();
+    return item;
+  }
+
+  async removeFromCart(cartItemId: number): Promise<void> {
+    await db.delete(cartItems).where(eq(cartItems.id, cartItemId));
+  }
+
+  async clearCart(userId: string): Promise<void> {
+    await db.delete(cartItems).where(eq(cartItems.userId, userId));
+  }
+
+  async createOrder(userId: string, items: { productId: number; quantity: number }[], note?: string): Promise<Order> {
+    let totalAmount = 0;
+    const resolvedItems: { productId: number; productName: string; quantity: number; unitPrice: number }[] = [];
+    for (const item of items) {
+      const product = await this.getProduct(item.productId);
+      if (!product) throw new Error(`商品不存在: ${item.productId}`);
+      if (!product.isActive) throw new Error(`商品已下架: ${product.name}`);
+      if (product.stock < item.quantity) throw new Error(`庫存不足: ${product.name}`);
+      const unitPrice = product.discountPrice ?? product.price;
+      resolvedItems.push({ productId: product.id, productName: product.name, quantity: item.quantity, unitPrice });
+      totalAmount += unitPrice * item.quantity;
+    }
+    const [order] = await db.insert(orders).values({ userId, totalAmount, status: "pending", note: note || null }).returning();
+    for (const ri of resolvedItems) {
+      await db.insert(orderItems).values({ orderId: order.id, ...ri });
+      await db.update(products).set({ stock: sql`${products.stock} - ${ri.quantity}` }).where(eq(products.id, ri.productId));
+    }
+    await this.clearCart(userId);
+    return order;
+  }
+
+  async getOrders(userId?: string): Promise<(Order & { userName?: string })[]> {
+    if (userId) {
+      return db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+    }
+    const rows = await db
+      .select({ order: orders, firstName: users.firstName })
+      .from(orders)
+      .leftJoin(users, eq(orders.userId, users.id))
+      .orderBy(desc(orders.createdAt));
+    return rows.map((r) => ({ ...r.order, userName: r.firstName || undefined }));
+  }
+
+  async getOrder(id: number): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order;
+  }
+
+  async getOrderItems(orderId: number): Promise<OrderItem[]> {
+    return db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  }
+
+  async updateOrderStatus(id: number, status: string): Promise<Order> {
+    const [order] = await db.update(orders).set({ status }).where(eq(orders.id, id)).returning();
+    return order;
   }
 }
 

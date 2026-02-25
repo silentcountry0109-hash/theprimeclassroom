@@ -34,12 +34,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   Home,
   Users,
   CalendarCheck,
   LogOut,
   Plus,
+  Minus,
   Trash2,
   GraduationCap,
   Clock,
@@ -55,8 +64,14 @@ import {
   AlertCircle,
   ArrowRight,
   ChevronLeft,
+  ShoppingBag,
+  ShoppingCart,
+  Package,
+  FileText,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-import type { Child, Booking, Franchise } from "@shared/schema";
+import type { Child, Booking, Franchise, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
 
@@ -170,6 +185,7 @@ const TAB_ITEMS = [
   { id: "book", label: "預約課程", icon: CalendarDays },
   { id: "children", label: "我的孩子", icon: Users },
   { id: "bookings", label: "預約紀錄", icon: CalendarCheck },
+  { id: "shop", label: "商城", icon: ShoppingBag },
 ];
 
 export default function ParentDashboard() {
@@ -269,6 +285,7 @@ export default function ParentDashboard() {
         {activeTab === "book" && <BookingFlowTab />}
         {activeTab === "children" && <ChildrenTab />}
         {activeTab === "bookings" && <BookingsTab />}
+        {activeTab === "shop" && <ShopTab />}
       </main>
     </div>
   );
@@ -1557,6 +1574,597 @@ function BookingsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+interface CartItemWithProduct extends CartItem {
+  product: Product;
+}
+
+interface OrderWithItems extends Order {
+  items?: OrderItem[];
+  userName?: string;
+}
+
+function formatPrice(cents: number) {
+  return `NT$ ${Math.round(cents).toLocaleString()}`;
+}
+
+function ShopTab() {
+  const { toast } = useToast();
+  const [category, setCategory] = useState<"all" | "教材" | "教具">("all");
+  const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [orderNote, setOrderNote] = useState("");
+  const [viewMode, setViewMode] = useState<"products" | "orders">("products");
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+
+  const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: ["/api/products"],
+  });
+
+  const { data: cartItems = [], isLoading: cartLoading } = useQuery<CartItemWithProduct[]>({
+    queryKey: ["/api/cart"],
+  });
+
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<OrderWithItems[]>({
+    queryKey: ["/api/orders"],
+  });
+
+  const filteredProducts = category === "all"
+    ? products
+    : products.filter((p) => p.category === category);
+
+  const cartTotal = cartItems.reduce((sum, item) => {
+    const price = item.product.discountPrice ?? item.product.price;
+    return sum + price * item.quantity;
+  }, 0);
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  const addToCartMutation = useMutation({
+    mutationFn: async (data: { productId: number; quantity: number }) => {
+      const res = await apiRequest("POST", "/api/cart", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+      toast({ title: "已加入購物車" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "加入失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateQuantityMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: number; quantity: number }) => {
+      const res = await apiRequest("PATCH", `/api/cart/${id}`, { quantity });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeFromCartMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/cart/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+      toast({ title: "已移除商品" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "移除失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createOrderMutation = useMutation({
+    mutationFn: async (data: { items: { productId: number; quantity: number }[]; note?: string }) => {
+      const res = await apiRequest("POST", "/api/orders", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      setCheckoutOpen(false);
+      setCartOpen(false);
+      setOrderNote("");
+      toast({ title: "下單成功", description: "您的訂單已建立" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "下單失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleCheckout = () => {
+    if (cartItems.length === 0) return;
+    const items = cartItems.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
+    createOrderMutation.mutate({
+      items,
+      note: orderNote || undefined,
+    });
+  };
+
+  const fetchOrderItems = async (orderId: number) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      return;
+    }
+    setExpandedOrderId(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        queryClient.setQueryData<OrderWithItems[]>(["/api/orders"], (old) =>
+          old?.map((o) => (o.id === orderId ? { ...o, items: data.items } : o)) ?? []
+        );
+      }
+    } catch {}
+  };
+
+  const orderStatusConfig: Record<string, { label: string; className: string }> = {
+    pending: { label: "待處理", className: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+    paid: { label: "已付款", className: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+    shipped: { label: "已出貨", className: "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+    completed: { label: "已完成", className: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+    cancelled: { label: "已取消", className: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400" },
+  };
+
+  const categoryTabs = [
+    { id: "all" as const, label: "全部" },
+    { id: "教材" as const, label: "教材" },
+    { id: "教具" as const, label: "教具" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">商城</h2>
+          <p className="text-sm text-muted-foreground">瀏覽教材與教具</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === "products" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("products")}
+            className={viewMode === "products" ? "rounded-full" : "rounded-full"}
+            style={viewMode === "products" ? { backgroundColor: "#81D8D0", color: "white" } : undefined}
+            data-testid="button-view-products"
+          >
+            <Package className="w-4 h-4 mr-1" />
+            商品
+          </Button>
+          <Button
+            variant={viewMode === "orders" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("orders")}
+            className="rounded-full"
+            style={viewMode === "orders" ? { backgroundColor: "#81D8D0", color: "white" } : undefined}
+            data-testid="button-view-orders"
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            訂單
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCartOpen(true)}
+            className="rounded-full relative"
+            data-testid="button-open-cart"
+          >
+            <ShoppingCart className="w-4 h-4 mr-1" />
+            購物車
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-coral text-white text-[10px] flex items-center justify-center font-medium" data-testid="text-cart-count">
+                {cartCount}
+              </span>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {viewMode === "products" && (
+        <>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {categoryTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setCategory(tab.id)}
+                className={`px-4 py-2 text-sm rounded-full border whitespace-nowrap transition-all ${
+                  category === tab.id
+                    ? "bg-tiffany text-white border-tiffany"
+                    : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany/50"
+                }`}
+                data-testid={`filter-category-${tab.id}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {productsLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-64 rounded-xl" />
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
+              <Package className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+              <h3 className="text-sm font-semibold text-foreground mb-1">
+                {category === "all" ? "尚無商品" : `沒有${category}類商品`}
+              </h3>
+              <p className="text-xs text-muted-foreground">敬請期待</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {filteredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:border-tiffany/30 hover:shadow-sm transition-all"
+                  data-testid={`card-product-${product.id}`}
+                >
+                  {product.imageUrl ? (
+                    <div className="w-full h-36 bg-gray-50">
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-36 bg-gradient-to-br from-tiffany/5 to-tiffany/10 flex items-center justify-center">
+                      <Package className="w-10 h-10 text-tiffany/30" />
+                    </div>
+                  )}
+                  <div className="p-3">
+                    <div className="flex items-start justify-between gap-1 mb-1">
+                      <h3 className="text-sm font-medium text-foreground line-clamp-2" data-testid={`text-product-name-${product.id}`}>
+                        {product.name}
+                      </h3>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-muted-foreground flex-shrink-0">
+                        {product.category}
+                      </span>
+                    </div>
+                    {product.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                        {product.description}
+                      </p>
+                    )}
+                    <div className="flex items-end justify-between gap-2">
+                      <div>
+                        {product.discountPrice ? (
+                          <>
+                            <span className="text-sm font-bold text-coral" data-testid={`text-product-price-${product.id}`}>
+                              {formatPrice(product.discountPrice)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground line-through ml-1">
+                              {formatPrice(product.price)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-sm font-bold text-foreground" data-testid={`text-product-price-${product.id}`}>
+                            {formatPrice(product.price)}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="rounded-full text-xs"
+                        style={{ backgroundColor: "#81D8D0", color: "white" }}
+                        disabled={product.stock <= 0 || addToCartMutation.isPending}
+                        onClick={() => addToCartMutation.mutate({ productId: product.id, quantity: 1 })}
+                        data-testid={`button-add-to-cart-${product.id}`}
+                      >
+                        {product.stock <= 0 ? (
+                          "缺貨"
+                        ) : (
+                          <>
+                            <Plus className="w-3 h-3 mr-0.5" />
+                            加入
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    {product.stock > 0 && product.stock <= 5 && (
+                      <p className="text-[10px] text-amber-600 mt-1">
+                        僅剩 {product.stock} 件
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {viewMode === "orders" && (
+        <div className="space-y-3">
+          {ordersLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 rounded-xl" />
+              ))}
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
+              <FileText className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+              <h3 className="text-sm font-semibold text-foreground mb-1">尚無訂單</h3>
+              <p className="text-xs text-muted-foreground mb-4">瀏覽商品並下單</p>
+              <Button
+                size="sm"
+                onClick={() => setViewMode("products")}
+                className="rounded-full"
+                style={{ backgroundColor: "#81D8D0", color: "white" }}
+                data-testid="button-browse-products"
+              >
+                瀏覽商品
+              </Button>
+            </div>
+          ) : (
+            orders.map((order) => {
+              const statusInfo = orderStatusConfig[order.status] || orderStatusConfig.pending;
+              const isExpanded = expandedOrderId === order.id;
+              return (
+                <div
+                  key={order.id}
+                  className="bg-white rounded-xl border border-gray-100 overflow-hidden"
+                  data-testid={`card-order-${order.id}`}
+                >
+                  <button
+                    onClick={() => fetchOrderItems(order.id)}
+                    className="w-full p-4 text-left hover:bg-gray-50/50 transition-colors"
+                    data-testid={`button-expand-order-${order.id}`}
+                  >
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                          <ShoppingBag className="w-5 h-5 text-tiffany" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground" data-testid={`text-order-id-${order.id}`}>
+                            訂單 #{order.id}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString("zh-TW", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }) : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-foreground" data-testid={`text-order-total-${order.id}`}>
+                          {formatPrice(order.totalAmount)}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded-full ${statusInfo.className}`} data-testid={`text-order-status-${order.id}`}>
+                          {statusInfo.label}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 px-4 py-3">
+                      {order.items && order.items.length > 0 ? (
+                        <div className="space-y-2">
+                          {order.items.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex items-center justify-between gap-4 text-sm"
+                              data-testid={`order-item-${item.id}`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-foreground truncate">{item.productName}</span>
+                                <span className="text-muted-foreground flex-shrink-0">x{item.quantity}</span>
+                              </div>
+                              <span className="text-foreground font-medium flex-shrink-0">
+                                {formatPrice(item.unitPrice * item.quantity)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex justify-center py-2">
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                      )}
+                      {order.note && (
+                        <p className="text-xs text-muted-foreground mt-3 pt-2 border-t border-gray-50">
+                          備註：{order.note}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+        <SheetContent className="flex flex-col" side="right">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5" />
+              購物車
+              {cartCount > 0 && (
+                <span className="text-xs text-muted-foreground font-normal">({cartCount} 件)</span>
+              )}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto py-4">
+            {cartLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 rounded-lg" />
+                ))}
+              </div>
+            ) : cartItems.length === 0 ? (
+              <div className="text-center py-12">
+                <ShoppingCart className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">購物車是空的</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {cartItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+                    data-testid={`cart-item-${item.id}`}
+                  >
+                    <div className="w-14 h-14 rounded-md bg-white dark:bg-gray-700 flex-shrink-0 overflow-hidden">
+                      {item.product.imageUrl ? (
+                        <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-6 h-6 text-muted-foreground/30" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate" data-testid={`text-cart-item-name-${item.id}`}>
+                        {item.product.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatPrice(item.product.discountPrice ?? item.product.price)}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="w-6 h-6"
+                          onClick={() => {
+                            if (item.quantity <= 1) {
+                              removeFromCartMutation.mutate(item.id);
+                            } else {
+                              updateQuantityMutation.mutate({ id: item.id, quantity: item.quantity - 1 });
+                            }
+                          }}
+                          data-testid={`button-decrease-${item.id}`}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <span className="text-sm font-medium w-6 text-center" data-testid={`text-cart-quantity-${item.id}`}>
+                          {item.quantity}
+                        </span>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="w-6 h-6"
+                          onClick={() => updateQuantityMutation.mutate({ id: item.id, quantity: item.quantity + 1 })}
+                          data-testid={`button-increase-${item.id}`}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                        <button
+                          onClick={() => removeFromCartMutation.mutate(item.id)}
+                          className="ml-auto p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                          data-testid={`button-remove-cart-item-${item.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {cartItems.length > 0 && (
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">小計</span>
+                <span className="text-lg font-bold text-foreground" data-testid="text-cart-total">
+                  {formatPrice(cartTotal)}
+                </span>
+              </div>
+              <Button
+                className="w-full rounded-full"
+                style={{ backgroundColor: "#81D8D0", color: "white" }}
+                onClick={() => setCheckoutOpen(true)}
+                data-testid="button-checkout"
+              >
+                結帳
+              </Button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>確認訂單</DialogTitle>
+            <DialogDescription>請確認您的訂單內容</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {cartItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-foreground truncate">{item.product.name}</span>
+                    <span className="text-muted-foreground flex-shrink-0">x{item.quantity}</span>
+                  </div>
+                  <span className="text-foreground font-medium flex-shrink-0">
+                    {formatPrice((item.product.discountPrice ?? item.product.price) * item.quantity)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between border-t pt-3">
+              <span className="text-sm font-medium text-foreground">總計</span>
+              <span className="text-lg font-bold text-foreground" data-testid="text-checkout-total">
+                {formatPrice(cartTotal)}
+              </span>
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-sm">備註（選填）</Label>
+              <Textarea
+                value={orderNote}
+                onChange={(e) => setOrderNote(e.target.value)}
+                placeholder="如有特殊需求請在此說明"
+                className="resize-none text-sm"
+                rows={3}
+                data-testid="input-order-note"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheckoutOpen(false)} data-testid="button-cancel-checkout">
+              取消
+            </Button>
+            <Button
+              onClick={handleCheckout}
+              disabled={createOrderMutation.isPending}
+              style={{ backgroundColor: "#81D8D0", color: "white" }}
+              data-testid="button-confirm-order"
+            >
+              {createOrderMutation.isPending ? "下單中..." : "確認下單"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

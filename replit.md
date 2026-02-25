@@ -63,7 +63,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - `client/src/components/coach-card.tsx` - Coach card with photo + seat dots
 
 ## Database Tables
-- users, sessions (Replit Auth)
+- users, sessions (Replit Auth) — users now include phone, address, referralSource fields
 - franchises (location-based classrooms with tags, rating, reviewCount, nearbySchools, photos array)
   - Photos uploaded via multer to /uploads/ directory, served statically
 - coaches (certified instructors)
@@ -71,6 +71,10 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - time_slots (bookable time periods, date stored as text YYYY-MM-DD)
 - bookings (parent-child-slot reservations)
 - faqs, success_stories, announcements (CMS content)
+- products (shop items: 教材/教具, price in TWD, discountPrice, stock, isActive)
+- cart_items (user cart: userId + productId + quantity)
+- orders (userId, totalAmount, status: pending/paid/shipped/completed/cancelled)
+- order_items (orderId + productId + productName + quantity + unitPrice)
 
 ## Authentication
 - Parents: Replit Auth (OIDC) via /api/login
@@ -107,6 +111,10 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 ### Protected (requires credential or Replit auth)
 - GET/POST/DELETE /api/children
 - GET/POST /api/bookings, PATCH /api/bookings/:id/cancel
+- GET /api/products (public, active only)
+- GET/POST/PATCH/DELETE /api/cart (shopping cart CRUD)
+- POST /api/orders (create order from cart items)
+- GET /api/orders, GET /api/orders/:id (order history)
 
 ### Admin (isAdmin middleware - role=admin only)
 - GET /api/admin/stats
