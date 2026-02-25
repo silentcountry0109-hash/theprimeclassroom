@@ -58,7 +58,8 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - `client/src/pages/landing.tsx` - Public landing page with carousels, animated hero
 - `client/src/pages/search-results.tsx` - Franchise card search results with sidebar filters
 - `client/src/pages/classroom-detail.tsx` - Franchise detail with coaches + bookable time slots
-- `client/src/pages/parent-dashboard.tsx` - Parent dashboard (top-tab layout: 首頁/預約課程/我的孩子/預約紀錄)
+- `client/src/pages/parent-dashboard.tsx` - Parent dashboard (top-tab layout: 首頁/預約課程/我的孩子/預約紀錄/商城)
+- `client/src/assets/avatar-boy.png`, `avatar-girl.png` - Generated child avatars by gender
 - `client/src/pages/admin-dashboard.tsx` - Admin CMS
 - `client/src/components/coach-card.tsx` - Coach card with photo + seat dots
 
@@ -67,7 +68,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - franchises (location-based classrooms with tags, rating, reviewCount, nearbySchools, photos array)
   - Photos uploaded via multer to /uploads/ directory, served statically
 - coaches (certified instructors)
-- children (managed by parents)
+- children (managed by parents, gender field for avatar display, parents can edit but not delete)
 - time_slots (bookable time periods, date stored as text YYYY-MM-DD)
 - bookings (parent-child-slot reservations)
 - faqs, success_stories, announcements (CMS content)

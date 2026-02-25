@@ -75,6 +75,8 @@ import {
 import type { Child, Booking, Franchise, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
+import avatarBoyPath from "../assets/avatar-boy.png";
+import avatarGirlPath from "../assets/avatar-girl.png";
 
 interface BookingWithDetails extends Booking {
   slotDate?: string;
@@ -83,6 +85,7 @@ interface BookingWithDetails extends Booking {
   franchiseName?: string;
   coachName?: string;
   childName?: string;
+  childGender?: string;
 }
 
 interface FranchiseResult {
@@ -1487,6 +1490,7 @@ function BookingsTab() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "completed" | "cancelled">("all");
   const [cancelTarget, setCancelTarget] = useState<BookingWithDetails | null>(null);
+  const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -1519,6 +1523,10 @@ function BookingsTab() {
     queryKey: ["/api/bookings"],
   });
 
+  const { data: children = [] } = useQuery<Child[]>({
+    queryKey: ["/api/children"],
+  });
+
   const cancelMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("PATCH", `/api/bookings/${id}/cancel`);
@@ -1540,22 +1548,52 @@ function BookingsTab() {
     });
   }, [bookings, dateFrom, dateTo]);
 
-  const filtered = statusFilter === "all" ? dateFiltered : dateFiltered.filter((b) => b.status === statusFilter);
+  const childFiltered = selectedChildId
+    ? dateFiltered.filter((b) => b.childId === selectedChildId)
+    : dateFiltered;
+
+  const filtered = statusFilter === "all" ? childFiltered : childFiltered.filter((b) => b.status === statusFilter);
 
   const statusCounts = useMemo(() => ({
-    all: dateFiltered.length,
-    confirmed: dateFiltered.filter((b) => b.status === "confirmed").length,
-    completed: dateFiltered.filter((b) => b.status === "completed").length,
-    cancelled: dateFiltered.filter((b) => b.status === "cancelled").length,
-  }), [dateFiltered]);
+    all: childFiltered.length,
+    confirmed: childFiltered.filter((b) => b.status === "confirmed").length,
+    completed: childFiltered.filter((b) => b.status === "completed").length,
+    cancelled: childFiltered.filter((b) => b.status === "cancelled").length,
+  }), [childFiltered]);
+
+  const isMultiChild = children.length >= 2;
+
+  const childSummaries = useMemo(() => {
+    if (!isMultiChild) return [];
+    return children.map((child) => {
+      const cb = dateFiltered.filter((b) => b.childId === child.id);
+      const upcoming = cb.filter((b) => b.status === "confirmed");
+      const completed = cb.filter((b) => b.status === "completed");
+      const nextClass = upcoming
+        .sort((a, b) => `${a.slotDate} ${a.slotStartTime}`.localeCompare(`${b.slotDate} ${b.slotStartTime}`))[0];
+      return { child, upcoming: upcoming.length, completed: completed.length, total: cb.length, nextClass };
+    });
+  }, [children, dateFiltered, isMultiChild]);
 
   const sorted = [...filtered].sort((a, b) => {
-    const dateA = `${a.slotDate} ${a.slotStartTime}`;
-    const dateB = `${b.slotDate} ${b.slotStartTime}`;
     if (a.status === "confirmed" && b.status !== "confirmed") return -1;
     if (a.status !== "confirmed" && b.status === "confirmed") return 1;
+    const dateA = `${a.slotDate} ${a.slotStartTime}`;
+    const dateB = `${b.slotDate} ${b.slotStartTime}`;
+    if (a.status === "confirmed") return dateA.localeCompare(dateB);
     return dateB.localeCompare(dateA);
   });
+
+  const groupedByDate = useMemo(() => {
+    const groups: { date: string; bookings: BookingWithDetails[] }[] = [];
+    const map = new Map<string, BookingWithDetails[]>();
+    for (const b of sorted) {
+      const d = b.slotDate || "unknown";
+      if (!map.has(d)) { map.set(d, []); groups.push({ date: d, bookings: map.get(d)! }); }
+      map.get(d)!.push(b);
+    }
+    return groups;
+  }, [sorted]);
 
   const statusConfig = {
     confirmed: { label: "已確認", icon: CheckCircle2, bgClass: "bg-tiffany/10", textClass: "text-tiffany", dotClass: "bg-tiffany" },
@@ -1569,6 +1607,19 @@ function BookingsTab() {
     { id: "completed" as const, label: "已完成" },
     { id: "cancelled" as const, label: "已取消" },
   ];
+
+  const formatDateLabel = (dateStr: string) => {
+    if (dateStr === "unknown") return "未知日期";
+    const d = new Date(dateStr + "T00:00:00");
+    const weekday = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    if (dateStr === today) return `今天 ${month}/${day}（${weekday}）`;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (dateStr === tomorrow.toISOString().split("T")[0]) return `明天 ${month}/${day}（${weekday}）`;
+    return `${month}/${day}（${weekday}）`;
+  };
 
   const handleCalendarSync = () => {
     const link = document.createElement("a");
@@ -1648,7 +1699,68 @@ function BookingsTab() {
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      {isMultiChild && (
+        <div className="grid grid-cols-2 gap-2.5 sm:flex sm:gap-2.5" data-testid="child-summary-cards">
+          {childSummaries.map(({ child, upcoming, completed, nextClass }) => {
+            const isSelected = selectedChildId === child.id;
+            const avatarSrc = child.gender === "female" ? avatarGirlPath : avatarBoyPath;
+            return (
+              <button
+                key={child.id}
+                onClick={() => setSelectedChildId(isSelected ? null : child.id)}
+                className={`relative text-left rounded-xl border p-3 transition-all sm:flex-1 sm:min-w-[160px] ${
+                  isSelected
+                    ? "border-tiffany bg-tiffany/5 shadow-sm"
+                    : "border-gray-100 bg-white hover:border-tiffany/30"
+                }`}
+                data-testid={`button-child-filter-${child.id}`}
+              >
+                {isSelected && (
+                  <div className="absolute top-2 right-2">
+                    <CheckCircle2 className="w-4 h-4 text-tiffany" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2.5 mb-2">
+                  <img src={avatarSrc} alt={child.name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate" data-testid={`text-child-summary-name-${child.id}`}>{child.name}</p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">待上課</span>
+                    <span className={`font-semibold ${upcoming > 0 ? "text-tiffany" : "text-muted-foreground"}`} data-testid={`text-child-upcoming-${child.id}`}>{upcoming}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">已完成</span>
+                    <span className="font-semibold text-green-600" data-testid={`text-child-completed-${child.id}`}>{completed}</span>
+                  </div>
+                </div>
+                {nextClass && (
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <p className="text-[10px] text-muted-foreground">下一堂</p>
+                    <p className="text-xs font-medium text-foreground">
+                      {nextClass.slotDate?.split("-").slice(1).join("/")} {nextClass.slotStartTime?.slice(0, 5)}
+                    </p>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {isMultiChild && selectedChildId && (
+          <button
+            onClick={() => setSelectedChildId(null)}
+            className="px-3 py-2 text-xs rounded-full border border-coral/30 text-coral bg-coral/5 hover:bg-coral/10 whitespace-nowrap transition-all flex items-center gap-1"
+            data-testid="button-clear-child-filter"
+          >
+            <XCircle className="w-3 h-3" />
+            全部孩子
+          </button>
+        )}
         {filterTabs.map((tab) => (
           <button
             key={tab.id}
@@ -1687,68 +1799,83 @@ function BookingsTab() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {sorted.map((booking) => {
-            const config = statusConfig[booking.status as keyof typeof statusConfig] || statusConfig.confirmed;
-            return (
-              <div
-                key={booking.id}
-                className="bg-white rounded-xl border border-gray-100 p-4 hover:border-gray-200 transition-colors"
-                data-testid={`card-booking-${booking.id}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 text-center min-w-[52px]">
-                    <div className="text-xs text-muted-foreground">
-                      {booking.slotDate?.split("-").slice(1).join("/")}
-                    </div>
-                    <div className={`text-lg font-bold ${config.textClass}`}>
-                      {booking.slotStartTime?.slice(0, 5)}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      ~ {booking.slotEndTime?.slice(0, 5)}
-                    </div>
-                  </div>
-
-                  <div className={`w-px h-12 ${booking.status === "confirmed" ? "bg-tiffany/30" : "bg-gray-100"} flex-shrink-0`} />
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {booking.franchiseName || "教室"}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
-                      {booking.coachName && (
-                        <span className="flex items-center gap-1">
-                          <GraduationCap className="w-3 h-3" />
-                          {booking.coachName}
-                        </span>
-                      )}
-                      {booking.childName && (
-                        <span className="bg-gray-50 px-1.5 py-0.5 rounded">
-                          {booking.childName}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${config.bgClass} ${config.textClass}`}>
-                      <config.icon className="w-3 h-3" />
-                      {config.label}
-                    </span>
-                    {booking.status === "confirmed" && (
-                      <button
-                        onClick={() => setCancelTarget(booking)}
-                        className="text-xs text-muted-foreground hover:text-red-500 transition-colors p-1"
-                        data-testid={`button-cancel-booking-${booking.id}`}
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+        <div className="space-y-4">
+          {groupedByDate.map(({ date, bookings: dayBookings }) => (
+            <div key={date}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-semibold text-foreground">{formatDateLabel(date)}</span>
+                <div className="flex-1 h-px bg-gray-100" />
+                <span className="text-[10px] text-muted-foreground">{dayBookings.length} 堂</span>
               </div>
-            );
-          })}
+              <div className="space-y-1.5">
+                {dayBookings.map((booking) => {
+                  const config = statusConfig[booking.status as keyof typeof statusConfig] || statusConfig.confirmed;
+                  const avatarSrc = booking.childGender === "female" ? avatarGirlPath : avatarBoyPath;
+                  return (
+                    <div
+                      key={booking.id}
+                      className={`bg-white rounded-xl border p-3.5 transition-colors ${
+                        booking.status === "confirmed" ? "border-gray-100 hover:border-tiffany/30" : "border-gray-50 opacity-75"
+                      }`}
+                      data-testid={`card-booking-${booking.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex-shrink-0 text-center min-w-[44px]">
+                          <div className={`text-base font-bold ${config.textClass}`}>
+                            {booking.slotStartTime?.slice(0, 5)}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            ~ {booking.slotEndTime?.slice(0, 5)}
+                          </div>
+                        </div>
+
+                        <div className={`w-px h-10 ${booking.status === "confirmed" ? "bg-tiffany/30" : "bg-gray-100"} flex-shrink-0`} />
+
+                        {isMultiChild && !selectedChildId && (
+                          <img src={avatarSrc} alt={booking.childName || ""} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {booking.franchiseName || "教室"}
+                            </p>
+                            <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${config.bgClass} ${config.textClass}`}>
+                              <config.icon className="w-2.5 h-2.5" />
+                              {config.label}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                            {booking.coachName && (
+                              <span className="flex items-center gap-0.5">
+                                <GraduationCap className="w-3 h-3" />
+                                {booking.coachName}
+                              </span>
+                            )}
+                            {isMultiChild && !selectedChildId && booking.childName && (
+                              <span className="bg-gray-50 px-1.5 py-0.5 rounded text-[11px]">
+                                {booking.childName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {booking.status === "confirmed" && (
+                          <button
+                            onClick={() => setCancelTarget(booking)}
+                            className="text-xs text-muted-foreground hover:text-red-500 transition-colors p-1.5 flex-shrink-0"
+                            data-testid={`button-cancel-booking-${booking.id}`}
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

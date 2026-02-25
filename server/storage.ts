@@ -463,6 +463,7 @@ export class DatabaseStorage implements IStorage {
       franchiseName: r.franchise.name,
       coachName: r.coach?.name || null,
       childName: r.child.name,
+      childGender: r.child.gender || "male",
     }));
   }
 
