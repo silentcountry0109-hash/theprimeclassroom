@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
+  { label: "認識質數", href: "#about" },
   { label: "教學特色", href: "#teaching" },
   { label: "教材介紹", href: "#textbook" },
-  { label: "認識質數", href: "#about" },
   { label: "成功案例", href: "#testimonials" },
   { label: "FAQ", href: "#faq" },
 ];

@@ -55,6 +55,7 @@ import heroClassroomImg from "@assets/hero_classroom.png";
 import brandPhilosophyImg from "@assets/brand_philosophy.png";
 import learningDetailImg from "@assets/learning_detail.png";
 import parentChildImg from "@assets/parent_child.png";
+import textbookDisplayImg from "@assets/textbook_display.png";
 import teacher1Img from "@assets/teacher_1.png";
 import teacher2Img from "@assets/teacher_2.png";
 import teacher3Img from "@assets/teacher_3.png";
@@ -420,7 +421,7 @@ function BrandPhilosophySection() {
   ];
 
   return (
-    <section className="relative bg-white">
+    <section id="about" className="relative bg-white">
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-24">
         <motion.div className="text-center mb-10 md:mb-14" {...fadeInUp}>
           <p className="text-sm text-tiffany font-medium tracking-widest mb-3">BRAND PHILOSOPHY</p>
@@ -742,6 +743,20 @@ function TextbookSection() {
           </p>
         </motion.div>
 
+        <motion.div
+          className="mb-10 md:mb-14 rounded-2xl overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+        >
+          <img
+            src={textbookDisplayImg}
+            alt="質數教室教材展示"
+            className="w-full h-[200px] sm:h-[280px] md:h-[360px] object-cover rounded-2xl"
+          />
+        </motion.div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -943,7 +958,7 @@ function CoachesSection() {
   }, [isPaused, maxIndex, goNext]);
 
   return (
-    <section id="about" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
+    <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
@@ -1433,6 +1448,11 @@ function FooterSection() {
             </h4>
             <ul className="space-y-2.5">
               <li>
+                <a href="#about" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-about">
+                  認識質數
+                </a>
+              </li>
+              <li>
                 <a href="#teaching" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-teaching">
                   教學特色
                 </a>
@@ -1440,11 +1460,6 @@ function FooterSection() {
               <li>
                 <a href="#textbook" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-textbook">
                   教材介紹
-                </a>
-              </li>
-              <li>
-                <a href="#about" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-about">
-                  認識質數
                 </a>
               </li>
               <li>
