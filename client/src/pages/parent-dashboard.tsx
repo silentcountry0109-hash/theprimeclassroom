@@ -1386,6 +1386,144 @@ function ChildrenTab() {
   );
 }
 
+function CancelBookingDialog({
+  cancelTarget,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  cancelTarget: BookingWithDetails | null;
+  onClose: () => void;
+  onConfirm: (id: number) => void;
+  isPending: boolean;
+}) {
+  const [sliderValue, setSliderValue] = useState(0);
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const isUnlocked = sliderValue >= 95;
+
+  useEffect(() => {
+    if (!cancelTarget) setSliderValue(0);
+  }, [cancelTarget]);
+
+  const sliderEmojis = [
+    { min: 0, emoji: "😊", label: "還在想..." },
+    { min: 15, emoji: "🤔", label: "認真考慮中..." },
+    { min: 35, emoji: "😮", label: "快要確定了..." },
+    { min: 55, emoji: "😰", label: "真的要取消嗎..." },
+    { min: 75, emoji: "😢", label: "好捨不得..." },
+    { min: 95, emoji: "✅", label: "可以取消了！" },
+  ];
+
+  const currentEmoji = [...sliderEmojis].reverse().find((e) => sliderValue >= e.min) || sliderEmojis[0];
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    isDragging.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    updateSlider(e.clientX);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging.current) return;
+    updateSlider(e.clientX);
+  };
+
+  const handlePointerUp = () => {
+    isDragging.current = false;
+    if (sliderValue < 95) {
+      setSliderValue(0);
+    }
+  };
+
+  const updateSlider = (clientX: number) => {
+    if (!sliderRef.current) return;
+    const rect = sliderRef.current.getBoundingClientRect();
+    const thumbWidth = 48;
+    const trackWidth = rect.width - thumbWidth;
+    const offsetX = clientX - rect.left - thumbWidth / 2;
+    const pct = Math.max(0, Math.min(100, (offsetX / trackWidth) * 100));
+    setSliderValue(pct);
+  };
+
+  return (
+    <AlertDialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) { onClose(); setSliderValue(0); } }}>
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>取消預約</AlertDialogTitle>
+          <AlertDialogDescription>
+            確定要取消這堂課嗎？
+            {cancelTarget && (
+              <span className="block mt-2 text-foreground font-medium">
+                {cancelTarget.franchiseName} · {cancelTarget.slotDate} {cancelTarget.slotStartTime} · {cancelTarget.childName}
+              </span>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="py-2 space-y-3">
+          <div className="text-center text-3xl transition-all duration-200" style={{ transform: `scale(${1 + sliderValue / 200})` }}>
+            {currentEmoji.emoji}
+          </div>
+          <p className="text-center text-xs text-muted-foreground font-medium">{currentEmoji.label}</p>
+
+          <div
+            ref={sliderRef}
+            className={`relative h-12 rounded-full border-2 select-none touch-none transition-colors ${
+              isUnlocked ? "bg-red-50 border-red-300" : "bg-gray-100 border-gray-200"
+            }`}
+            data-testid="slider-cancel-track"
+          >
+            <div
+              className="absolute inset-y-0 left-0 rounded-full transition-all duration-100"
+              style={{
+                width: `${sliderValue}%`,
+                background: isUnlocked
+                  ? "linear-gradient(90deg, #fca5a5, #ef4444)"
+                  : "linear-gradient(90deg, #e5e7eb, #d1d5db)",
+              }}
+            />
+            {!isUnlocked && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-xs text-muted-foreground font-medium tracking-wider">
+                  👉 滑動以解鎖取消
+                </span>
+              </div>
+            )}
+            <div
+              className={`absolute top-1 h-10 w-10 rounded-full shadow-md flex items-center justify-center text-lg cursor-grab active:cursor-grabbing transition-colors ${
+                isUnlocked ? "bg-red-500" : "bg-white border border-gray-300"
+              }`}
+              style={{ left: `max(4px, calc(${sliderValue / 100} * (100% - 48px)))` }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              data-testid="slider-cancel-thumb"
+            >
+              {isUnlocked ? "🔓" : "🔒"}
+            </div>
+          </div>
+        </div>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setSliderValue(0)}>保留預約</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => cancelTarget && onConfirm(cancelTarget.id)}
+            className={`text-white transition-all ${
+              isUnlocked
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-gray-300 cursor-not-allowed pointer-events-none"
+            }`}
+            disabled={!isUnlocked}
+            data-testid="button-confirm-cancel"
+          >
+            {isPending ? "取消中..." : "確認取消"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function BookingsTab() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "completed" | "cancelled">("all");
@@ -1655,31 +1793,12 @@ function BookingsTab() {
         </div>
       )}
 
-      <AlertDialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) setCancelTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>取消預約</AlertDialogTitle>
-            <AlertDialogDescription>
-              確定要取消這堂課嗎？
-              {cancelTarget && (
-                <span className="block mt-2 text-foreground font-medium">
-                  {cancelTarget.franchiseName} · {cancelTarget.slotDate} {cancelTarget.slotStartTime} · {cancelTarget.childName}
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>保留預約</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => cancelTarget && cancelMutation.mutate(cancelTarget.id)}
-              className="bg-red-500 text-white hover:bg-red-600"
-              data-testid="button-confirm-cancel"
-            >
-              {cancelMutation.isPending ? "取消中..." : "確認取消"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CancelBookingDialog
+        cancelTarget={cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={(id) => cancelMutation.mutate(id)}
+        isPending={cancelMutation.isPending}
+      />
 
       <div className="bg-amber-50/50 rounded-xl border border-amber-200/50 p-3">
         <p className="text-xs text-amber-700 leading-relaxed">
