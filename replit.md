@@ -47,7 +47,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 
 ## Key Files
 - `shared/models/auth.ts` - User/session tables (Replit Auth)
-- `shared/schema.ts` - All data models (franchises now have tags, rating, reviewCount, nearbySchools)
+- `shared/schema.ts` - All data models (franchises now have tags, rating, reviewCount, nearbySchools, photos)
 - `shared/constants.ts` - Taiwan city/district data, day labels, time period constants
 - `server/routes.ts` - All API routes
 - `server/storage.ts` - DatabaseStorage with CRUD methods + searchFranchises + getFranchiseDetail
@@ -61,7 +61,8 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 
 ## Database Tables
 - users, sessions (Replit Auth)
-- franchises (location-based classrooms with tags, rating, reviewCount, nearbySchools)
+- franchises (location-based classrooms with tags, rating, reviewCount, nearbySchools, photos array)
+  - Photos uploaded via multer to /uploads/ directory, served statically
 - coaches (certified instructors)
 - children (managed by parents)
 - time_slots (bookable time periods, date stored as text YYYY-MM-DD)

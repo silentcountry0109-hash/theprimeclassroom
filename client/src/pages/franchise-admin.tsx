@@ -52,6 +52,7 @@ import {
   MapPin,
   FileText,
   Users,
+  Image as ImageIcon,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -355,6 +356,108 @@ function FranchiseInfoTab() {
               {saveMutation.isPending ? "儲存中..." : "儲存變更"}
             </Button>
           </div>
+        </div>
+      )}
+
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-foreground mb-1">教室照片管理</h2>
+        <p className="text-sm text-muted-foreground mb-4">上傳教室環境照片，將顯示在分校頁面的照片輪播中</p>
+        <PhotoManager franchiseId={franchise.id} photos={franchise.photos || []} />
+      </div>
+    </div>
+  );
+}
+
+function PhotoManager({ franchiseId, photos }: { franchiseId: number; photos: string[] }) {
+  const { toast } = useToast();
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const res = await fetch("/api/franchise-admin/upload-photo", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "上傳失敗");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "照片已上傳" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/my-franchise"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "上傳失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (photoUrl: string) => {
+      const res = await apiRequest("DELETE", "/api/franchise-admin/delete-photo", { photoUrl });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "照片已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/my-franchise"] });
+    },
+    onError: () => {
+      toast({ title: "刪除失敗", variant: "destructive" });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadMutation.mutate(file);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-md border border-gray-100 p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <label className="cursor-pointer" data-testid="button-upload-photo">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+            disabled={uploadMutation.isPending}
+          />
+          <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-tiffany text-white text-sm rounded-full hover:bg-tiffany/90 transition-colors">
+            <ImageIcon className="w-4 h-4" />
+            {uploadMutation.isPending ? "上傳中..." : "上傳照片"}
+          </div>
+        </label>
+        <span className="text-xs text-muted-foreground">支援 JPG、PNG、GIF、WebP，最大 5MB</span>
+      </div>
+
+      {photos.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">尚未上傳任何照片</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {photos.map((photo, i) => (
+            <div key={photo} className="relative group rounded-lg overflow-hidden border border-gray-100" data-testid={`photo-item-${i}`}>
+              <img src={photo} alt={`教室照片 ${i + 1}`} className="w-full aspect-[4/3] object-cover" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                <button
+                  onClick={() => deleteMutation.mutate(photo)}
+                  disabled={deleteMutation.isPending}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-sm hover:bg-red-50"
+                  data-testid={`button-delete-photo-${i}`}
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

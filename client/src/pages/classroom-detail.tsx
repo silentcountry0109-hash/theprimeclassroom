@@ -30,6 +30,9 @@ import {
   Sparkles,
   Calendar,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -264,6 +267,10 @@ export default function ClassroomDetail() {
           </div>
         </div>
 
+        {f.photos && f.photos.length > 0 && (
+          <PhotoCarousel photos={f.photos} />
+        )}
+
         {coachList.length > 0 && (
           <div className="mb-6">
             <h2 className="font-serif text-lg tracking-[0.08em] text-foreground mb-3" data-testid="text-coaches-title">
@@ -493,6 +500,60 @@ export default function ClassroomDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function PhotoCarousel({ photos }: { photos: string[] }) {
+  const [current, setCurrent] = useState(0);
+
+  const prev = () => setCurrent((c) => (c === 0 ? photos.length - 1 : c - 1));
+  const next = () => setCurrent((c) => (c === photos.length - 1 ? 0 : c + 1));
+
+  return (
+    <div className="mb-6" data-testid="photo-carousel">
+      <h2 className="font-serif text-lg tracking-[0.08em] text-foreground mb-3 flex items-center gap-2">
+        <ImageIcon className="w-5 h-5 text-tiffany" />
+        教室環境
+      </h2>
+      <div className="relative bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="relative aspect-[16/9] md:aspect-[21/9]">
+          <img
+            src={photos[current]}
+            alt={`教室照片 ${current + 1}`}
+            className="w-full h-full object-cover"
+            data-testid={`photo-slide-${current}`}
+          />
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-white transition-colors"
+                data-testid="button-photo-prev"
+              >
+                <ChevronLeft className="w-5 h-5 text-foreground" />
+              </button>
+              <button
+                onClick={next}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-white transition-colors"
+                data-testid="button-photo-next"
+              >
+                <ChevronRight className="w-5 h-5 text-foreground" />
+              </button>
+            </>
+          )}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {photos.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrent(i)}
+                className={`w-2 h-2 rounded-full transition-colors ${i === current ? "bg-tiffany" : "bg-white/60"}`}
+                data-testid={`photo-dot-${i}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

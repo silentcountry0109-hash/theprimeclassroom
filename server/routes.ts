@@ -8,6 +8,29 @@ import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from "express";
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+    if (allowed.test(path.extname(file.originalname))) cb(null, true);
+    else cb(new Error("只允許上傳圖片檔案"));
+  },
+});
 
 function getSessionUserId(req: any): string | null {
   if (req.session?.credentialUserId) return req.session.credentialUserId;
@@ -49,6 +72,8 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  app.use("/uploads", express.static(uploadsDir));
 
   await seedDatabase();
 
@@ -366,6 +391,22 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/franchises/:id/upload-photo", isAdmin, upload.single("photo"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
+      const franchiseId = parseInt(req.params.id);
+      const photoUrl = `/uploads/${req.file.filename}`;
+      const franchise = await storage.getFranchise(franchiseId);
+      if (!franchise) return res.status(404).json({ message: "Franchise not found" });
+      const currentPhotos = franchise.photos || [];
+      const updatedPhotos = [...currentPhotos, photoUrl];
+      await storage.updateFranchise(franchiseId, { photos: updatedPhotos });
+      res.json({ url: photoUrl, photos: updatedPhotos });
+    } catch (error) {
+      res.status(500).json({ message: "上傳失敗" });
+    }
+  });
+
   app.delete("/api/admin/franchises/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteFranchise(parseInt(req.params.id));
@@ -510,11 +551,46 @@ export async function registerRoutes(
 
   app.patch("/api/franchise-admin/my-franchise", isFranchiseAdmin, async (req: any, res) => {
     try {
-      const { description, phone, tags, nearbySchools } = req.body;
-      const franchise = await storage.updateFranchise(req.franchiseId, { description, phone, tags, nearbySchools });
+      const { description, phone, tags, nearbySchools, photos } = req.body;
+      const updates: any = { description, phone, tags, nearbySchools };
+      if (photos !== undefined) updates.photos = photos;
+      const franchise = await storage.updateFranchise(req.franchiseId, updates);
       res.json(franchise);
     } catch (error) {
       res.status(500).json({ message: "Failed to update franchise" });
+    }
+  });
+
+  app.post("/api/franchise-admin/upload-photo", isFranchiseAdmin, upload.single("photo"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
+      const photoUrl = `/uploads/${req.file.filename}`;
+      const franchise = await storage.getFranchise(req.franchiseId);
+      if (!franchise) return res.status(404).json({ message: "Franchise not found" });
+      const currentPhotos = franchise.photos || [];
+      const updatedPhotos = [...currentPhotos, photoUrl];
+      await storage.updateFranchise(req.franchiseId, { photos: updatedPhotos });
+      res.json({ url: photoUrl, photos: updatedPhotos });
+    } catch (error) {
+      res.status(500).json({ message: "上傳失敗" });
+    }
+  });
+
+  app.delete("/api/franchise-admin/delete-photo", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { photoUrl } = req.body;
+      if (!photoUrl) return res.status(400).json({ message: "Missing photoUrl" });
+      const franchise = await storage.getFranchise(req.franchiseId);
+      if (!franchise) return res.status(404).json({ message: "Franchise not found" });
+      const currentPhotos = franchise.photos || [];
+      const updatedPhotos = currentPhotos.filter((p: string) => p !== photoUrl);
+      await storage.updateFranchise(req.franchiseId, { photos: updatedPhotos });
+      const filename = photoUrl.replace("/uploads/", "");
+      const filePath = path.join(uploadsDir, filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      res.json({ photos: updatedPhotos });
+    } catch (error) {
+      res.status(500).json({ message: "刪除失敗" });
     }
   });
 
