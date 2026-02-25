@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
@@ -54,6 +54,7 @@ import {
   Edit3,
   AlertCircle,
   ArrowRight,
+  ChevronLeft,
 } from "lucide-react";
 import type { Child, Booking, Franchise } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -93,6 +94,75 @@ interface FranchiseDetail {
   franchise: Franchise;
   coaches: { id: number; name: string; specialties: string[] | null; rating: number | null; isCertified: boolean }[];
   timeSlots: SlotWithCoach[];
+}
+
+function PhotoCarousel({ photos, alt, height = "h-36", showControls = false }: { photos: string[]; alt: string; height?: string; showControls?: boolean }) {
+  const [current, setCurrent] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (photos.length <= 1 || paused) return;
+    timerRef.current = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % photos.length);
+    }, 3500);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [photos.length, paused]);
+
+  if (!photos || photos.length === 0) return null;
+
+  const prev = () => setCurrent((c) => (c - 1 + photos.length) % photos.length);
+  const next = () => setCurrent((c) => (c + 1) % photos.length);
+
+  return (
+    <div
+      className={`relative w-full ${height} overflow-hidden group`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      data-testid="photo-carousel"
+    >
+      {photos.map((photo, idx) => (
+        <img
+          key={photo}
+          src={photo}
+          alt={`${alt} ${idx + 1}`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${idx === current ? "opacity-100" : "opacity-0"}`}
+        />
+      ))}
+      {photos.length > 1 && (
+        <>
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            {photos.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => { e.stopPropagation(); setCurrent(idx); }}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${idx === current ? "bg-white w-4" : "bg-white/50"}`}
+                data-testid={`carousel-dot-${idx}`}
+              />
+            ))}
+          </div>
+          {showControls && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); prev(); }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                data-testid="carousel-prev"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); next(); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                data-testid="carousel-next"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 const TAB_ITEMS = [
@@ -835,6 +905,15 @@ function BookingFlowTab() {
               )}
             </div>
 
+            {detail.franchise.photos && detail.franchise.photos.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <PhotoCarousel photos={detail.franchise.photos} alt={detail.franchise.name} height="h-52" showControls />
+                <div className="px-4 py-2 text-xs text-muted-foreground/60 text-center">
+                  教室環境 · {detail.franchise.photos.length} 張照片
+                </div>
+              </div>
+            )}
+
             <div>
               <h3 className="text-base font-semibold text-foreground mb-3">可預約時段</h3>
 
@@ -989,14 +1068,7 @@ function BookingFlowTab() {
                 data-testid={`franchise-card-${f.id}`}
               >
                 {f.photos && f.photos.length > 0 && (
-                  <div className="w-full h-36 overflow-hidden">
-                    <img
-                      src={f.photos[0]}
-                      alt={f.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      data-testid={`franchise-photo-${f.id}`}
-                    />
-                  </div>
+                  <PhotoCarousel photos={f.photos} alt={f.name} height="h-36" />
                 )}
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
