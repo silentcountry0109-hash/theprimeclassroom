@@ -132,7 +132,7 @@ export interface IStorage {
     bookedSeats: number;
     occupancyRate: number;
     dailyStats: Array<{ date: string; slots: number; bookings: number; bookedSeats: number; totalSeats: number }>;
-    coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; bookedSeats: number }>;
+    coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; confirmedBookings: number; cancelledBookings: number; completedBookings: number; bookedSeats: number }>;
   }>;
 }
 
@@ -716,9 +716,9 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const franchiseCoaches = await db.select({ id: coaches.id, name: coaches.name }).from(coaches).where(eq(coaches.franchiseId, franchiseId));
-    const coachMap = new Map<number, { coachId: number; coachName: string; slots: number; bookings: number; bookedSeats: number }>();
+    const coachMap = new Map<number, { coachId: number; coachName: string; slots: number; bookings: number; confirmedBookings: number; cancelledBookings: number; completedBookings: number; bookedSeats: number }>();
     for (const c of franchiseCoaches) {
-      coachMap.set(c.id, { coachId: c.id, coachName: c.name, slots: 0, bookings: 0, bookedSeats: 0 });
+      coachMap.set(c.id, { coachId: c.id, coachName: c.name, slots: 0, bookings: 0, confirmedBookings: 0, cancelledBookings: 0, completedBookings: 0, bookedSeats: 0 });
     }
     for (const slot of slotsInRange) {
       if (slot.coachId && coachMap.has(slot.coachId)) {
@@ -730,7 +730,11 @@ export class DatabaseStorage implements IStorage {
     for (const b of bookingRows) {
       const slot = slotsInRange.find((s) => s.id === b.slotId);
       if (slot?.coachId && coachMap.has(slot.coachId)) {
-        coachMap.get(slot.coachId)!.bookings++;
+        const entry = coachMap.get(slot.coachId)!;
+        entry.bookings++;
+        if (b.status === "confirmed") entry.confirmedBookings++;
+        else if (b.status === "cancelled") entry.cancelledBookings++;
+        else if (b.status === "completed") entry.completedBookings++;
       }
     }
     const coachStats = Array.from(coachMap.values());

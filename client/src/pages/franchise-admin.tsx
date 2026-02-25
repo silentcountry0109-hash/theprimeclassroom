@@ -373,6 +373,10 @@ function OverviewTab() {
                       <th className="py-2 pr-4 text-xs font-medium text-muted-foreground">老師</th>
                       <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">時段數</th>
                       <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">預約數</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">已確認</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">已完成</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">已取消</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">取消率</th>
                       <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">已用座位</th>
                       <th className="py-2 text-xs font-medium text-muted-foreground text-center">使用率</th>
                     </tr>
@@ -381,11 +385,26 @@ function OverviewTab() {
                     {rangeStats.coachStats.map((coach) => {
                       const maxSeats = coach.slots * 5;
                       const coachRate = maxSeats > 0 ? Math.round((coach.bookedSeats / maxSeats) * 100) : 0;
+                      const cancelRate = coach.bookings > 0 ? Math.round((coach.cancelledBookings / coach.bookings) * 100) : 0;
                       return (
                         <tr key={coach.coachId} className="border-b border-gray-50" data-testid={`stats-coach-${coach.coachId}`}>
-                          <td className="py-3 pr-4 font-medium text-foreground">{coach.coachName}</td>
+                          <td className="py-3 pr-4 font-medium text-foreground whitespace-nowrap">{coach.coachName}</td>
                           <td className="py-3 pr-4 text-center text-muted-foreground">{coach.slots}</td>
                           <td className="py-3 pr-4 text-center text-muted-foreground">{coach.bookings}</td>
+                          <td className="py-3 pr-4 text-center">
+                            <span className="text-xs font-medium text-tiffany">{coach.confirmedBookings}</span>
+                          </td>
+                          <td className="py-3 pr-4 text-center">
+                            <span className="text-xs font-medium text-green-600">{coach.completedBookings}</span>
+                          </td>
+                          <td className="py-3 pr-4 text-center">
+                            <span className={`text-xs font-medium ${coach.cancelledBookings > 0 ? "text-red-500" : "text-muted-foreground"}`}>{coach.cancelledBookings}</span>
+                          </td>
+                          <td className="py-3 pr-4 text-center">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cancelRate >= 30 ? "bg-red-50 text-red-500" : cancelRate >= 15 ? "bg-amber-50 text-amber-600" : "bg-gray-50 text-muted-foreground"}`}>
+                              {cancelRate}%
+                            </span>
+                          </td>
                           <td className="py-3 pr-4 text-center text-muted-foreground">{coach.bookedSeats}</td>
                           <td className="py-3 text-center">
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${coachRate >= 80 ? "bg-tiffany/10 text-tiffany" : coachRate >= 50 ? "bg-coral/10 text-coral" : "bg-gray-100 text-muted-foreground"}`}>
@@ -422,7 +441,7 @@ interface DateRangeStats {
   bookedSeats: number;
   occupancyRate: number;
   dailyStats: Array<{ date: string; slots: number; bookings: number; bookedSeats: number; totalSeats: number }>;
-  coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; bookedSeats: number }>;
+  coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; confirmedBookings: number; cancelledBookings: number; completedBookings: number; bookedSeats: number }>;
 }
 
 function FranchiseInfoTab() {
