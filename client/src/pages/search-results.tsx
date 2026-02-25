@@ -241,10 +241,19 @@ export default function SearchResults() {
                   return (
                     <div
                       key={f.id}
-                      className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md hover:border-tiffany/20 transition-all cursor-pointer group"
+                      className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-tiffany/20 transition-all cursor-pointer group"
                       onClick={() => navigate(`/classroom/${f.id}`)}
                       data-testid={`franchise-card-${f.id}`}
                     >
+                      {(() => {
+                        const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null);
+                        return coverImg ? (
+                          <div className="w-full h-44 md:h-48 overflow-hidden">
+                            <img src={coverImg} alt={f.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          </div>
+                        ) : null;
+                      })()}
+                      <div className="p-5">
                       <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1">
                           <div className="flex items-start gap-3 mb-2">
@@ -344,6 +353,7 @@ export default function SearchResults() {
                             <ChevronRight className="w-4 h-4 ml-1" />
                           </Button>
                         </div>
+                      </div>
                       </div>
                     </div>
                   );
