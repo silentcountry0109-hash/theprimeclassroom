@@ -65,6 +65,9 @@ import {
   Package,
   Eye,
   EyeOff,
+  Globe,
+  Save,
+  FileText,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem } from "@shared/schema";
@@ -107,6 +110,7 @@ export default function AdminDashboard() {
     { id: "users", label: "帳號管理", icon: UserCog },
     { id: "announcements", label: "公告管理", icon: Megaphone },
     { id: "shop", label: "商城管理", icon: ShoppingBag },
+    { id: "site-editor", label: "官網編輯", icon: Globe },
   ];
 
   return (
@@ -175,6 +179,7 @@ export default function AdminDashboard() {
             {activeTab === "users" && <UsersTab />}
             {activeTab === "announcements" && <AnnouncementsTab />}
             {activeTab === "shop" && <ShopManagementTab />}
+            {activeTab === "site-editor" && <SiteEditorTab />}
           </main>
         </div>
       </div>
@@ -1985,6 +1990,372 @@ function OrderItemsDetail({ orderId }: { orderId: number }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+interface SiteContentSection {
+  id: string;
+  label: string;
+  fields: { key: string; label: string; multiline?: boolean }[];
+}
+
+const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
+  {
+    id: "hero",
+    label: "首頁 Hero 區塊",
+    fields: [
+      { key: "hero.subtitle", label: "副標題" },
+      { key: "hero.tagline", label: "標語", multiline: true },
+      { key: "hero.searchHint", label: "搜尋提示文字" },
+      { key: "hero.socialProof", label: "社群證明文字" },
+    ],
+  },
+  {
+    id: "brand",
+    label: "品牌理念區塊",
+    fields: [
+      { key: "brand.title", label: "區塊標題" },
+      { key: "brand.description", label: "區塊描述", multiline: true },
+      { key: "brand.quote", label: "品牌金句", multiline: true },
+      { key: "brand.phil1.title", label: "理念1 標題" },
+      { key: "brand.phil1.desc", label: "理念1 描述", multiline: true },
+      { key: "brand.phil2.title", label: "理念2 標題" },
+      { key: "brand.phil2.desc", label: "理念2 描述", multiline: true },
+      { key: "brand.phil3.title", label: "理念3 標題" },
+      { key: "brand.phil3.desc", label: "理念3 描述", multiline: true },
+      { key: "brand.phil4.title", label: "理念4 標題" },
+      { key: "brand.phil4.desc", label: "理念4 描述", multiline: true },
+    ],
+  },
+  {
+    id: "teaching",
+    label: "教學特色區塊",
+    fields: [
+      { key: "teaching.title", label: "區塊標題" },
+      { key: "teaching.description", label: "區塊描述", multiline: true },
+      { key: "teaching.method1.title", label: "特色1 標題" },
+      { key: "teaching.method1.desc", label: "特色1 描述", multiline: true },
+      { key: "teaching.method2.title", label: "特色2 標題" },
+      { key: "teaching.method2.desc", label: "特色2 描述", multiline: true },
+      { key: "teaching.method3.title", label: "特色3 標題" },
+      { key: "teaching.method3.desc", label: "特色3 描述", multiline: true },
+      { key: "teaching.method4.title", label: "特色4 標題" },
+      { key: "teaching.method4.desc", label: "特色4 描述", multiline: true },
+    ],
+  },
+  {
+    id: "features",
+    label: "優勢特色區塊",
+    fields: [
+      { key: "features.title", label: "區塊標題" },
+      { key: "features.description", label: "區塊描述", multiline: true },
+      { key: "features.feat1.title", label: "優勢1 標題" },
+      { key: "features.feat1.desc", label: "優勢1 描述", multiline: true },
+      { key: "features.feat2.title", label: "優勢2 標題" },
+      { key: "features.feat2.desc", label: "優勢2 描述", multiline: true },
+      { key: "features.feat3.title", label: "優勢3 標題" },
+      { key: "features.feat3.desc", label: "優勢3 描述", multiline: true },
+    ],
+  },
+  {
+    id: "process",
+    label: "如何開始區塊",
+    fields: [
+      { key: "process.title", label: "區塊標題" },
+      { key: "process.description", label: "區塊描述", multiline: true },
+      { key: "process.step1.title", label: "步驟1 標題" },
+      { key: "process.step1.desc", label: "步驟1 描述" },
+      { key: "process.step2.title", label: "步驟2 標題" },
+      { key: "process.step2.desc", label: "步驟2 描述" },
+      { key: "process.step3.title", label: "步驟3 標題" },
+      { key: "process.step3.desc", label: "步驟3 描述" },
+      { key: "process.step4.title", label: "步驟4 標題" },
+      { key: "process.step4.desc", label: "步驟4 描述" },
+    ],
+  },
+  {
+    id: "cta",
+    label: "行動呼籲區塊",
+    fields: [
+      { key: "cta.title", label: "標題" },
+      { key: "cta.description", label: "描述", multiline: true },
+    ],
+  },
+  {
+    id: "footer",
+    label: "頁尾資訊",
+    fields: [
+      { key: "footer.description", label: "品牌描述", multiline: true },
+      { key: "footer.phone", label: "聯絡電話" },
+      { key: "footer.email", label: "電子信箱" },
+      { key: "footer.address", label: "地址" },
+    ],
+  },
+];
+
+const DEFAULT_VALUES: Record<string, string> = {
+  "hero.subtitle": "國小數學個別指導",
+  "hero.tagline": "讓教學回歸「1 位老師」對「1 位學生」的學習體驗",
+  "hero.searchHint": "找到最適合孩子的數學老師，立即預約免費診斷",
+  "hero.socialProof": "200+ 位家長推薦",
+  "brand.title": "品牌與教學理念",
+  "brand.description": "The Prime 質數教室，專注國小數學個別指導。我們相信每個孩子都有獨特的學習節奏，不該被統一的進度框架限制。透過一對一的個別指導，讓每位孩子都能按照自己的步調，扎實地建立數學基礎。",
+  "brand.quote": "不是補習，是真正理解數學。當孩子真正理解了，分數自然會來。",
+  "brand.phil1.title": "個別指導・個別進度",
+  "brand.phil1.desc": "每位孩子都有專屬的學習計畫，老師一對一關注，不是大班齊頭式教學",
+  "brand.phil2.title": "理解優先・不靠死背",
+  "brand.phil2.desc": "引導孩子真正理解觀念，而非填鴨式記憶，讓數學成為思考的工具",
+  "brand.phil3.title": "學習地圖・透明可見",
+  "brand.phil3.desc": "家長清楚掌握孩子的學習階段、單元進度與重點，學習不再是黑箱",
+  "brand.phil4.title": "溫暖空間・安心成長",
+  "brand.phil4.desc": "明亮舒適的教室環境，讓孩子在輕鬆愉快的氛圍中專注學習",
+  "teaching.title": "教學特色",
+  "teaching.description": "螺旋式課程、階梯式教學、搭配單元評測，個別指導、個別進度，為每個孩子量身打造吸收效率最好的學習規劃",
+  "teaching.method1.title": "螺旋式課程",
+  "teaching.method1.desc": "同一概念在不同階段反覆出現，每次加深難度，讓孩子自然內化數學觀念，不再死記硬背。",
+  "teaching.method2.title": "階梯式教學",
+  "teaching.method2.desc": "由淺入深，每一步都建立在前一步的基礎上，確保孩子穩紮穩打，不會因跳躍式進度而掉隊。",
+  "teaching.method3.title": "單元評測",
+  "teaching.method3.desc": "每個單元結束後進行評測，精準掌握孩子的學習狀態，找出需要加強的環節，即時調整教學方向。",
+  "teaching.method4.title": "個別指導・個別進度",
+  "teaching.method4.desc": "每位孩子都有專屬的學習計畫與進度，老師依據評測結果量身打造最適合的學習路徑，讓吸收效率最大化。",
+  "features.title": "為什麼選擇質數教室",
+  "features.description": "我們相信，每個孩子都值得一場不被干擾的學習對話",
+  "features.feat1.title": "個別指導",
+  "features.feat1.desc": "每位學生都有獨立的學習進度與教材，老師會依據學生狀態即時調整教學，確保每個孩子都能獲得充分的關注。",
+  "features.feat2.title": "專業認證師資",
+  "features.feat2.desc": "所有老師均通過總部嚴格培訓與認證，深諳認知轉譯技巧，能以孩子的語言解釋數學概念。",
+  "features.feat3.title": "彈性預約制度",
+  "features.feat3.desc": "如同訂機票般簡單，家長可自由選擇教室、時段與老師，完全配合家庭的作息安排。",
+  "process.title": "如何開始",
+  "process.description": "只需簡單四步驟，即可開始孩子的學習旅程",
+  "process.step1.title": "搜尋教室",
+  "process.step1.desc": "選擇地區與年級，找到離您最近的教室",
+  "process.step2.title": "選擇老師",
+  "process.step2.desc": "瀏覽老師資歷與評價，選擇最適合的老師",
+  "process.step3.title": "預約時段",
+  "process.step3.desc": "選擇方便的時段，輕鬆完成線上預約",
+  "process.step4.title": "開始學習",
+  "process.step4.desc": "孩子享受專業的數學個別指導",
+  "cta.title": "立即預約免費診斷",
+  "cta.description": "讓我們的認證老師為您的孩子進行一次免費的數學能力適性診斷，了解孩子的學習狀態，制定最適合的學習計畫。",
+  "footer.description": "讓教學回歸「1 位老師」對「1 位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。",
+  "footer.phone": "02-1234-5678",
+  "footer.email": "hello@primemath.tw",
+  "footer.address": "台北市大安區",
+};
+
+function SiteEditorTab() {
+  const { toast } = useToast();
+  const [activeSection, setActiveSection] = useState("hero");
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const { data: siteContent = [], isLoading } = useQuery<{ id: number; sectionKey: string; value: string; updatedAt: string }[]>({
+    queryKey: ["/api/admin/site-content"],
+  });
+
+  const contentMap: Record<string, string> = {};
+  siteContent.forEach((item) => { contentMap[item.sectionKey] = item.value; });
+
+  const getFieldValue = (key: string): string => {
+    if (editValues[key] !== undefined) return editValues[key];
+    return contentMap[key] ?? DEFAULT_VALUES[key] ?? "";
+  };
+
+  const handleFieldChange = (key: string, value: string) => {
+    setEditValues((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const items = Object.entries(editValues).map(([sectionKey, value]) => ({ sectionKey, value }));
+      if (items.length === 0) return;
+      await apiRequest("PUT", "/api/admin/site-content/batch", { items });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/site-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/site-content"] });
+      setEditValues({});
+      setHasChanges(false);
+      toast({ title: "儲存成功", description: "官網內容已更新，前台將即時反映變更" });
+    },
+    onError: () => {
+      toast({ title: "儲存失敗", description: "請稍後再試", variant: "destructive" });
+    },
+  });
+
+  const saveSectionMutation = useMutation({
+    mutationFn: async (sectionId: string) => {
+      const section = SITE_CONTENT_SECTIONS.find((s) => s.id === sectionId);
+      if (!section) return;
+      const items = section.fields
+        .filter((f) => editValues[f.key] !== undefined)
+        .map((f) => ({ sectionKey: f.key, value: editValues[f.key] }));
+      if (items.length === 0) return;
+      await apiRequest("PUT", "/api/admin/site-content/batch", { items });
+    },
+    onSuccess: (_, sectionId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/site-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/site-content"] });
+      const section = SITE_CONTENT_SECTIONS.find((s) => s.id === sectionId);
+      if (section) {
+        const newEditValues = { ...editValues };
+        section.fields.forEach((f) => { delete newEditValues[f.key]; });
+        setEditValues(newEditValues);
+        if (Object.keys(newEditValues).length === 0) setHasChanges(false);
+      }
+      toast({ title: "儲存成功", description: "該區塊已更新" });
+    },
+    onError: () => {
+      toast({ title: "儲存失敗", description: "請稍後再試", variant: "destructive" });
+    },
+  });
+
+  const resetSection = (sectionId: string) => {
+    const section = SITE_CONTENT_SECTIONS.find((s) => s.id === sectionId);
+    if (!section) return;
+    const newEditValues = { ...editValues };
+    section.fields.forEach((f) => { delete newEditValues[f.key]; });
+    setEditValues(newEditValues);
+    if (Object.keys(newEditValues).length === 0) setHasChanges(false);
+  };
+
+  const currentSection = SITE_CONTENT_SECTIONS.find((s) => s.id === activeSection);
+  const sectionHasChanges = currentSection?.fields.some((f) => editValues[f.key] !== undefined) ?? false;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground" data-testid="text-site-editor-title">官網內容編輯</h3>
+          <p className="text-sm text-muted-foreground mt-1">編輯前台各區塊的文字內容，儲存後即時更新官網</p>
+        </div>
+        {hasChanges && (
+          <Button
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className="bg-tiffany text-white hover:bg-tiffany/90"
+            data-testid="button-save-all-content"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {saveMutation.isPending ? "儲存中..." : "全部儲存"}
+          </Button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="md:col-span-1">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="p-3 bg-gray-50 border-b border-gray-100">
+              <p className="text-xs font-medium text-muted-foreground">頁面區塊</p>
+            </div>
+            <div className="p-1">
+              {SITE_CONTENT_SECTIONS.map((section) => {
+                const sectionChanged = section.fields.some((f) => editValues[f.key] !== undefined);
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between ${
+                      activeSection === section.id
+                        ? "bg-tiffany/10 text-tiffany font-medium"
+                        : "text-foreground hover:bg-gray-50"
+                    }`}
+                    data-testid={`button-section-${section.id}`}
+                  >
+                    <span>{section.label}</span>
+                    {sectionChanged && (
+                      <span className="w-2 h-2 rounded-full bg-coral" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="md:col-span-3">
+          {currentSection && (
+            <div className="bg-white rounded-xl border border-gray-100">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-tiffany" />
+                  <h4 className="font-medium text-foreground">{currentSection.label}</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  {sectionHasChanges && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => resetSection(currentSection.id)}
+                        className="text-xs"
+                        data-testid={`button-reset-${currentSection.id}`}
+                      >
+                        取消變更
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => saveSectionMutation.mutate(currentSection.id)}
+                        disabled={saveSectionMutation.isPending}
+                        className="bg-tiffany text-white hover:bg-tiffany/90 text-xs"
+                        data-testid={`button-save-${currentSection.id}`}
+                      >
+                        <Save className="w-3 h-3 mr-1" />
+                        {saveSectionMutation.isPending ? "儲存中..." : "儲存此區塊"}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="p-4 space-y-5">
+                {currentSection.fields.map((field) => {
+                  const currentValue = getFieldValue(field.key);
+                  const isEdited = editValues[field.key] !== undefined;
+                  return (
+                    <div key={field.key}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-sm font-medium text-foreground">{field.label}</Label>
+                        {isEdited && (
+                          <span className="text-xs text-coral">已修改</span>
+                        )}
+                      </div>
+                      {field.multiline ? (
+                        <Textarea
+                          value={currentValue}
+                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                          className={`min-h-[80px] text-sm ${isEdited ? "border-coral/40 bg-coral/5" : ""}`}
+                          data-testid={`textarea-${field.key}`}
+                        />
+                      ) : (
+                        <Input
+                          value={currentValue}
+                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                          className={`text-sm ${isEdited ? "border-coral/40 bg-coral/5" : ""}`}
+                          data-testid={`input-${field.key}`}
+                        />
+                      )}
+                      <p className="text-[11px] text-muted-foreground mt-1 font-mono">{field.key}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

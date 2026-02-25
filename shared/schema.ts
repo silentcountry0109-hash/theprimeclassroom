@@ -168,6 +168,17 @@ export type InsertSuccessStory = z.infer<typeof insertSuccessStorySchema>;
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 
+export const siteContent = pgTable("site_content", {
+  id: serial("id").primaryKey(),
+  sectionKey: text("section_key").notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSiteContentSchema = createInsertSchema(siteContent).omit({ id: true, updatedAt: true });
+export type SiteContent = typeof siteContent.$inferSelect;
+export type InsertSiteContent = z.infer<typeof insertSiteContentSchema>;
+
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({ id: true, createdAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });

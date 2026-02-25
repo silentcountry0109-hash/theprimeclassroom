@@ -1067,5 +1067,59 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/site-content", async (_req, res) => {
+    try {
+      const content = await storage.getAllSiteContent();
+      const contentMap: Record<string, string> = {};
+      for (const item of content) {
+        contentMap[item.sectionKey] = item.value;
+      }
+      res.json(contentMap);
+    } catch (error) {
+      res.status(500).json({ message: "取得網站內容失敗" });
+    }
+  });
+
+  app.get("/api/admin/site-content", isAdmin, async (_req, res) => {
+    try {
+      const content = await storage.getAllSiteContent();
+      res.json(content);
+    } catch (error) {
+      res.status(500).json({ message: "取得網站內容失敗" });
+    }
+  });
+
+  app.put("/api/admin/site-content", isAdmin, async (req: any, res) => {
+    try {
+      const { sectionKey, value } = req.body;
+      if (!sectionKey || value === undefined) {
+        return res.status(400).json({ message: "請提供 sectionKey 和 value" });
+      }
+      const result = await storage.upsertSiteContent(sectionKey, value);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "更新網站內容失敗" });
+    }
+  });
+
+  app.put("/api/admin/site-content/batch", isAdmin, async (req: any, res) => {
+    try {
+      const { items } = req.body;
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "請提供 items 陣列" });
+      }
+      const results = [];
+      for (const item of items) {
+        if (item.sectionKey && item.value !== undefined) {
+          const result = await storage.upsertSiteContent(item.sectionKey, item.value);
+          results.push(result);
+        }
+      }
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ message: "批次更新網站內容失敗" });
+    }
+  });
+
   return httpServer;
 }

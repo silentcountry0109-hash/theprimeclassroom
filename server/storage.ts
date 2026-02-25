@@ -1,6 +1,6 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
-  products, cartItems, orders, orderItems,
+  products, cartItems, orders, orderItems, siteContent,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -15,6 +15,7 @@ import {
   type Order, type InsertOrder,
   type OrderItem, type InsertOrderItem,
   type User,
+  type SiteContent,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte } from "drizzle-orm";
@@ -115,6 +116,10 @@ export interface IStorage {
   getOrder(id: number): Promise<Order | undefined>;
   getOrderItems(orderId: number): Promise<OrderItem[]>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
+
+  getAllSiteContent(): Promise<SiteContent[]>;
+  getSiteContent(sectionKey: string): Promise<SiteContent | undefined>;
+  upsertSiteContent(sectionKey: string, value: string): Promise<SiteContent>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -837,6 +842,28 @@ export class DatabaseStorage implements IStorage {
   async updateOrderStatus(id: number, status: string): Promise<Order> {
     const [order] = await db.update(orders).set({ status }).where(eq(orders.id, id)).returning();
     return order;
+  }
+
+  async getAllSiteContent(): Promise<SiteContent[]> {
+    return db.select().from(siteContent);
+  }
+
+  async getSiteContent(sectionKey: string): Promise<SiteContent | undefined> {
+    const [row] = await db.select().from(siteContent).where(eq(siteContent.sectionKey, sectionKey));
+    return row;
+  }
+
+  async upsertSiteContent(sectionKey: string, value: string): Promise<SiteContent> {
+    const existing = await this.getSiteContent(sectionKey);
+    if (existing) {
+      const [updated] = await db.update(siteContent)
+        .set({ value, updatedAt: new Date() })
+        .where(eq(siteContent.sectionKey, sectionKey))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(siteContent).values({ sectionKey, value }).returning();
+    return created;
   }
 }
 

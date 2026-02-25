@@ -75,6 +75,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - cart_items (user cart: userId + productId + quantity)
 - orders (userId, totalAmount, status: pending/paid/shipped/completed/cancelled)
 - order_items (orderId + productId + productName + quantity + unitPrice)
+- site_content (sectionKey unique, value text — CMS key-value for editable landing page text)
 
 ## Authentication
 - Parents: Replit Auth (OIDC) via /api/login
@@ -141,6 +142,8 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - 時段管理: Per-franchise time slot management (select franchise → view/add/delete slots)
 - 帳號管理: User role management (assign parent/franchise_admin/admin, link franchise_admin to specific franchise)
 - 公告管理: Announcements CRUD
+- 商城管理: Product CRUD + Order management
+- 官網編輯: CMS editor for landing page text content (section-based editing with real-time preview)
 
 ## Franchise Admin Dashboard (/franchise-admin)
 - 分校總覽: Stats (coaches, slots, bookings, confirmed) + date-range analytics merged in

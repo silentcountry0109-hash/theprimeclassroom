@@ -51,6 +51,13 @@ import {
   XCircle,
 } from "lucide-react";
 import type { Coach, Faq, SuccessStory } from "@shared/schema";
+import { createContext, useContext } from "react";
+
+const SiteContentContext = createContext<Record<string, string>>({});
+function useSiteContent(key: string, fallback: string): string {
+  const content = useContext(SiteContentContext);
+  return content[key] ?? fallback;
+}
 
 import heroClassroomImg from "@assets/hero_classroom.png";
 import brandPhilosophyImg from "@assets/brand_philosophy.png";
@@ -96,6 +103,11 @@ const fadeInUp = {
 };
 
 function HeroSection() {
+  const heroSubtitle = useSiteContent("hero.subtitle", "國小數學個別指導");
+  const heroTagline = useSiteContent("hero.tagline", "讓教學回歸「1 位老師」對「1 位學生」的學習體驗");
+  const heroSearchHint = useSiteContent("hero.searchHint", "找到最適合孩子的數學老師，立即預約免費診斷");
+  const heroSocialProof = useSiteContent("hero.socialProof", "200+ 位家長推薦");
+
   const [, navigate] = useLocation();
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
@@ -201,7 +213,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          國小數學個別指導
+          {heroSubtitle}
         </motion.p>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
@@ -209,7 +221,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.2 }}
         >
-          讓教學回歸「1 位老師」對「1 位學生」的學習體驗
+          {heroTagline}
         </motion.p>
       </div>
 
@@ -227,7 +239,7 @@ function HeroSection() {
           transition={{ delay: 1.0 }}
         >
           <Sparkles className="w-4 h-4 text-tiffany" />
-          找到最適合孩子的數學老師，立即預約免費診斷
+          {heroSearchHint}
         </motion.p>
 
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl md:rounded-[2rem] border border-tiffany/15 shadow-[0_8px_40px_rgba(129,216,208,0.12)] p-2 md:p-3 relative">
@@ -359,7 +371,7 @@ function HeroSection() {
           <img src={teacher4Img} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover hidden sm:block" />
         </div>
         <div className="text-left">
-          <p className="text-xs sm:text-sm font-semibold text-foreground">200+ 位家長推薦</p>
+          <p className="text-xs sm:text-sm font-semibold text-foreground">{heroSocialProof}</p>
           <div className="flex items-center gap-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
@@ -381,31 +393,23 @@ function HeroSection() {
 }
 
 function BrandPhilosophySection() {
+  const brandTitle = useSiteContent("brand.title", "品牌與教學理念");
+  const brandDescription = useSiteContent("brand.description", "The Prime 質數教室，專注國小數學個別指導。我們相信每個孩子都有獨特的學習節奏，不該被統一的進度框架限制。透過一對一的個別指導，讓每位孩子都能按照自己的步調，扎實地建立數學基礎。");
+  const brandQuote = useSiteContent("brand.quote", "不是補習，是真正理解數學。當孩子真正理解了，分數自然會來。");
+  const brandPhil1Title = useSiteContent("brand.phil1.title", "個別指導・個別進度");
+  const brandPhil1Desc = useSiteContent("brand.phil1.desc", "每位孩子都有專屬的學習計畫，老師一對一關注，不是大班齊頭式教學");
+  const brandPhil2Title = useSiteContent("brand.phil2.title", "理解優先・不靠死背");
+  const brandPhil2Desc = useSiteContent("brand.phil2.desc", "引導孩子真正理解觀念，而非填鴨式記憶，讓數學成為思考的工具");
+  const brandPhil3Title = useSiteContent("brand.phil3.title", "學習地圖・透明可見");
+  const brandPhil3Desc = useSiteContent("brand.phil3.desc", "家長清楚掌握孩子的學習階段、單元進度與重點，學習不再是黑箱");
+  const brandPhil4Title = useSiteContent("brand.phil4.title", "溫暖空間・安心成長");
+  const brandPhil4Desc = useSiteContent("brand.phil4.desc", "明亮舒適的教室環境，讓孩子在輕鬆愉快的氛圍中專注學習");
+
   const philosophies = [
-    {
-      icon: Users,
-      title: "個別指導・個別進度",
-      description: "每位孩子都有專屬的學習計畫，老師一對一關注，不是大班齊頭式教學",
-      color: "tiffany",
-    },
-    {
-      icon: Lightbulb,
-      title: "理解優先・不靠死背",
-      description: "引導孩子真正理解觀念，而非填鴨式記憶，讓數學成為思考的工具",
-      color: "coral",
-    },
-    {
-      icon: Map,
-      title: "學習地圖・透明可見",
-      description: "家長清楚掌握孩子的學習階段、單元進度與重點，學習不再是黑箱",
-      color: "tiffany",
-    },
-    {
-      icon: Shield,
-      title: "溫暖空間・安心成長",
-      description: "明亮舒適的教室環境，讓孩子在輕鬆愉快的氛圍中專注學習",
-      color: "coral",
-    },
+    { icon: Users, title: brandPhil1Title, description: brandPhil1Desc, color: "tiffany" },
+    { icon: Lightbulb, title: brandPhil2Title, description: brandPhil2Desc, color: "coral" },
+    { icon: Map, title: brandPhil3Title, description: brandPhil3Desc, color: "tiffany" },
+    { icon: Shield, title: brandPhil4Title, description: brandPhil4Desc, color: "coral" },
   ];
 
   return (
@@ -414,10 +418,10 @@ function BrandPhilosophySection() {
         <motion.div className="text-center mb-10 md:mb-14" {...fadeInUp}>
           <p className="text-sm text-tiffany font-medium tracking-widest mb-3">BRAND PHILOSOPHY</p>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-4" data-testid="text-brand-philosophy-title">
-            品牌與教學理念
+            {brandTitle}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            The Prime 質數教室，專注國小數學個別指導。我們相信每個孩子都有獨特的學習節奏，不該被統一的進度框架限制。透過一對一的個別指導，讓每位孩子都能按照自己的步調，扎實地建立數學基礎。
+            {brandDescription}
           </p>
         </motion.div>
 
@@ -475,7 +479,7 @@ function BrandPhilosophySection() {
           transition={{ duration: 0.6, delay: 0.5 }}
         >
           <p className="text-foreground font-medium text-base md:text-lg leading-relaxed">
-            「不是補習，是真正理解數學。<br className="hidden sm:block" />當孩子真正理解了，分數自然會來。」
+            「{brandQuote}」
           </p>
         </motion.div>
       </div>
@@ -484,31 +488,22 @@ function BrandPhilosophySection() {
 }
 
 function TeachingMethodSection() {
+  const teachTitle = useSiteContent("teaching.title", "教學特色");
+  const teachDesc = useSiteContent("teaching.description", "螺旋式課程、階梯式教學、搭配單元評測，個別指導、個別進度，為每個孩子量身打造吸收效率最好的學習規劃");
+  const teach1Title = useSiteContent("teaching.method1.title", "螺旋式課程");
+  const teach1Desc = useSiteContent("teaching.method1.desc", "同一概念在不同階段反覆出現，每次加深難度，讓孩子自然內化數學觀念，不再死記硬背。");
+  const teach2Title = useSiteContent("teaching.method2.title", "階梯式教學");
+  const teach2Desc = useSiteContent("teaching.method2.desc", "由淺入深，每一步都建立在前一步的基礎上，確保孩子穩紮穩打，不會因跳躍式進度而掉隊。");
+  const teach3Title = useSiteContent("teaching.method3.title", "單元評測");
+  const teach3Desc = useSiteContent("teaching.method3.desc", "每個單元結束後進行評測，精準掌握孩子的學習狀態，找出需要加強的環節，即時調整教學方向。");
+  const teach4Title = useSiteContent("teaching.method4.title", "個別指導・個別進度");
+  const teach4Desc = useSiteContent("teaching.method4.desc", "每位孩子都有專屬的學習計畫與進度，老師依據評測結果量身打造最適合的學習路徑，讓吸收效率最大化。");
+
   const methods = [
-    {
-      icon: Repeat,
-      title: "螺旋式課程",
-      description: "同一概念在不同階段反覆出現，每次加深難度，讓孩子自然內化數學觀念，不再死記硬背。",
-      color: "tiffany",
-    },
-    {
-      icon: Layers,
-      title: "階梯式教學",
-      description: "由淺入深，每一步都建立在前一步的基礎上，確保孩子穩紮穩打，不會因跳躍式進度而掉隊。",
-      color: "coral",
-    },
-    {
-      icon: BarChart3,
-      title: "單元評測",
-      description: "每個單元結束後進行評測，精準掌握孩子的學習狀態，找出需要加強的環節，即時調整教學方向。",
-      color: "tiffany",
-    },
-    {
-      icon: Users,
-      title: "個別指導・個別進度",
-      description: "每位孩子都有專屬的學習計畫與進度，老師依據評測結果量身打造最適合的學習路徑，讓吸收效率最大化。",
-      color: "coral",
-    },
+    { icon: Repeat, title: teach1Title, description: teach1Desc, color: "tiffany" },
+    { icon: Layers, title: teach2Title, description: teach2Desc, color: "coral" },
+    { icon: BarChart3, title: teach3Title, description: teach3Desc, color: "tiffany" },
+    { icon: Users, title: teach4Title, description: teach4Desc, color: "coral" },
   ];
 
   return (
@@ -516,10 +511,10 @@ function TeachingMethodSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
-            教學特色
+            {teachTitle}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            螺旋式課程、階梯式教學、搭配單元評測，個別指導、個別進度，為每個孩子量身打造吸收效率最好的學習規劃
+            {teachDesc}
           </p>
         </motion.div>
 
@@ -1067,28 +1062,19 @@ function TextbookSection() {
 }
 
 function FeaturesSection() {
+  const featTitle = useSiteContent("features.title", "為什麼選擇質數教室");
+  const featDesc = useSiteContent("features.description", "我們相信，每個孩子都值得一場不被干擾的學習對話");
+  const feat1Title = useSiteContent("features.feat1.title", "個別指導");
+  const feat1Desc = useSiteContent("features.feat1.desc", "每位學生都有獨立的學習進度與教材，老師會依據學生狀態即時調整教學，確保每個孩子都能獲得充分的關注。");
+  const feat2Title = useSiteContent("features.feat2.title", "專業認證師資");
+  const feat2Desc = useSiteContent("features.feat2.desc", "所有老師均通過總部嚴格培訓與認證，深諳認知轉譯技巧，能以孩子的語言解釋數學概念。");
+  const feat3Title = useSiteContent("features.feat3.title", "彈性預約制度");
+  const feat3Desc = useSiteContent("features.feat3.desc", "如同訂機票般簡單，家長可自由選擇教室、時段與老師，完全配合家庭的作息安排。");
+
   const features = [
-    {
-      icon: Users,
-      title: "個別指導",
-      description:
-        "每位學生都有獨立的學習進度與教材，老師會依據學生狀態即時調整教學，確保每個孩子都能獲得充分的關注。",
-      image: learningDetailImg,
-    },
-    {
-      icon: Shield,
-      title: "專業認證師資",
-      description:
-        "所有老師均通過總部嚴格培訓與認證，深諳認知轉譯技巧，能以孩子的語言解釋數學概念。",
-      image: teacher1Img,
-    },
-    {
-      icon: Target,
-      title: "彈性預約制度",
-      description:
-        "如同訂機票般簡單，家長可自由選擇教室、時段與老師，完全配合家庭的作息安排。",
-      image: parentChildImg,
-    },
+    { icon: Users, title: feat1Title, description: feat1Desc, image: learningDetailImg },
+    { icon: Shield, title: feat2Title, description: feat2Desc, image: teacher1Img },
+    { icon: Target, title: feat3Title, description: feat3Desc, image: parentChildImg },
   ];
 
   return (
@@ -1096,10 +1082,10 @@ function FeaturesSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
-            為什麼選擇質數教室
+            {featTitle}
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            我們相信，每個孩子都值得一場不被干擾的學習對話
+            {featDesc}
           </p>
         </motion.div>
 
@@ -1277,31 +1263,22 @@ function CoachesSection() {
 }
 
 function ProcessSection() {
+  const procTitle = useSiteContent("process.title", "如何開始");
+  const procDesc = useSiteContent("process.description", "只需簡單四步驟，即可開始孩子的學習旅程");
+  const proc1Title = useSiteContent("process.step1.title", "搜尋教室");
+  const proc1Desc = useSiteContent("process.step1.desc", "選擇地區與年級，找到離您最近的教室");
+  const proc2Title = useSiteContent("process.step2.title", "選擇老師");
+  const proc2Desc = useSiteContent("process.step2.desc", "瀏覽老師資歷與評價，選擇最適合的老師");
+  const proc3Title = useSiteContent("process.step3.title", "預約時段");
+  const proc3Desc = useSiteContent("process.step3.desc", "選擇方便的時段，輕鬆完成線上預約");
+  const proc4Title = useSiteContent("process.step4.title", "開始學習");
+  const proc4Desc = useSiteContent("process.step4.desc", "孩子享受專業的數學個別指導");
+
   const steps = [
-    {
-      icon: Search,
-      number: "01",
-      title: "搜尋教室",
-      description: "選擇地區與年級，找到離您最近的教室",
-    },
-    {
-      icon: Users,
-      number: "02",
-      title: "選擇老師",
-      description: "瀏覽老師資歷與評價，選擇最適合的老師",
-    },
-    {
-      icon: Clock,
-      number: "03",
-      title: "預約時段",
-      description: "選擇方便的時段，輕鬆完成線上預約",
-    },
-    {
-      icon: GraduationCap,
-      number: "04",
-      title: "開始學習",
-      description: "孩子享受專業的數學個別指導",
-    },
+    { icon: Search, number: "01", title: proc1Title, description: proc1Desc },
+    { icon: Users, number: "02", title: proc2Title, description: proc2Desc },
+    { icon: Clock, number: "03", title: proc3Title, description: proc3Desc },
+    { icon: GraduationCap, number: "04", title: proc4Title, description: proc4Desc },
   ];
 
   return (
@@ -1309,10 +1286,10 @@ function ProcessSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
-            如何開始
+            {procTitle}
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            只需簡單四步驟，即可開始孩子的學習旅程
+            {procDesc}
           </p>
         </motion.div>
 
@@ -1567,6 +1544,9 @@ function FAQSection() {
 }
 
 function CTASection() {
+  const ctaTitle = useSiteContent("cta.title", "立即預約免費診斷");
+  const ctaDesc = useSiteContent("cta.description", "讓我們的認證老師為您的孩子進行一次免費的數學能力適性診斷，了解孩子的學習狀態，制定最適合的學習計畫。");
+
   return (
     <section
       className="py-14 md:py-24 px-4 md:px-6 relative"
@@ -1601,11 +1581,10 @@ function CTASection() {
             transition={{ duration: 0.7, delay: 0.15 }}
           >
             <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
-              立即預約免費診斷
+              {ctaTitle}
             </h2>
             <p className="text-muted-foreground mb-8 leading-relaxed">
-              讓我們的認證老師為您的孩子進行一次免費的數學能力適性診斷，
-              了解孩子的學習狀態，制定最適合的學習計畫。
+              {ctaDesc}
             </p>
             <div className="flex flex-col sm:flex-row items-center md:items-start gap-4">
               <Button
@@ -1635,6 +1614,11 @@ function CTASection() {
 }
 
 function FooterSection() {
+  const footerDesc = useSiteContent("footer.description", "讓教學回歸「1 位老師」對「1 位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。");
+  const footerPhone = useSiteContent("footer.phone", "02-1234-5678");
+  const footerEmail = useSiteContent("footer.email", "hello@primemath.tw");
+  const footerAddress = useSiteContent("footer.address", "台北市大安區");
+
   return (
     <footer className="bg-foreground text-white/80 py-10 md:py-16 px-4 md:px-6">
       <div className="max-w-6xl mx-auto">
@@ -1647,8 +1631,7 @@ function FooterSection() {
               The Prime
             </p>
             <p className="text-sm text-white/60 leading-relaxed mt-4 max-w-sm">
-              讓教學回歸「1 位老師」對「1
-              位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。
+              {footerDesc}
             </p>
           </div>
 
@@ -1697,15 +1680,15 @@ function FooterSection() {
             <ul className="space-y-2.5">
               <li className="flex items-center gap-2 text-sm text-white/60">
                 <Phone className="w-4 h-4" />
-                02-1234-5678
+                {footerPhone}
               </li>
               <li className="flex items-center gap-2 text-sm text-white/60">
                 <Mail className="w-4 h-4" />
-                hello@primemath.tw
+                {footerEmail}
               </li>
               <li className="flex items-center gap-2 text-sm text-white/60">
                 <MapPin className="w-4 h-4" />
-                台北市大安區
+                {footerAddress}
               </li>
             </ul>
           </div>
@@ -1731,21 +1714,27 @@ function FooterSection() {
 }
 
 export default function LandingPage() {
+  const { data: siteContentData = {} } = useQuery<Record<string, string>>({
+    queryKey: ["/api/site-content"],
+  });
+
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <HeroSection />
-      <BrandPhilosophySection />
-      <TeachingMethodSection />
-      <LearningMapSection />
-      <TextbookSection />
-      <FeaturesSection />
-      <CoachesSection />
-      <ProcessSection />
-      <TestimonialsSection />
-      <FAQSection />
-      <CTASection />
-      <FooterSection />
-    </div>
+    <SiteContentContext.Provider value={siteContentData}>
+      <div className="min-h-screen">
+        <Navbar />
+        <HeroSection />
+        <BrandPhilosophySection />
+        <TeachingMethodSection />
+        <LearningMapSection />
+        <TextbookSection />
+        <FeaturesSection />
+        <CoachesSection />
+        <ProcessSection />
+        <TestimonialsSection />
+        <FAQSection />
+        <CTASection />
+        <FooterSection />
+      </div>
+    </SiteContentContext.Provider>
   );
 }
