@@ -207,7 +207,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.2 }}
         >
-          不可拆解的對話，讓教學回歸「1 位老師」對「1 位學生」的學習體驗
+          讓教學回歸「1 位老師」對「1 位學生」的學習體驗
         </motion.p>
       </div>
 
@@ -1422,7 +1422,7 @@ function FooterSection() {
               The Prime
             </p>
             <p className="text-sm text-white/60 leading-relaxed mt-4 max-w-sm">
-              不可拆解的對話，讓教學回歸「1 位老師」對「1
+              讓教學回歸「1 位老師」對「1
               位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。
             </p>
           </div>
