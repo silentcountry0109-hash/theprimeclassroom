@@ -440,6 +440,16 @@ export async function registerRoutes(
       if (target.status !== "confirmed") {
         return res.status(400).json({ message: "此預約無法取消" });
       }
+
+      const slotDate = target.slotDate;
+      const slotStartTime = target.slotStartTime;
+      const slotDateTime = new Date(`${slotDate}T${slotStartTime}:00+08:00`);
+      const now = new Date();
+      const hoursUntilStart = (slotDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      if (hoursUntilStart < 4) {
+        return res.status(400).json({ message: "課程開始前 4 小時內無法取消，系統仍會扣除點數計費。如有特殊情況，請聯繫教室。" });
+      }
+
       await storage.cancelBooking(bookingId);
       res.json({ success: true });
     } catch (error: any) {

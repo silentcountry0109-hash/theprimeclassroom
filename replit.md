@@ -166,6 +166,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - **預約課程 (Book)**: 3-step visual flow with StepIndicator (搜尋教室 → 選擇時段 → 確認預約); search classrooms → select time slot → select child (with avatars) & confirm → recurring weekly dialog
   - Duplicate booking prevention: backend rejects same child + same slot if confirmed booking exists
   - Recurring booking: after successful booking, dialog offers same weekday/time for next 4 weeks
+  - Cancellation policy: Must cancel 4+ hours before class start; backend enforces with 400 error if <4hrs; notice shown in confirm step, cancel dialog, and bookings tab
   - API: POST /api/bookings/recurring (batch book multiple slots), GET /api/bookings/recurring-slots (find matching future slots)
 - **我的孩子 (Children)**: Child cards with boy/girl avatars, grade badge, school, per-child booking stats, progress bar (completion %), next booking preview; edit button opens dialog with gender picker (avatar-based male/female buttons); add dialog includes gender selection
 - **預約紀錄 (Bookings)**: Dynamic subtitle showing counts; multi-child summary cards; filter tabs with counts; date-grouped bookings; slider-to-cancel dialog; calendar sync (.ics)

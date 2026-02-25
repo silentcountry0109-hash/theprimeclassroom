@@ -997,6 +997,13 @@ function BookingFlowTab() {
           )}
         </div>
 
+        <div className="bg-amber-50/60 rounded-lg border border-amber-200/50 px-3 py-2">
+          <p className="text-[11px] text-amber-700 leading-relaxed">
+            <AlertCircle className="w-3 h-3 inline mr-1 -mt-0.5" />
+            提醒：預約後若需取消，請於課程開始前 4 小時操作。逾時取消系統仍會扣除點數計費。
+          </p>
+        </div>
+
         <div className="flex gap-3">
           <Button
             variant="outline"
@@ -1830,6 +1837,9 @@ function CancelBookingDialog({
                 {cancelTarget.franchiseName} · {cancelTarget.slotDate} {cancelTarget.slotStartTime} · {cancelTarget.childName}
               </span>
             )}
+            <span className="block mt-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-200/50">
+              提醒：課程開始前 4 小時內取消，系統仍會扣除點數計費。
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -2301,11 +2311,19 @@ function BookingsTab() {
         isPending={cancelMutation.isPending}
       />
 
-      <div className="bg-amber-50/50 rounded-xl border border-amber-200/50 p-3">
-        <p className="text-xs text-amber-700 leading-relaxed">
-          <AlertCircle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-          行事曆同步說明：點擊「加入行事曆」會下載 .ics 檔案，開啟後可匯入手機行事曆。每堂課會在開始前 6 小時發送提醒。若取消課程，手機行事曆中的排程需手動刪除。每次下載會包含所有已確認的課程。
-        </p>
+      <div className="space-y-2">
+        <div className="bg-red-50/60 rounded-xl border border-red-200/50 p-3">
+          <p className="text-xs text-red-700 leading-relaxed font-medium">
+            <AlertCircle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+            取消課程注意事項：已預約的課程若要取消，必須在課程開始前 4 小時透過系統操作取消。若超過此期限，系統仍會扣除點數計費，敬請留意。
+          </p>
+        </div>
+        <div className="bg-amber-50/50 rounded-xl border border-amber-200/50 p-3">
+          <p className="text-xs text-amber-700 leading-relaxed">
+            <AlertCircle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+            行事曆同步說明：點擊「加入行事曆」會下載 .ics 檔案，開啟後可匯入手機行事曆。每堂課會在開始前 6 小時發送提醒。若取消課程，手機行事曆中的排程需手動刪除。每次下載會包含所有已確認的課程。
+          </p>
+        </div>
       </div>
     </div>
   );
