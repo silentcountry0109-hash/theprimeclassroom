@@ -105,10 +105,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/credential-user", async (req: any, res) => {
-    const userId = getSessionUserId(req);
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const credId = req.session?.credentialUserId;
+    if (!credId) return res.status(401).json({ message: "Unauthorized" });
     try {
-      const user = await authStorage.getUser(userId);
+      const user = await authStorage.getUser(credId);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
       const { passwordHash: _, ...safeUser } = user as any;
       res.json(safeUser);
@@ -119,9 +119,17 @@ export async function registerRoutes(
 
   app.post("/api/credential-logout", (req: any, res) => {
     req.session.credentialUserId = null;
-    req.session.save(() => {
-      res.json({ success: true });
-    });
+    if (req.isAuthenticated?.()) {
+      req.logout(() => {
+        req.session.save(() => {
+          res.json({ success: true });
+        });
+      });
+    } else {
+      req.session.save(() => {
+        res.json({ success: true });
+      });
+    }
   });
 
   app.post("/api/parent-register", async (req: any, res) => {

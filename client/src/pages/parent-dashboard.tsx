@@ -129,13 +129,11 @@ export default function ParentDashboard() {
     return null;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (isCredentialUser) {
-      credLogout();
-      window.location.href = "/parent-login";
-    } else {
-      replitLogout();
+      await fetch("/api/credential-logout", { method: "POST", credentials: "include" });
     }
+    window.location.href = "/api/logout";
   };
 
   const typedUser = user as User;
