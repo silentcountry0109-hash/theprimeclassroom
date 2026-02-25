@@ -71,6 +71,10 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
+  Sparkles,
+  TrendingUp,
+  Bell,
+  Pencil,
 } from "lucide-react";
 import type { Child, Booking, Franchise, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -295,6 +299,26 @@ export default function ParentDashboard() {
   );
 }
 
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "早安";
+  if (hour < 18) return "午安";
+  return "晚安";
+}
+
+function getCountdownText(dateStr: string, timeStr: string): string {
+  const now = new Date();
+  const target = new Date(`${dateStr}T${timeStr}`);
+  const diff = target.getTime() - now.getTime();
+  if (diff <= 0) return "即將開始";
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (days > 0) return `${days} 天 ${hours} 小時後`;
+  if (hours > 0) return `${hours} 小時 ${mins} 分鐘後`;
+  return `${mins} 分鐘後`;
+}
+
 function OverviewTab({
   user,
   onNavigate,
@@ -309,6 +333,12 @@ function OverviewTab({
     queryKey: ["/api/bookings"],
   });
 
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const upcomingBookings = bookings
     .filter((b) => b.status === "confirmed")
     .sort((a, b) => {
@@ -317,19 +347,16 @@ function OverviewTab({
       return dateA.localeCompare(dateB);
     });
 
-  const cancelledCount = bookings.filter((b) => b.status === "cancelled").length;
+  const completedCount = bookings.filter((b) => b.status === "completed").length;
+  const nextClass = upcomingBookings[0];
+
+  const gradeLabel = (g: number) => {
+    const labels = ["一", "二", "三", "四", "五", "六"];
+    return labels[g - 1] ? `${labels[g - 1]}年級` : `${g}年級`;
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground mb-1" data-testid="text-welcome">
-          {user.firstName ? `${user.firstName}，歡迎回來` : "歡迎回來"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          在這裡管理孩子的課程與預約
-        </p>
-      </div>
-
+    <div className="space-y-5">
       {(childrenError || bookingsError) && (
         <div className="bg-white rounded-xl border border-red-200 p-4 flex items-center gap-3" data-testid="error-loading">
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -337,69 +364,100 @@ function OverviewTab({
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <button
-          onClick={() => onNavigate("children")}
-          className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
-          data-testid="card-stat-children"
-        >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-tiffany/10 flex items-center justify-center mb-2 sm:mb-3">
-            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-tiffany" />
-          </div>
-          <p className="text-xl sm:text-2xl font-bold text-foreground">{children.length}</p>
-          <p className="text-xs text-muted-foreground">登記的孩子</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate("bookings")}
-          className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
-          data-testid="card-stat-upcoming"
-        >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-tiffany/10 flex items-center justify-center mb-2 sm:mb-3">
-            <CalendarCheck className="w-4 h-4 sm:w-5 sm:h-5 text-tiffany" />
-          </div>
-          <p className="text-xl sm:text-2xl font-bold text-foreground">{upcomingBookings.length}</p>
-          <p className="text-xs text-muted-foreground">即將上課</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate("bookings")}
-          className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 text-left hover:border-gray-200 hover:shadow-sm transition-all group"
-          data-testid="card-stat-completed"
-        >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-green-50 flex items-center justify-center mb-2 sm:mb-3">
-            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
-          </div>
-          <p className="text-xl sm:text-2xl font-bold text-foreground">
-            {bookings.filter((b) => b.status === "completed").length}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground" data-testid="text-welcome">
+            {user.firstName ? `${user.firstName}，${getTimeGreeting()}` : getTimeGreeting()}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5" data-testid="text-today-date">
+            {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "long" })}
           </p>
-          <p className="text-xs text-muted-foreground">已完成課程</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate("book")}
-          className="bg-gradient-to-br from-tiffany/5 to-coral/5 rounded-xl border border-tiffany/20 p-3 sm:p-4 text-left hover:shadow-sm transition-all group"
-          data-testid="card-quick-book"
-        >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-coral/10 flex items-center justify-center mb-2 sm:mb-3">
-            <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-coral" />
-          </div>
-          <p className="text-sm font-semibold text-foreground">預約新課程</p>
-          <p className="text-xs text-muted-foreground">搜尋可用時段</p>
-        </button>
+        </div>
+        {upcomingBookings.length > 0 && (
+          <button
+            onClick={() => onNavigate("bookings")}
+            className="flex items-center gap-1.5 text-xs text-tiffany bg-tiffany/5 px-3 py-1.5 rounded-full hover:bg-tiffany/10 transition-colors"
+            data-testid="link-all-bookings-count"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            {upcomingBookings.length} 堂待上課
+          </button>
+        )}
       </div>
 
-      {children.length === 0 && (
-        <div className="bg-white rounded-xl border border-amber-200 p-5 flex items-start gap-4">
-          <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-5 h-5 text-amber-500" />
+      {nextClass && (
+        <button
+          onClick={() => onNavigate("bookings")}
+          className="w-full bg-gradient-to-r from-tiffany/8 via-white to-coral/5 rounded-2xl border border-tiffany/20 p-4 sm:p-5 text-left hover:shadow-md transition-all group"
+          data-testid="card-next-class"
+        >
+          <div className="flex items-center gap-1.5 mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-tiffany" />
+            <span className="text-xs font-medium text-tiffany tracking-wider">下一堂課</span>
+            <span className="text-[10px] text-muted-foreground ml-auto" data-testid="text-next-class-countdown">
+              {nextClass.slotDate && nextClass.slotStartTime && getCountdownText(nextClass.slotDate, nextClass.slotStartTime)}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex-shrink-0 bg-white rounded-xl p-3 shadow-sm border border-gray-50">
+              <div className="text-xs text-muted-foreground text-center">
+                {(() => {
+                  if (!nextClass.slotDate) return "";
+                  const d = new Date(nextClass.slotDate + "T00:00:00");
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  const tmrw = new Date(today); tmrw.setDate(tmrw.getDate()+1);
+                  if (d.getTime() === today.getTime()) return "今天";
+                  if (d.getTime() === tmrw.getTime()) return "明天";
+                  return `${d.getMonth()+1}/${d.getDate()}`;
+                })()}
+              </div>
+              <div className="text-xl font-bold text-tiffany text-center">
+                {nextClass.slotStartTime?.slice(0, 5)}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-semibold text-foreground truncate group-hover:text-tiffany transition-colors">
+                {nextClass.franchiseName || "教室"}
+              </p>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                {nextClass.coachName && (
+                  <span className="flex items-center gap-1">
+                    <GraduationCap className="w-3 h-3 text-tiffany" />
+                    {nextClass.coachName} 老師
+                  </span>
+                )}
+                <span className="text-muted-foreground/60">
+                  {nextClass.slotStartTime?.slice(0,5)} - {nextClass.slotEndTime?.slice(0,5)}
+                </span>
+              </div>
+              {nextClass.childName && (
+                <div className="flex items-center gap-1.5 mt-1.5" data-testid="text-next-class-child">
+                  <img
+                    src={nextClass.childGender === "female" ? avatarGirlPath : avatarBoyPath}
+                    alt={nextClass.childName}
+                    className="w-5 h-5 rounded-full object-cover"
+                  />
+                  <span className="text-xs font-medium text-foreground">{nextClass.childName}</span>
+                </div>
+              )}
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-tiffany transition-colors flex-shrink-0" />
+          </div>
+        </button>
+      )}
+
+      {children.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-amber-200/80 p-6 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-6 h-6 text-amber-500" />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">
-              還沒有登記孩子
+              開始使用質數教室
             </h3>
             <p className="text-sm text-muted-foreground mb-3">
-              請先登記孩子的資料，才能開始預約課程
+              先登記孩子的資料，就可以搜尋教室、預約課程
             </p>
             <Button
               onClick={() => onNavigate("children")}
@@ -413,74 +471,160 @@ function OverviewTab({
             </Button>
           </div>
         </div>
-      )}
-
-      {upcomingBookings.length > 0 && (
+      ) : (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-foreground">即將到來的課程</h2>
-            {upcomingBookings.length > 3 && (
-              <button
-                onClick={() => onNavigate("bookings")}
-                className="text-xs text-tiffany hover:underline flex items-center gap-0.5"
-                data-testid="link-view-all-bookings"
-              >
-                查看全部
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-tiffany" />
+              孩子概況
+            </h2>
+            <button
+              onClick={() => onNavigate("children")}
+              className="text-xs text-muted-foreground hover:text-tiffany flex items-center gap-0.5 transition-colors"
+              data-testid="link-manage-children"
+            >
+              管理
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+          <div className={`grid gap-3 ${children.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+            {children.map((child) => {
+              const childUpcoming = upcomingBookings.filter((b) => b.childId === child.id).length;
+              const childCompleted = bookings.filter((b) => b.childId === child.id && b.status === "completed").length;
+              const avatarSrc = child.gender === "female" ? avatarGirlPath : avatarBoyPath;
+              return (
+                <div
+                  key={child.id}
+                  className="bg-white rounded-xl border border-gray-100 p-3.5 hover:border-tiffany/20 transition-colors"
+                  data-testid={`overview-child-${child.id}`}
+                >
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <img src={avatarSrc} alt={child.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-gray-50" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate" data-testid={`text-overview-child-name-${child.id}`}>{child.name}</p>
+                      <p className="text-xs text-muted-foreground" data-testid={`text-overview-child-grade-${child.id}`}>{gradeLabel(child.grade)}{child.school ? ` · ${child.school}` : ""}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 text-xs">
+                      <div className="w-1.5 h-1.5 rounded-full bg-tiffany" />
+                      <span className="text-muted-foreground">待上課</span>
+                      <span className="font-semibold text-foreground" data-testid={`text-overview-child-upcoming-${child.id}`}>{childUpcoming}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span className="text-muted-foreground">已完成</span>
+                      <span className="font-semibold text-foreground" data-testid={`text-overview-child-completed-${child.id}`}>{childCompleted}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2.5">
+        <button
+          onClick={() => onNavigate("book")}
+          className="bg-gradient-to-br from-tiffany/8 to-tiffany/3 rounded-xl border border-tiffany/15 p-3.5 text-center hover:shadow-sm hover:border-tiffany/30 transition-all group"
+          data-testid="card-quick-book"
+        >
+          <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+            <CalendarPlus className="w-5 h-5 text-tiffany" />
+          </div>
+          <p className="text-xs font-semibold text-foreground">預約課程</p>
+        </button>
+        <button
+          onClick={() => onNavigate("bookings")}
+          className="bg-white rounded-xl border border-gray-100 p-3.5 text-center hover:shadow-sm hover:border-tiffany/30 transition-all group"
+          data-testid="card-stat-upcoming"
+        >
+          <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+            <TrendingUp className="w-5 h-5 text-green-500" />
+          </div>
+          <p className="text-xs font-semibold text-foreground">{completedCount} 堂完成</p>
+        </button>
+        <button
+          onClick={() => onNavigate("shop")}
+          className="bg-white rounded-xl border border-gray-100 p-3.5 text-center hover:shadow-sm hover:border-tiffany/30 transition-all group"
+          data-testid="card-quick-shop"
+        >
+          <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+            <ShoppingBag className="w-5 h-5 text-coral" />
+          </div>
+          <p className="text-xs font-semibold text-foreground">教材商城</p>
+        </button>
+      </div>
+
+      {upcomingBookings.length > 1 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <CalendarCheck className="w-4 h-4 text-tiffany" />
+              即將到來
+            </h2>
+            <button
+              onClick={() => onNavigate("bookings")}
+              className="text-xs text-muted-foreground hover:text-tiffany flex items-center gap-0.5 transition-colors"
+              data-testid="link-view-all-bookings"
+            >
+              查看全部
+              <ChevronRight className="w-3 h-3" />
+            </button>
           </div>
           <div className="space-y-2">
-            {upcomingBookings.slice(0, 4).map((booking) => (
-              <div
-                key={booking.id}
-                className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4 hover:border-tiffany/20 transition-colors"
-                data-testid={`booking-upcoming-${booking.id}`}
-              >
-                <div className="flex-shrink-0 text-center min-w-[52px]">
-                  <div className="text-xs text-muted-foreground">
-                    {booking.slotDate?.split("-").slice(1).join("/")}
+            {upcomingBookings.slice(1, 4).map((booking) => {
+              const avatarSrc = booking.childGender === "female" ? avatarGirlPath : avatarBoyPath;
+              return (
+                <div
+                  key={booking.id}
+                  className="bg-white rounded-xl border border-gray-100 p-3.5 flex items-center gap-3 hover:border-tiffany/20 transition-colors"
+                  data-testid={`booking-upcoming-${booking.id}`}
+                >
+                  <div className="flex-shrink-0 text-center min-w-[44px]">
+                    <div className="text-[10px] text-muted-foreground">
+                      {(() => {
+                        if (!booking.slotDate) return "";
+                        const d = new Date(booking.slotDate + "T00:00:00");
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        const tmrw = new Date(today); tmrw.setDate(tmrw.getDate()+1);
+                        if (d.getTime() === today.getTime()) return "今天";
+                        if (d.getTime() === tmrw.getTime()) return "明天";
+                        return `${d.getMonth()+1}/${d.getDate()}`;
+                      })()}
+                    </div>
+                    <div className="text-base font-bold text-tiffany">
+                      {booking.slotStartTime?.slice(0, 5)}
+                    </div>
                   </div>
-                  <div className="text-lg font-bold text-tiffany">
-                    {booking.slotStartTime?.slice(0, 5)}
+                  <div className="w-px h-8 bg-gray-100 flex-shrink-0" />
+                  <img src={avatarSrc} alt={booking.childName || ""} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {booking.franchiseName || "教室"}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      {booking.coachName && (
+                        <span>{booking.coachName} 老師</span>
+                      )}
+                      {booking.childName && (
+                        <span className="text-tiffany">{booking.childName}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="w-px h-10 bg-gray-100 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {booking.franchiseName || "教室"}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                    {booking.coachName && (
-                      <span className="flex items-center gap-1">
-                        <GraduationCap className="w-3 h-3" />
-                        {booking.coachName}
-                      </span>
-                    )}
-                    {booking.childName && (
-                      <span className="bg-tiffany/10 text-tiffany px-1.5 py-0.5 rounded-full">
-                        {booking.childName}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex-shrink-0">
-                  <span className="inline-flex items-center gap-1 text-xs bg-tiffany/10 text-tiffany px-2 py-1 rounded-full">
-                    <CheckCircle2 className="w-3 h-3" />
-                    已確認
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {upcomingBookings.length === 0 && children.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-          <CalendarDays className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+          <CalendarDays className="w-12 h-12 text-muted-foreground/15 mx-auto mb-3" />
           <h3 className="text-sm font-semibold text-foreground mb-1">
-            還沒有預約的課程
+            目前沒有預約的課程
           </h3>
           <p className="text-xs text-muted-foreground mb-4">
             立刻預約，讓孩子開始學習之旅
@@ -506,6 +650,34 @@ interface RecurringSlotInfo {
   slotId: number | null;
   available: number;
   alreadyBooked: boolean;
+}
+
+function StepIndicator({ current, steps }: { current: number; steps: { label: string }[] }) {
+  return (
+    <div className="flex items-center justify-center gap-1 mb-5" data-testid="step-indicator">
+      {steps.map((s, i) => (
+        <div key={i} className="flex items-center gap-1">
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            i < current ? "bg-tiffany/10 text-tiffany" :
+            i === current ? "bg-tiffany text-white shadow-sm" :
+            "bg-gray-100 text-muted-foreground"
+          }`}>
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+              i < current ? "bg-tiffany text-white" :
+              i === current ? "bg-white/30 text-white" :
+              "bg-gray-200 text-muted-foreground"
+            }`}>
+              {i < current ? "✓" : i + 1}
+            </span>
+            <span className="hidden sm:inline">{s.label}</span>
+          </div>
+          {i < steps.length - 1 && (
+            <div className={`w-6 h-px ${i < current ? "bg-tiffany/40" : "bg-gray-200"}`} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function BookingFlowTab() {
@@ -676,9 +848,17 @@ function BookingFlowTab() {
     return `${d.getMonth() + 1}/${d.getDate()} ${dayLabel}`;
   };
 
+  const bookingSteps = [
+    { label: "搜尋教室" },
+    { label: "選擇時段" },
+    { label: "確認預約" },
+  ];
+  const currentStepIndex = step === "search" ? 0 : step === "detail" ? 1 : 2;
+
   if (step === "confirm" && bookingSlot && detail) {
     return (
       <div className="max-w-lg mx-auto space-y-6">
+        <StepIndicator current={currentStepIndex} steps={bookingSteps} />
         <div>
           <button
             onClick={() => { setStep("detail"); setBookingSlot(null); setSelectedChild(""); }}
@@ -730,9 +910,11 @@ function BookingFlowTab() {
           <Label className="text-sm font-medium mb-3 block">選擇上課的孩子</Label>
           {children.length === 1 ? (
             <div className="flex items-center gap-3 p-3 rounded-lg bg-tiffany/5 border border-tiffany/20">
-              <div className="w-9 h-9 rounded-full bg-tiffany/10 flex items-center justify-center">
-                <span className="text-sm font-serif text-tiffany">{children[0].name[0]}</span>
-              </div>
+              <img
+                src={children[0].gender === "female" ? avatarGirlPath : avatarBoyPath}
+                alt={children[0].name}
+                className="w-9 h-9 rounded-full object-cover"
+              />
               <div>
                 <p className="text-sm font-medium text-foreground">{children[0].name}</p>
                 <p className="text-xs text-muted-foreground">{children[0].grade} 年級</p>
@@ -741,7 +923,9 @@ function BookingFlowTab() {
             </div>
           ) : (
             <div className="space-y-2">
-              {children.map((child) => (
+              {children.map((child) => {
+                const avatarSrc = child.gender === "female" ? avatarGirlPath : avatarBoyPath;
+                return (
                 <button
                   key={child.id}
                   onClick={() => setSelectedChild(child.id.toString())}
@@ -752,9 +936,7 @@ function BookingFlowTab() {
                   }`}
                   data-testid={`select-child-${child.id}`}
                 >
-                  <div className="w-9 h-9 rounded-full bg-tiffany/10 flex items-center justify-center">
-                    <span className="text-sm font-serif text-tiffany">{child.name[0]}</span>
-                  </div>
+                  <img src={avatarSrc} alt={child.name} className="w-9 h-9 rounded-full object-cover" />
                   <div className="text-left">
                     <p className="text-sm font-medium text-foreground">{child.name}</p>
                     <p className="text-xs text-muted-foreground">{child.grade} 年級</p>
@@ -763,7 +945,8 @@ function BookingFlowTab() {
                     <CheckCircle2 className="w-4 h-4 text-tiffany ml-auto" />
                   )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -884,6 +1067,7 @@ function BookingFlowTab() {
   if (step === "detail" && selectedFranchiseId) {
     return (
       <div className="space-y-5">
+        <StepIndicator current={currentStepIndex} steps={bookingSteps} />
         <div>
           <button
             onClick={() => { setStep("search"); setSelectedFranchiseId(null); }}
@@ -1025,9 +1209,10 @@ function BookingFlowTab() {
 
   return (
     <div className="space-y-5">
+      <StepIndicator current={currentStepIndex} steps={bookingSteps} />
       <div>
         <h2 className="text-xl font-semibold text-foreground mb-1">預約課程</h2>
-        <p className="text-sm text-muted-foreground">搜尋附近的教室並預約上課時段</p>
+        <p className="text-sm text-muted-foreground">選擇地區，找到離你最近的教室</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -1138,6 +1323,7 @@ function ChildrenTab() {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
   const [school, setSchool] = useState("");
+  const [gender, setGender] = useState<"male" | "female">("male");
 
   const { data: children = [], isLoading } = useQuery<Child[]>({
     queryKey: ["/api/children"],
@@ -1151,7 +1337,7 @@ function ChildrenTab() {
     bookings.filter((b) => b.childId === childId);
 
   const addMutation = useMutation({
-    mutationFn: async (data: { name: string; grade: number; school?: string }) => {
+    mutationFn: async (data: { name: string; grade: number; school?: string; gender?: string }) => {
       const res = await apiRequest("POST", "/api/children", data);
       return res.json();
     },
@@ -1165,6 +1351,20 @@ function ChildrenTab() {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { name?: string; grade?: number; school?: string; gender?: string } }) => {
+      const res = await apiRequest("PATCH", `/api/children/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
+      closeDialog();
+    },
+    onError: (error: Error) => {
+      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+    },
+  });
 
   const closeDialog = () => {
     setShowAddDialog(false);
@@ -1172,28 +1372,49 @@ function ChildrenTab() {
     setName("");
     setGrade("");
     setSchool("");
+    setGender("male");
   };
 
   const openAdd = () => {
     setName("");
     setGrade("");
     setSchool("");
+    setGender("male");
     setShowAddDialog(true);
+  };
+
+  const openEdit = (child: Child) => {
+    setEditingChild(child);
+    setName(child.name);
+    setGrade(child.grade.toString());
+    setSchool(child.school || "");
+    setGender((child.gender as "male" | "female") || "male");
   };
 
   const handleSubmit = () => {
     if (!name || !grade) return;
-    addMutation.mutate({
-      name,
-      grade: parseInt(grade),
-      school: school || undefined,
-    });
+    if (editingChild) {
+      editMutation.mutate({
+        id: editingChild.id,
+        data: { name, grade: parseInt(grade), school: school || undefined, gender },
+      });
+    } else {
+      addMutation.mutate({
+        name,
+        grade: parseInt(grade),
+        school: school || undefined,
+        gender,
+      });
+    }
   };
 
   const gradeLabel = (g: number) => {
     const labels = ["一", "二", "三", "四", "五", "六"];
     return labels[g - 1] ? `${labels[g - 1]}年級` : `${g} 年級`;
   };
+
+  const isDialogOpen = showAddDialog || !!editingChild;
+  const isMutating = addMutation.isPending || editMutation.isPending;
 
   return (
     <div className="space-y-5">
@@ -1244,19 +1465,20 @@ function ChildrenTab() {
             const childBookings = getChildBookings(child.id);
             const upcomingCount = childBookings.filter((b) => b.status === "confirmed").length;
             const completedCount = childBookings.filter((b) => b.status === "completed").length;
+            const totalCount = upcomingCount + completedCount;
+            const avatarSrc = child.gender === "female" ? avatarGirlPath : avatarBoyPath;
+            const nextBooking = childBookings
+              .filter((b) => b.status === "confirmed")
+              .sort((a, b) => `${a.slotDate} ${a.slotStartTime}`.localeCompare(`${b.slotDate} ${b.slotStartTime}`))[0];
 
             return (
               <div
                 key={child.id}
-                className="bg-white rounded-xl border border-gray-100 p-5"
+                className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-tiffany/20 transition-colors"
                 data-testid={`card-child-${child.id}`}
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-tiffany/15 to-tiffany/5 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xl font-serif text-tiffany">
-                      {child.name[0]}
-                    </span>
-                  </div>
+                  <img src={avatarSrc} alt={child.name} className="w-14 h-14 rounded-full object-cover flex-shrink-0 ring-2 ring-gray-50" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-base font-semibold text-foreground">{child.name}</h3>
@@ -1265,7 +1487,10 @@ function ChildrenTab() {
                       </span>
                     </div>
                     {child.school && (
-                      <p className="text-sm text-muted-foreground mb-2">{child.school}</p>
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                        <BookOpen className="w-3 h-3" />
+                        {child.school}
+                      </p>
                     )}
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
@@ -1277,9 +1502,36 @@ function ChildrenTab() {
                         {completedCount} 堂已完成
                       </span>
                     </div>
+                    {totalCount > 0 && (
+                      <div className="mt-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-tiffany to-green-400 rounded-full transition-all"
+                              style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}%</span>
+                        </div>
+                      </div>
+                    )}
+                    {nextBooking && (
+                      <div className="mt-2.5 bg-tiffany/5 rounded-lg px-3 py-2 flex items-center gap-2">
+                        <Clock className="w-3 h-3 text-tiffany flex-shrink-0" />
+                        <span className="text-xs text-foreground">
+                          下一堂：{nextBooking.slotDate?.split("-").slice(1).join("/")} {nextBooking.slotStartTime?.slice(0, 5)}
+                          {nextBooking.franchiseName && ` · ${nextBooking.franchiseName}`}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-1.5 flex-shrink-0">
-                  </div>
+                  <button
+                    onClick={() => openEdit(child)}
+                    className="p-2 text-muted-foreground hover:text-tiffany hover:bg-tiffany/5 rounded-lg transition-colors flex-shrink-0"
+                    data-testid={`button-edit-child-${child.id}`}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             );
@@ -1287,11 +1539,11 @@ function ChildrenTab() {
         </div>
       )}
 
-      <Dialog open={showAddDialog} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新增孩子</DialogTitle>
-            <DialogDescription>填寫孩子的基本資料</DialogDescription>
+            <DialogTitle>{editingChild ? "編輯孩子" : "新增孩子"}</DialogTitle>
+            <DialogDescription>{editingChild ? "更新孩子的基本資料" : "填寫孩子的基本資料"}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -1302,6 +1554,33 @@ function ChildrenTab() {
                 placeholder="請輸入孩子的姓名"
                 data-testid="input-child-name"
               />
+            </div>
+            <div>
+              <Label className="mb-2 block">性別</Label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setGender("male")}
+                  className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                    gender === "male" ? "border-tiffany bg-tiffany/5" : "border-gray-200 hover:border-gray-300"
+                  }`}
+                  data-testid="button-gender-male"
+                >
+                  <img src={avatarBoyPath} alt="男生" className="w-10 h-10 rounded-full object-cover" />
+                  <span className={`text-sm font-medium ${gender === "male" ? "text-tiffany" : "text-muted-foreground"}`}>男生</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGender("female")}
+                  className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                    gender === "female" ? "border-coral bg-coral/5" : "border-gray-200 hover:border-gray-300"
+                  }`}
+                  data-testid="button-gender-female"
+                >
+                  <img src={avatarGirlPath} alt="女生" className="w-10 h-10 rounded-full object-cover" />
+                  <span className={`text-sm font-medium ${gender === "female" ? "text-coral" : "text-muted-foreground"}`}>女生</span>
+                </button>
+              </div>
             </div>
             <div>
               <Label className="mb-1.5 block">年級</Label>
@@ -1334,11 +1613,11 @@ function ChildrenTab() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!name || !grade || addMutation.isPending}
+              disabled={!name || !grade || isMutating}
               style={{ backgroundColor: "#81D8D0", color: "white" }}
               data-testid="button-submit-child"
             >
-              {addMutation.isPending ? "新增中..." : "確認新增"}
+              {isMutating ? (editingChild ? "更新中..." : "新增中...") : (editingChild ? "儲存變更" : "確認新增")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1639,7 +1918,11 @@ function BookingsTab() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-foreground">預約紀錄</h2>
-          <p className="text-sm text-muted-foreground">查看和管理所有預約</p>
+          <p className="text-sm text-muted-foreground">
+            {statusCounts.confirmed > 0
+              ? `${statusCounts.confirmed} 堂即將上課，${statusCounts.completed} 堂已完成`
+              : "查看和管理所有預約"}
+          </p>
         </div>
         <Button
           variant="outline"
@@ -2047,46 +2330,43 @@ function ShopTab() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-semibold text-foreground">商城</h2>
-          <p className="text-sm text-muted-foreground">瀏覽教材與教具</p>
+          <p className="text-sm text-muted-foreground">
+            {viewMode === "orders" ? `${orders.length} 筆訂單紀錄` : "為孩子挑選合適的教材與教具"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === "products" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("products")}
-            className={viewMode === "products" ? "rounded-full" : "rounded-full"}
-            style={viewMode === "products" ? { backgroundColor: "#81D8D0", color: "white" } : undefined}
-            data-testid="button-view-products"
-          >
-            <Package className="w-4 h-4 mr-1" />
-            商品
-          </Button>
-          <Button
-            variant={viewMode === "orders" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("orders")}
-            className="rounded-full"
-            style={viewMode === "orders" ? { backgroundColor: "#81D8D0", color: "white" } : undefined}
-            data-testid="button-view-orders"
-          >
-            <FileText className="w-4 h-4 mr-1" />
-            訂單
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          <div className="bg-gray-100 rounded-full p-0.5 flex">
+            <button
+              onClick={() => setViewMode("products")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+                viewMode === "products" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="button-view-products"
+            >
+              商品
+            </button>
+            <button
+              onClick={() => setViewMode("orders")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+                viewMode === "orders" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="button-view-orders"
+            >
+              訂單
+            </button>
+          </div>
+          <button
             onClick={() => setCartOpen(true)}
-            className="rounded-full relative"
+            className="relative p-2 text-muted-foreground hover:text-tiffany transition-colors"
             data-testid="button-open-cart"
           >
-            <ShoppingCart className="w-4 h-4 mr-1" />
-            購物車
+            <ShoppingCart className="w-5 h-5" />
             {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-coral text-white text-[10px] flex items-center justify-center font-medium" data-testid="text-cart-count">
+              <span className="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 min-w-[18px] rounded-full bg-coral text-white text-[10px] flex items-center justify-center font-bold" data-testid="text-cart-count">
                 {cartCount}
               </span>
             )}
-          </Button>
+          </button>
         </div>
       </div>
 

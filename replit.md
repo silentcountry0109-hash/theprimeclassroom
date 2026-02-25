@@ -162,14 +162,15 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 
 ## Parent Dashboard UX (/dashboard or / when logged in)
 - Top tab navigation (mobile-friendly) instead of sidebar
-- **首頁 (Overview)**: Stats cards (children, upcoming, completed, quick-book), upcoming bookings timeline, onboarding prompt when no children
-- **預約課程 (Book)**: 3-step inline flow — search classrooms → select time slot → select child & confirm → recurring weekly dialog
+- **首頁 (Overview)**: Time-aware greeting (早安/午安/晚安), today's date, pending-class badge; prominent "next class" hero card with countdown timer + child avatar; children summary cards with avatars, grade, school, per-child upcoming/completed counts; quick action grid (預約課程/完成堂數/教材商城); upcoming bookings list with avatars
+- **預約課程 (Book)**: 3-step visual flow with StepIndicator (搜尋教室 → 選擇時段 → 確認預約); search classrooms → select time slot → select child (with avatars) & confirm → recurring weekly dialog
   - Duplicate booking prevention: backend rejects same child + same slot if confirmed booking exists
   - Recurring booking: after successful booking, dialog offers same weekday/time for next 4 weeks
   - API: POST /api/bookings/recurring (batch book multiple slots), GET /api/bookings/recurring-slots (find matching future slots)
-- **我的孩子 (Children)**: Child cards with booking stats per child, AlertDialog confirmation on delete
-- **預約紀錄 (Bookings)**: Filter tabs (全部/即將上課/已完成/已取消) with counts, AlertDialog confirmation on cancel
-- Confirmation dialogs (AlertDialog) for all destructive actions (delete child, cancel booking)
+- **我的孩子 (Children)**: Child cards with boy/girl avatars, grade badge, school, per-child booking stats, progress bar (completion %), next booking preview; edit button opens dialog with gender picker (avatar-based male/female buttons); add dialog includes gender selection
+- **預約紀錄 (Bookings)**: Dynamic subtitle showing counts; multi-child summary cards; filter tabs with counts; date-grouped bookings; slider-to-cancel dialog; calendar sync (.ics)
+- **商城 (Shop)**: Segmented control (商品/訂單) toggle; cart icon with badge; product grid; order history with expandable items
+- Confirmation dialogs (AlertDialog) for all destructive actions (cancel booking with slide-to-unlock)
 
 ## Franchise Tags
 - 家長好評推薦 (amber styling)
