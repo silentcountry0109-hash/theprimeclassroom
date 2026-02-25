@@ -81,6 +81,11 @@ export default function FranchiseAdminDashboard() {
   const { user, isLoading: authLoading, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
+  const { data: myFranchise } = useQuery<Franchise>({
+    queryKey: ["/api/franchise-admin/my-franchise"],
+    enabled: !!user && user.role === "franchise_admin",
+  });
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-washi flex items-center justify-center">
@@ -109,7 +114,11 @@ export default function FranchiseAdminDashboard() {
           <SidebarContent>
             <div className="p-4 border-b border-sidebar-border">
               <p className="font-serif text-lg tracking-[0.1em] text-foreground">質數數學</p>
-              <p className="text-xs text-muted-foreground mt-0.5">分校管理系統</p>
+              {myFranchise ? (
+                <p className="text-xs text-tiffany font-medium mt-1" data-testid="sidebar-franchise-name">{myFranchise.name}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-0.5">分校管理系統</p>
+              )}
             </div>
             <SidebarGroup>
               <SidebarGroupLabel>管理</SidebarGroupLabel>
