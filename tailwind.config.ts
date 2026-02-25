@@ -100,24 +100,24 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "grid-drift": {
-          "0%": { backgroundPosition: "0px 0px" },
-          "100%": { backgroundPosition: "28px 28px" },
+        "line-h": {
+          "0%": { clipPath: "inset(0 100% 0 0)" },
+          "40%": { clipPath: "inset(0 0 0 0)" },
+          "60%": { clipPath: "inset(0 0 0 0)" },
+          "100%": { clipPath: "inset(0 0 0 100%)" },
         },
-        "grid-drift-reverse": {
-          "0%": { backgroundPosition: "0px 0px" },
-          "100%": { backgroundPosition: "-56px -56px" },
-        },
-        "grid-pulse": {
-          "0%, 100%": { opacity: "0.7" },
-          "50%": { opacity: "1" },
+        "line-v": {
+          "0%": { clipPath: "inset(0 0 100% 0)" },
+          "40%": { clipPath: "inset(0 0 0 0)" },
+          "60%": { clipPath: "inset(0 0 0 0)" },
+          "100%": { clipPath: "inset(100% 0 0 0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "grid-drift": "grid-drift 25s linear infinite, grid-pulse 8s ease-in-out infinite",
-        "grid-drift-reverse": "grid-drift-reverse 40s linear infinite",
+        "line-h": "line-h 7s ease-in-out infinite",
+        "line-v": "line-v 7s ease-in-out infinite",
       },
     },
   },

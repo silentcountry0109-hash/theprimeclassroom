@@ -132,25 +132,62 @@ function HeroSection() {
       style={{ backgroundColor: "#FAF9F6" }}
     >
       <div
-        className="absolute inset-0 pointer-events-none animate-grid-drift"
+        className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(129, 216, 208, 0.09) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(129, 216, 208, 0.09) 1px, transparent 1px)
+            linear-gradient(rgba(129, 216, 208, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(129, 216, 208, 0.07) 1px, transparent 1px)
           `,
-          backgroundSize: "28px 28px",
+          backgroundSize: "32px 32px",
         }}
       />
-      <div
-        className="absolute inset-0 pointer-events-none animate-grid-drift-reverse"
-        style={{
-          backgroundImage: `
-            linear-gradient(rgba(129, 216, 208, 0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(129, 216, 208, 0.04) 1px, transparent 1px)
-          `,
-          backgroundSize: "56px 56px",
-        }}
-      />
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        {[
+          { dir: "h", top: "8%", duration: 7, delay: 0, opacity: 0.18 },
+          { dir: "h", top: "24%", duration: 5, delay: 1.2, opacity: 0.12 },
+          { dir: "h", top: "42%", duration: 9, delay: 0.5, opacity: 0.15 },
+          { dir: "h", top: "58%", duration: 6, delay: 2.8, opacity: 0.10 },
+          { dir: "h", top: "73%", duration: 8, delay: 1.8, opacity: 0.14 },
+          { dir: "h", top: "91%", duration: 11, delay: 3.5, opacity: 0.08 },
+          { dir: "v", left: "6%", duration: 8, delay: 0.3, opacity: 0.15 },
+          { dir: "v", left: "19%", duration: 6, delay: 2.0, opacity: 0.10 },
+          { dir: "v", left: "35%", duration: 10, delay: 0.8, opacity: 0.13 },
+          { dir: "v", left: "52%", duration: 7, delay: 1.5, opacity: 0.16 },
+          { dir: "v", left: "68%", duration: 5.5, delay: 3.2, opacity: 0.11 },
+          { dir: "v", left: "84%", duration: 9, delay: 0.6, opacity: 0.14 },
+          { dir: "v", left: "95%", duration: 12, delay: 4.0, opacity: 0.07 },
+        ].map((line, i) =>
+          line.dir === "h" ? (
+            <div
+              key={`h-${i}`}
+              className="absolute animate-line-h"
+              style={{
+                top: line.top,
+                left: 0,
+                width: "100%",
+                height: "1px",
+                background: `linear-gradient(90deg, transparent 0%, rgba(129,216,208,${line.opacity}) 15%, rgba(129,216,208,${line.opacity * 1.6}) 50%, rgba(129,216,208,${line.opacity}) 85%, transparent 100%)`,
+                animationDuration: `${line.duration}s`,
+                animationDelay: `${line.delay}s`,
+              }}
+            />
+          ) : (
+            <div
+              key={`v-${i}`}
+              className="absolute animate-line-v"
+              style={{
+                left: line.left,
+                top: 0,
+                height: "100%",
+                width: "1px",
+                background: `linear-gradient(180deg, transparent 0%, rgba(129,216,208,${line.opacity}) 15%, rgba(129,216,208,${line.opacity * 1.6}) 50%, rgba(129,216,208,${line.opacity}) 85%, transparent 100%)`,
+                animationDuration: `${line.duration}s`,
+                animationDelay: `${line.delay}s`,
+              }}
+            />
+          )
+        )}
+      </div>
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
         <span className="absolute top-[12%] left-[6%] text-8xl text-tiffany/[0.06] font-serif rotate-[-15deg]">+</span>
         <span className="absolute top-[22%] right-[10%] text-7xl text-coral/[0.08] font-serif rotate-[20deg]">×</span>
