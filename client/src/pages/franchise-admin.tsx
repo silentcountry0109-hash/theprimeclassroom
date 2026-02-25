@@ -581,13 +581,13 @@ function FranchiseInfoTab() {
       <div className="mt-8">
         <h2 className="text-lg font-semibold text-foreground mb-1">教室照片管理</h2>
         <p className="text-sm text-muted-foreground mb-4">上傳教室環境照片，將顯示在分校頁面的照片輪播中</p>
-        <PhotoManager franchiseId={franchise.id} photos={franchise.photos || []} />
+        <PhotoManager franchiseId={franchise.id} photos={franchise.photos || []} coverPhoto={franchise.coverPhoto || null} />
       </div>
     </div>
   );
 }
 
-function PhotoManager({ franchiseId, photos }: { franchiseId: number; photos: string[] }) {
+function PhotoManager({ franchiseId, photos, coverPhoto }: { franchiseId: number; photos: string[]; coverPhoto: string | null }) {
   const { toast } = useToast();
 
   const uploadMutation = useMutation({
@@ -628,6 +628,20 @@ function PhotoManager({ franchiseId, photos }: { franchiseId: number; photos: st
     },
   });
 
+  const setCoverMutation = useMutation({
+    mutationFn: async (photoUrl: string | null) => {
+      const res = await apiRequest("PATCH", "/api/franchise-admin/my-franchise", { coverPhoto: photoUrl });
+      return res.json();
+    },
+    onSuccess: (_, photoUrl) => {
+      toast({ title: photoUrl ? "已設為封面照片" : "已取消封面照片" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/my-franchise"] });
+    },
+    onError: () => {
+      toast({ title: "設定失敗", variant: "destructive" });
+    },
+  });
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -638,7 +652,7 @@ function PhotoManager({ franchiseId, photos }: { franchiseId: number; photos: st
 
   return (
     <div className="bg-white rounded-md border border-gray-100 p-6">
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-2">
         <label className="cursor-pointer" data-testid="button-upload-photo">
           <input
             type="file"
@@ -654,6 +668,7 @@ function PhotoManager({ franchiseId, photos }: { franchiseId: number; photos: st
         </label>
         <span className="text-xs text-muted-foreground">支援 JPG、PNG、GIF、WebP，最大 5MB</span>
       </div>
+      <p className="text-xs text-muted-foreground/70 mb-4">點擊照片上的星號可設為封面圖，封面圖會顯示在家長搜尋教室的列表中</p>
 
       {photos.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
@@ -662,21 +677,45 @@ function PhotoManager({ franchiseId, photos }: { franchiseId: number; photos: st
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {photos.map((photo, i) => (
-            <div key={photo} className="relative group rounded-lg overflow-hidden border border-gray-100" data-testid={`photo-item-${i}`}>
-              <img src={photo} alt={`教室照片 ${i + 1}`} className="w-full aspect-[4/3] object-cover" />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                <button
-                  onClick={() => deleteMutation.mutate(photo)}
-                  disabled={deleteMutation.isPending}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-sm hover:bg-red-50"
-                  data-testid={`button-delete-photo-${i}`}
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </button>
+          {photos.map((photo, i) => {
+            const isCover = coverPhoto === photo;
+            return (
+              <div
+                key={photo}
+                className={`relative group rounded-lg overflow-hidden border-2 transition-colors ${
+                  isCover ? "border-tiffany ring-1 ring-tiffany/30" : "border-gray-100"
+                }`}
+                data-testid={`photo-item-${i}`}
+              >
+                <img src={photo} alt={`教室照片 ${i + 1}`} className="w-full aspect-[4/3] object-cover" />
+                {isCover && (
+                  <div className="absolute top-2 left-2 inline-flex items-center gap-1 bg-tiffany text-white text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm">
+                    <Star className="w-2.5 h-2.5 fill-white" />
+                    封面
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setCoverMutation.mutate(isCover ? null : photo)}
+                    disabled={setCoverMutation.isPending}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-sm hover:bg-amber-50"
+                    title={isCover ? "取消封面" : "設為封面"}
+                    data-testid={`button-set-cover-${i}`}
+                  >
+                    <Star className={`w-4 h-4 ${isCover ? "fill-amber-400 text-amber-400" : "text-amber-500"}`} />
+                  </button>
+                  <button
+                    onClick={() => deleteMutation.mutate(photo)}
+                    disabled={deleteMutation.isPending}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-sm hover:bg-red-50"
+                    data-testid={`button-delete-photo-${i}`}
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

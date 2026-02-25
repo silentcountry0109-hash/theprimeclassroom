@@ -16,6 +16,7 @@ export const franchises = pgTable("franchises", {
   description: text("description"),
   imageUrl: text("image_url"),
   photos: text("photos").array(),
+  coverPhoto: text("cover_photo"),
   maxSeats: integer("max_seats").default(5).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   tags: text("tags").array(),

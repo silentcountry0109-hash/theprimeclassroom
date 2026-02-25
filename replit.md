@@ -155,7 +155,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
   - Coach table: per-coach slots, bookings, booked seats, usage rate
   - API: GET /api/franchise-admin/stats/date-range?startDate=&endDate=
 - Sidebar name format: `{city} {district without 區}教室` (e.g. "台北市 信義教室")
-- 分校資訊: Edit own franchise description, phone, tags, nearby schools + photo management
+- 分校資訊: Edit own franchise description, phone, tags, nearby schools + photo management + cover photo selection (star icon on photo grid, shown on parent search cards)
 - 師資管理: CRUD coaches for own franchise only
 - 時段管理: CRUD time slots for own franchise only
 - 預約管理: View bookings for own franchise (child name, grade, school, date/time, status)

@@ -790,9 +790,10 @@ export async function registerRoutes(
 
   app.patch("/api/franchise-admin/my-franchise", isFranchiseAdmin, async (req: any, res) => {
     try {
-      const { description, phone, tags, nearbySchools, photos } = req.body;
+      const { description, phone, tags, nearbySchools, photos, coverPhoto } = req.body;
       const updates: any = { description, phone, tags, nearbySchools };
       if (photos !== undefined) updates.photos = photos;
+      if (coverPhoto !== undefined) updates.coverPhoto = coverPhoto;
       const franchise = await storage.updateFranchise(req.franchiseId, updates);
       res.json(franchise);
     } catch (error) {
@@ -823,7 +824,11 @@ export async function registerRoutes(
       if (!franchise) return res.status(404).json({ message: "Franchise not found" });
       const currentPhotos = franchise.photos || [];
       const updatedPhotos = currentPhotos.filter((p: string) => p !== photoUrl);
-      await storage.updateFranchise(req.franchiseId, { photos: updatedPhotos });
+      const updateData: any = { photos: updatedPhotos };
+      if (franchise.coverPhoto === photoUrl) {
+        updateData.coverPhoto = null;
+      }
+      await storage.updateFranchise(req.franchiseId, updateData);
       const filename = photoUrl.replace("/uploads/", "");
       const filePath = path.join(uploadsDir, filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);

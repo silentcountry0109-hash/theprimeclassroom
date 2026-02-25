@@ -1392,9 +1392,14 @@ function BookingFlowTab() {
                 className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
                 data-testid={`franchise-card-${f.id}`}
               >
-                {f.photos && f.photos.length > 0 && (
-                  <PhotoCarousel photos={f.photos} alt={f.name} height="h-36" />
-                )}
+                {(() => {
+                  const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null);
+                  return coverImg ? (
+                    <div className="relative">
+                      <img src={coverImg} alt={f.name} className="w-full h-36 object-cover" />
+                    </div>
+                  ) : null;
+                })()}
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-base font-semibold text-foreground group-hover:text-tiffany transition-colors">
