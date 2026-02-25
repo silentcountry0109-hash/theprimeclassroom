@@ -195,7 +195,7 @@ function HeroSection() {
 
       <motion.div
         id="hero-search"
-        className="w-full max-w-3xl mx-auto z-10"
+        className="w-full max-w-3xl mx-auto z-20 relative"
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
