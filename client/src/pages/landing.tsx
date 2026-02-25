@@ -211,12 +211,6 @@ function HeroSection() {
         </motion.p>
 
         <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-tiffany/15 shadow-[0_8px_40px_rgba(129,216,208,0.12)] p-2 md:p-3 relative">
-          <div className="absolute -top-3 left-8">
-            <span className="inline-flex items-center gap-1 text-xs font-medium bg-coral/90 text-white px-3 py-1 rounded-full shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              免費試聽
-            </span>
-          </div>
           <div className="flex flex-col md:flex-row items-stretch">
             <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50">
               <div className="flex items-center gap-2 mb-1.5">
