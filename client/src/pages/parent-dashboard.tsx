@@ -75,8 +75,11 @@ import {
   TrendingUp,
   Bell,
   Pencil,
+  Phone,
+  Award,
+  UserCircle,
 } from "lucide-react";
-import type { Child, Booking, Franchise, Product, CartItem, Order, OrderItem } from "@shared/schema";
+import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
 import avatarBoyPath from "../assets/avatar-boy.png";
@@ -872,31 +875,33 @@ function BookingFlowTab() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
-          <div className="flex items-center gap-3 pb-4 border-b border-gray-50">
-            <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-tiffany" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">{detail.franchise.name}</p>
-              <p className="text-xs text-muted-foreground">{detail.franchise.city} {detail.franchise.district}</p>
+          <div className="pb-4 border-b border-gray-50">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-tiffany" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground" data-testid="text-confirm-franchise">{detail.franchise.name}</p>
+                <p className="text-xs text-muted-foreground">{detail.franchise.address || `${detail.franchise.city} ${detail.franchise.district}`}</p>
+                {detail.franchise.phone && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Phone className="w-3 h-3" />
+                    {detail.franchise.phone}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-1">日期</p>
-              <p className="text-sm font-medium text-foreground">{formatDate(bookingSlot.date)}</p>
+              <p className="text-sm font-medium text-foreground" data-testid="text-confirm-date">{formatDate(bookingSlot.date)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">時間</p>
-              <p className="text-sm font-medium text-foreground">{bookingSlot.startTime} - {bookingSlot.endTime}</p>
+              <p className="text-sm font-medium text-foreground" data-testid="text-confirm-time">{bookingSlot.startTime} - {bookingSlot.endTime}</p>
             </div>
-            {bookingSlot.coachName && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">老師</p>
-                <p className="text-sm font-medium text-foreground">{bookingSlot.coachName}</p>
-              </div>
-            )}
             <div>
               <p className="text-xs text-muted-foreground mb-1">剩餘名額</p>
               <p className="text-sm font-medium text-tiffany">
@@ -904,6 +909,47 @@ function BookingFlowTab() {
               </p>
             </div>
           </div>
+
+          {(() => {
+            const confirmCoach = detail.coaches.find((c) => c.id === bookingSlot.coachId);
+            if (!confirmCoach) return null;
+            return (
+              <div className="pt-3 border-t border-gray-50">
+                <p className="text-xs text-muted-foreground mb-2">授課老師</p>
+                <div className="flex items-start gap-2.5 p-2.5 bg-gray-50/80 rounded-lg" data-testid="text-confirm-coach">
+                  <div className="w-9 h-9 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                    <UserCircle className="w-4.5 h-4.5 text-tiffany" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-sm font-medium text-foreground">{confirmCoach.name}</span>
+                      {confirmCoach.isCertified && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-tiffany bg-tiffany/10 px-1.5 py-0.5 rounded-full">
+                          <Award className="w-2.5 h-2.5" />
+                          認證
+                        </span>
+                      )}
+                      {(confirmCoach.rating ?? 0) > 0 && (
+                        <span className="text-[10px] text-amber-600 flex items-center gap-0.5 ml-auto">
+                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                          {confirmCoach.rating?.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                    {confirmCoach.specialties && confirmCoach.specialties.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {confirmCoach.specialties.map((s, i) => (
+                          <span key={i} className="text-[10px] text-muted-foreground bg-white px-1.5 py-0.5 rounded border border-gray-100">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-5">
@@ -1089,19 +1135,21 @@ function BookingFlowTab() {
               <h2 className="font-serif text-xl tracking-[0.08em] text-foreground mb-2" data-testid="text-franchise-name">
                 {detail.franchise.name}
               </h2>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-tiffany" />
-                  {detail.franchise.city} {detail.franchise.district}
+              <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5" data-testid="text-franchise-address">
+                  <MapPin className="w-3.5 h-3.5 text-tiffany flex-shrink-0" />
+                  {detail.franchise.address || `${detail.franchise.city} ${detail.franchise.district}`}
                 </span>
                 {detail.franchise.phone && (
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-tiffany" />
-                    {detail.franchise.phone}
+                  <span className="flex items-center gap-1.5" data-testid="text-franchise-phone">
+                    <Phone className="w-3.5 h-3.5 text-tiffany flex-shrink-0" />
+                    <a href={`tel:${detail.franchise.phone}`} className="hover:text-tiffany transition-colors">
+                      {detail.franchise.phone}
+                    </a>
                   </span>
                 )}
                 <span className="flex items-center gap-1.5">
-                  <GraduationCap className="w-3.5 h-3.5 text-tiffany" />
+                  <GraduationCap className="w-3.5 h-3.5 text-tiffany flex-shrink-0" />
                   {detail.coaches.length} 位老師
                 </span>
               </div>
@@ -1115,6 +1163,52 @@ function BookingFlowTab() {
                 <PhotoCarousel photos={detail.franchise.photos} alt={detail.franchise.name} height="h-52" showControls />
                 <div className="px-4 py-2 text-xs text-muted-foreground/60 text-center">
                   教室環境 · {detail.franchise.photos.length} 張照片
+                </div>
+              </div>
+            )}
+
+            {detail.coaches.length > 0 && (
+              <div>
+                <h3 className="text-base font-semibold text-foreground mb-3">師資介紹</h3>
+                <div className="space-y-3">
+                  {detail.coaches.map((coach) => (
+                    <div key={coach.id} className="bg-white rounded-xl border border-gray-100 p-4" data-testid={`coach-card-${coach.id}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                          <UserCircle className="w-5 h-5 text-tiffany" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold text-foreground" data-testid={`text-coach-name-${coach.id}`}>{coach.name}</span>
+                            {coach.isCertified && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-tiffany bg-tiffany/10 px-1.5 py-0.5 rounded-full">
+                                <Award className="w-2.5 h-2.5" />
+                                認證
+                              </span>
+                            )}
+                            {(coach.rating ?? 0) > 0 && (
+                              <span className="text-[10px] text-amber-600 flex items-center gap-0.5">
+                                <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                {coach.rating?.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                          {coach.bio && (
+                            <p className="text-xs text-muted-foreground leading-relaxed mb-1.5" data-testid={`text-coach-bio-${coach.id}`}>{coach.bio}</p>
+                          )}
+                          {coach.specialties && coach.specialties.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {coach.specialties.map((s, i) => (
+                                <span key={i} className="text-[10px] bg-gray-50 text-muted-foreground px-2 py-0.5 rounded-full border border-gray-100">
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1147,9 +1241,10 @@ function BookingFlowTab() {
                   <p className="text-sm text-muted-foreground">此日期沒有可預約的時段</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {filteredSlots.map((slot) => {
                     const available = slot.maxSeats - slot.bookedSeats;
+                    const coach = detail.coaches.find((c) => c.id === slot.coachId);
                     return (
                       <div
                         key={slot.id}
@@ -1158,19 +1253,11 @@ function BookingFlowTab() {
                         }`}
                         data-testid={`slot-card-${slot.id}`}
                       >
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-3">
                           <span className="font-medium text-foreground flex items-center gap-1.5">
                             <Clock className="w-4 h-4 text-tiffany" />
                             {slot.startTime} - {slot.endTime}
                           </span>
-                        </div>
-                        {slot.coachName && (
-                          <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
-                            <GraduationCap className="w-3.5 h-3.5" />
-                            {slot.coachName}
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between mt-3">
                           <div className="flex items-center gap-1.5">
                             {Array.from({ length: slot.maxSeats }).map((_, i) => (
                               <div
@@ -1180,10 +1267,42 @@ function BookingFlowTab() {
                                 }`}
                               />
                             ))}
-                            <span className="text-xs text-muted-foreground ml-1">
+                            <span className="text-xs text-muted-foreground ml-0.5">
                               餘 {available}
                             </span>
                           </div>
+                        </div>
+                        {coach && (
+                          <div className="flex items-start gap-2.5 mb-3 p-2.5 bg-gray-50/80 rounded-lg" data-testid={`slot-coach-info-${slot.id}`}>
+                            <div className="w-8 h-8 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                              <UserCircle className="w-4 h-4 text-tiffany" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-sm font-medium text-foreground">{coach.name}</span>
+                                {coach.isCertified && (
+                                  <Award className="w-3 h-3 text-tiffany" />
+                                )}
+                                {(coach.rating ?? 0) > 0 && (
+                                  <span className="text-[10px] text-amber-600 flex items-center gap-0.5 ml-auto">
+                                    <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                    {coach.rating?.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                              {coach.specialties && coach.specialties.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {coach.specialties.map((s, i) => (
+                                    <span key={i} className="text-[10px] text-muted-foreground bg-white px-1.5 py-0.5 rounded border border-gray-100">
+                                      {s}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-end">
                           <Button
                             size="sm"
                             onClick={() => handleBook(slot)}
@@ -1283,11 +1402,19 @@ function BookingFlowTab() {
                     </h3>
                     <ChevronRight className="w-5 h-5 text-muted-foreground/40 group-hover:text-tiffany transition-colors" />
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-2">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-1">
                     <span className="flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5" />
-                      {f.city} {f.district}
+                      {f.address || `${f.city} ${f.district}`}
                     </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-2">
+                    {f.phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5" />
+                        {f.phone}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <GraduationCap className="w-3.5 h-3.5" />
                       {result.coachCount} 位老師
