@@ -1,8 +1,26 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { authStorage } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { seedDatabase } from "./seed";
+
+const isAdmin: RequestHandler = async (req: any, res, next) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  const userId = req.user.claims.sub;
+  const user = await authStorage.getUser(userId);
+  if (!user || user.role !== "admin") return res.status(403).json({ message: "Forbidden" });
+  next();
+};
+
+const isFranchiseAdmin: RequestHandler = async (req: any, res, next) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  const userId = req.user.claims.sub;
+  const user = await authStorage.getUser(userId);
+  if (!user || user.role !== "franchise_admin" || !user.franchiseId) return res.status(403).json({ message: "Forbidden" });
+  req.franchiseId = user.franchiseId;
+  next();
+};
 
 export async function registerRoutes(
   httpServer: Server,
@@ -236,7 +254,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/franchises", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/franchises", isAdmin, async (req, res) => {
     try {
       const franchise = await storage.createFranchise(req.body);
       res.json(franchise);
@@ -245,7 +263,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/franchises/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/franchises/:id", isAdmin, async (req, res) => {
     try {
       const franchise = await storage.updateFranchise(parseInt(req.params.id), req.body);
       res.json(franchise);
@@ -254,7 +272,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/franchises/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/franchises/:id", isAdmin, async (req, res) => {
     try {
       await storage.deleteFranchise(parseInt(req.params.id));
       res.json({ success: true });
@@ -364,6 +382,133 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete announcement" });
+    }
+  });
+
+  app.get("/api/admin/users", isAdmin, async (_req, res) => {
+    try {
+      const userList = await storage.getAllUsers();
+      res.json(userList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/role", isAdmin, async (req, res) => {
+    try {
+      const { role, franchiseId } = req.body;
+      const user = await storage.updateUserRole(req.params.id, role, franchiseId || null);
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  app.get("/api/franchise-admin/my-franchise", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const franchise = await storage.getFranchise(req.franchiseId);
+      if (!franchise) return res.status(404).json({ message: "Franchise not found" });
+      res.json(franchise);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch franchise" });
+    }
+  });
+
+  app.patch("/api/franchise-admin/my-franchise", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { description, phone, tags, nearbySchools } = req.body;
+      const franchise = await storage.updateFranchise(req.franchiseId, { description, phone, tags, nearbySchools });
+      res.json(franchise);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update franchise" });
+    }
+  });
+
+  app.get("/api/franchise-admin/stats", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const stats = await storage.getFranchiseStats(req.franchiseId);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  app.get("/api/franchise-admin/coaches", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coachList = await storage.getCoachesByFranchise(req.franchiseId);
+      res.json(coachList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch coaches" });
+    }
+  });
+
+  app.post("/api/franchise-admin/coaches", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coach = await storage.createCoach({ ...req.body, franchiseId: req.franchiseId });
+      res.json(coach);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create coach" });
+    }
+  });
+
+  app.patch("/api/franchise-admin/coaches/:id", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coach = await storage.getCoach(parseInt(req.params.id));
+      if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
+      const updated = await storage.updateCoach(parseInt(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update coach" });
+    }
+  });
+
+  app.delete("/api/franchise-admin/coaches/:id", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coach = await storage.getCoach(parseInt(req.params.id));
+      if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteCoach(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete coach" });
+    }
+  });
+
+  app.get("/api/franchise-admin/time-slots", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const slotList = await storage.getSlotsByFranchise(req.franchiseId);
+      res.json(slotList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch time slots" });
+    }
+  });
+
+  app.post("/api/franchise-admin/time-slots", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const slot = await storage.createSlot({ ...req.body, franchiseId: req.franchiseId });
+      res.json(slot);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create time slot" });
+    }
+  });
+
+  app.delete("/api/franchise-admin/time-slots/:id", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const slotList = await storage.getSlotsByFranchise(req.franchiseId);
+      const slot = slotList.find((s) => s.id === parseInt(req.params.id));
+      if (!slot) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteSlot(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete time slot" });
+    }
+  });
+
+  app.get("/api/franchise-admin/bookings", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const bookingList = await storage.getBookingsByFranchise(req.franchiseId);
+      res.json(bookingList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch bookings" });
     }
   });
 

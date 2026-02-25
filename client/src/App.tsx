@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import ParentDashboard from "@/pages/parent-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
+import FranchiseAdminDashboard from "@/pages/franchise-admin";
 import SearchResults from "@/pages/search-results";
 import ClassroomDetail from "@/pages/classroom-detail";
 import type { User } from "@shared/models/auth";
@@ -50,6 +51,9 @@ function HomePage() {
     if (typedUser.role === "admin") {
       return <AdminDashboard />;
     }
+    if (typedUser.role === "franchise_admin") {
+      return <FranchiseAdminDashboard />;
+    }
     return <ParentDashboard />;
   }
 
@@ -64,6 +68,7 @@ function Router() {
       <Route path="/classroom/:id" component={ClassroomDetail} />
       <Route path="/dashboard" component={ParentDashboard} />
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/franchise-admin" component={FranchiseAdminDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

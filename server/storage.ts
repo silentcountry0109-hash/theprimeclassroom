@@ -1,5 +1,6 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
+  users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
   type Child, type InsertChild,
@@ -8,6 +9,7 @@ import {
   type Faq, type InsertFaq,
   type SuccessStory, type InsertSuccessStory,
   type Announcement, type InsertAnnouncement,
+  type User,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
@@ -73,6 +75,16 @@ export interface IStorage {
     totalCoaches: number;
     totalFranchises: number;
     totalBookings: number;
+  }>;
+
+  getAllUsers(): Promise<User[]>;
+  updateUserRole(id: string, role: string, franchiseId: number | null): Promise<User>;
+  getBookingsByFranchise(franchiseId: number): Promise<any[]>;
+  getFranchiseStats(franchiseId: number): Promise<{
+    totalCoaches: number;
+    totalSlots: number;
+    totalBookings: number;
+    confirmedBookings: number;
   }>;
 }
 
@@ -462,6 +474,64 @@ export class DatabaseStorage implements IStorage {
       totalCoaches: Number(coachCount.count),
       totalFranchises: Number(franchiseCount.count),
       totalBookings: Number(bookingCount.count),
+    };
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async updateUserRole(id: string, role: string, franchiseId: number | null): Promise<User> {
+    const [updated] = await db.update(users).set({ role, franchiseId, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async getBookingsByFranchise(franchiseId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        booking: bookings,
+        slot: timeSlots,
+        child: children,
+      })
+      .from(bookings)
+      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+      .innerJoin(children, eq(bookings.childId, children.id))
+      .where(eq(timeSlots.franchiseId, franchiseId))
+      .orderBy(desc(bookings.createdAt));
+
+    return results.map((r) => ({
+      id: r.booking.id,
+      status: r.booking.status,
+      createdAt: r.booking.createdAt,
+      childName: r.child.name,
+      childGrade: r.child.grade,
+      childSchool: r.child.school,
+      date: r.slot.date,
+      startTime: r.slot.startTime,
+      endTime: r.slot.endTime,
+    }));
+  }
+
+  async getFranchiseStats(franchiseId: number) {
+    const [coachCount] = await db.select({ count: sql<number>`count(*)` }).from(coaches).where(eq(coaches.franchiseId, franchiseId));
+    const [slotCount] = await db.select({ count: sql<number>`count(*)` }).from(timeSlots).where(eq(timeSlots.franchiseId, franchiseId));
+
+    const franchiseSlots = await db.select({ id: timeSlots.id }).from(timeSlots).where(eq(timeSlots.franchiseId, franchiseId));
+    let totalBookings = 0;
+    let confirmedBookings = 0;
+    if (franchiseSlots.length > 0) {
+      const slotIds = franchiseSlots.map((s) => s.id);
+      const [allBookings] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(inArray(bookings.slotId, slotIds));
+      const [confirmed] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(and(inArray(bookings.slotId, slotIds), eq(bookings.status, "confirmed")));
+      totalBookings = Number(allBookings.count);
+      confirmedBookings = Number(confirmed.count);
+    }
+
+    return {
+      totalCoaches: Number(coachCount.count),
+      totalSlots: Number(slotCount.count),
+      totalBookings,
+      confirmedBookings,
     };
   }
 }

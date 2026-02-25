@@ -70,7 +70,10 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 
 ## User Roles
 - `parent` (default) - Manage children, book sessions
-- `admin` - CMS management, view stats
+- `admin` (總部管理員) - Full CMS management, franchise CRUD, user role management
+- `franchise_admin` (分校主任) - Manage own franchise info, coaches, time slots, view bookings
+  - Linked to a specific franchise via `users.franchiseId`
+  - HQ admin assigns this role via 帳號管理 tab
 
 ## API Routes
 ### Public
@@ -83,22 +86,38 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - GET/POST/DELETE /api/children
 - GET/POST /api/bookings, PATCH /api/bookings/:id/cancel
 
-### Admin
+### Admin (isAdmin middleware - role=admin only)
 - GET /api/admin/stats
 - CRUD: /api/admin/faqs, /api/admin/success-stories, /api/admin/announcements
 - CRUD: /api/admin/franchises (GET all, POST create, PATCH/:id update, DELETE/:id)
 - CRUD: /api/admin/coaches (GET all, POST create, PATCH/:id update, DELETE/:id)
 - GET /api/admin/franchises/:id/coaches, GET /api/admin/franchises/:id/slots
 - POST /api/admin/time-slots, DELETE /api/admin/time-slots/:id
+- GET /api/admin/users, PATCH /api/admin/users/:id/role
 
-## Admin Dashboard Tabs
+### Franchise Admin (isFranchiseAdmin middleware - role=franchise_admin only)
+- GET /api/franchise-admin/my-franchise, PATCH (edit description/phone/tags/nearbySchools)
+- GET /api/franchise-admin/stats
+- CRUD: /api/franchise-admin/coaches (scoped to own franchise)
+- GET/POST/DELETE /api/franchise-admin/time-slots (scoped to own franchise)
+- GET /api/franchise-admin/bookings (scoped to own franchise)
+
+## HQ Admin Dashboard Tabs (/admin)
 - 總覽: Stats cards (students, coaches, franchises, bookings)
 - 常見問題: FAQ CRUD
 - 成功案例: Success stories CRUD
 - 加盟分校: Full franchise CRUD (name, city/district, address, phone, tags, nearbySchools, rating, reviewCount, isActive toggle)
 - 老師管理: Full coach CRUD (name, franchise assignment, bio, specialties, rating, certified toggle)
-- 時段管理: Per-franchise time slot management (select franchise → view/add/delete slots with date, time, coach assignment)
+- 時段管理: Per-franchise time slot management (select franchise → view/add/delete slots)
+- 帳號管理: User role management (assign parent/franchise_admin/admin, link franchise_admin to specific franchise)
 - 公告管理: Announcements CRUD
+
+## Franchise Admin Dashboard (/franchise-admin)
+- 分校總覽: Stats (coaches, slots, bookings, confirmed)
+- 分校資訊: Edit own franchise description, phone, tags, nearby schools
+- 師資管理: CRUD coaches for own franchise only
+- 時段管理: CRUD time slots for own franchise only
+- 預約管理: View bookings for own franchise (child name, grade, school, date/time, status)
 
 ## Franchise Tags
 - 家長好評推薦 (amber styling)

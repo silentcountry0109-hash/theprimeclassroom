@@ -56,6 +56,8 @@ import {
   ToggleRight,
   ChevronDown,
   ChevronUp,
+  UserCog,
+  Shield,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot } from "@shared/schema";
@@ -95,6 +97,7 @@ export default function AdminDashboard() {
     { id: "franchises", label: "加盟分校", icon: Building2 },
     { id: "coaches", label: "老師管理", icon: GraduationCap },
     { id: "timeslots", label: "時段管理", icon: Clock },
+    { id: "users", label: "帳號管理", icon: UserCog },
     { id: "announcements", label: "公告管理", icon: Megaphone },
   ];
 
@@ -161,6 +164,7 @@ export default function AdminDashboard() {
             {activeTab === "franchises" && <FranchisesTab />}
             {activeTab === "coaches" && <CoachesTab />}
             {activeTab === "timeslots" && <TimeSlotsTab />}
+            {activeTab === "users" && <UsersTab />}
             {activeTab === "announcements" && <AnnouncementsTab />}
           </main>
         </div>
@@ -1173,6 +1177,162 @@ function TimeSlotsTab() {
               data-testid="button-submit-slot"
             >
               {addSlotMutation.isPending ? "新增中..." : "新增時段"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function UsersTab() {
+  const { toast } = useToast();
+  const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [newRole, setNewRole] = useState("parent");
+  const [newFranchiseId, setNewFranchiseId] = useState<number>(0);
+
+  const { data: userList = [], isLoading } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const { data: franchiseList = [] } = useQuery<Franchise[]>({
+    queryKey: ["/api/admin/franchises"],
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role, franchiseId }: { userId: string; role: string; franchiseId: number | null }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role, franchiseId });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "帳號權限已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setShowRoleDialog(false);
+      setSelectedUser(null);
+    },
+  });
+
+  const openRoleDialog = (u: User) => {
+    setSelectedUser(u);
+    setNewRole(u.role || "parent");
+    setNewFranchiseId(u.franchiseId || 0);
+    setShowRoleDialog(true);
+  };
+
+  const roleLabels: Record<string, { label: string; color: string }> = {
+    admin: { label: "總部管理員", color: "bg-coral/10 text-coral" },
+    franchise_admin: { label: "分校主任", color: "bg-tiffany/10 text-tiffany" },
+    parent: { label: "家長", color: "bg-gray-100 text-gray-600" },
+  };
+
+  const getFranchiseName = (fId: number | null) => {
+    if (!fId) return "";
+    return franchiseList.find((f) => f.id === fId)?.name || "";
+  };
+
+  return (
+    <div className="max-w-4xl">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-foreground">帳號管理</h1>
+        <p className="text-sm text-muted-foreground">管理使用者角色，指派分校主任帳號</p>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}</div>
+      ) : userList.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+          <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">尚無使用者</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {userList.map((u) => {
+            const role = roleLabels[u.role || "parent"] || roleLabels.parent;
+            return (
+              <div key={u.id} className="bg-white rounded-md border border-gray-100 p-4 flex items-center gap-4" data-testid={`admin-user-${u.id}`}>
+                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                  {u.profileImageUrl ? (
+                    <img src={u.profileImageUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Users className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-foreground">
+                      {u.firstName || ""} {u.lastName || ""}
+                      {!u.firstName && !u.lastName && <span className="text-muted-foreground">未命名</span>}
+                    </p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${role.color}`}>{role.label}</span>
+                    {u.role === "franchise_admin" && u.franchiseId && (
+                      <span className="text-xs bg-amber-warm text-amber-700 px-2 py-0.5 rounded-full">
+                        {getFranchiseName(u.franchiseId)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{u.email || "無 Email"}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => openRoleDialog(u)} data-testid={`button-edit-user-role-${u.id}`}>
+                  <Shield className="w-3.5 h-3.5 mr-1" />權限
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={showRoleDialog} onOpenChange={(open) => { if (!open) setSelectedUser(null); setShowRoleDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>設定帳號權限</DialogTitle>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4 py-4">
+              <div className="bg-gray-50 rounded-md p-3">
+                <p className="text-sm font-medium">{selectedUser.firstName || ""} {selectedUser.lastName || ""}</p>
+                <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
+              </div>
+              <div>
+                <Label>角色</Label>
+                <Select value={newRole} onValueChange={(v) => { setNewRole(v); if (v !== "franchise_admin") setNewFranchiseId(0); }}>
+                  <SelectTrigger data-testid="select-user-role"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="parent">家長</SelectItem>
+                    <SelectItem value="franchise_admin">分校主任</SelectItem>
+                    <SelectItem value="admin">總部管理員</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {newRole === "franchise_admin" && (
+                <div>
+                  <Label>指派分校 *</Label>
+                  <Select value={newFranchiseId ? newFranchiseId.toString() : ""} onValueChange={(v) => setNewFranchiseId(parseInt(v) || 0)}>
+                    <SelectTrigger data-testid="select-user-franchise"><SelectValue placeholder="選擇分校" /></SelectTrigger>
+                    <SelectContent>
+                      {franchiseList.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.name} ({f.city} {f.district})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRoleDialog(false)}>取消</Button>
+            <Button
+              onClick={() => {
+                if (selectedUser) {
+                  updateRoleMutation.mutate({
+                    userId: selectedUser.id,
+                    role: newRole,
+                    franchiseId: newRole === "franchise_admin" ? newFranchiseId : null,
+                  });
+                }
+              }}
+              disabled={updateRoleMutation.isPending || (newRole === "franchise_admin" && !newFranchiseId)}
+              data-testid="button-submit-user-role"
+            >
+              {updateRoleMutation.isPending ? "更新中..." : "確認更新"}
             </Button>
           </DialogFooter>
         </DialogContent>
