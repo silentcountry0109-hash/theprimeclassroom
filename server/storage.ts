@@ -51,6 +51,7 @@ export interface IStorage {
 
   getChildrenByParent(parentId: string): Promise<Child[]>;
   createChild(child: InsertChild): Promise<Child>;
+  updateChild(id: number, data: Partial<InsertChild>): Promise<Child>;
   deleteChild(id: number): Promise<void>;
 
   searchSlots(city?: string, grade?: string): Promise<any[]>;
@@ -359,6 +360,11 @@ export class DatabaseStorage implements IStorage {
   async createChild(child: InsertChild): Promise<Child> {
     const [created] = await db.insert(children).values(child).returning();
     return created;
+  }
+
+  async updateChild(id: number, data: Partial<InsertChild>): Promise<Child> {
+    const [updated] = await db.update(children).set(data).where(eq(children.id, id)).returning();
+    return updated;
   }
 
   async deleteChild(id: number): Promise<void> {

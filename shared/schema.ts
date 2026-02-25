@@ -43,6 +43,7 @@ export const children = pgTable("children", {
   id: serial("id").primaryKey(),
   parentId: varchar("parent_id").references(() => users.id).notNull(),
   name: text("name").notNull(),
+  gender: text("gender").default("male"),
   grade: integer("grade").notNull(),
   school: text("school"),
   notes: text("notes"),
