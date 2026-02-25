@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -58,10 +59,15 @@ interface BookingWithDetails extends Booking {
 }
 
 export default function ParentDashboard() {
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user: replitUser, isLoading: replitLoading, logout: replitLogout } = useAuth();
+  const { user: credUser, isLoading: credLoading, logout: credLogout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
-  if (authLoading) {
+  const isLoading = replitLoading || credLoading;
+  const user = credUser || replitUser;
+  const isCredentialUser = !!credUser;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-washi flex items-center justify-center">
         <div className="text-center">
@@ -75,9 +81,18 @@ export default function ParentDashboard() {
   }
 
   if (!user) {
-    window.location.href = "/api/login";
+    window.location.href = "/parent-login";
     return null;
   }
+
+  const handleLogout = () => {
+    if (isCredentialUser) {
+      credLogout();
+      window.location.href = "/parent-login";
+    } else {
+      replitLogout();
+    }
+  };
 
   const typedUser = user as User;
 
@@ -133,7 +148,7 @@ export default function ParentDashboard() {
 
             <div className="mt-auto p-4">
               <SidebarMenuButton
-                onClick={() => logout()}
+                onClick={() => handleLogout()}
                 className="w-full justify-start text-muted-foreground"
                 data-testid="button-logout"
               >

@@ -63,7 +63,7 @@ export default function Navbar() {
 
         <div className="hidden md:flex items-center gap-4">
           <a
-            href="/api/login"
+            href="/parent-login"
             className="text-sm text-muted-foreground transition-colors"
             data-testid="link-login"
           >
@@ -99,7 +99,7 @@ export default function Navbar() {
             </button>
           ))}
           <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-gray-100">
-            <a href="/api/login" className="text-sm text-muted-foreground py-2">
+            <a href="/parent-login" className="text-sm text-muted-foreground py-2">
               家長登入
             </a>
             <Button className="rounded-full w-full">預約診斷</Button>

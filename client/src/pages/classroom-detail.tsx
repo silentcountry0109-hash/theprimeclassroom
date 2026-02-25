@@ -35,6 +35,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Franchise, Coach, Child } from "@shared/schema";
@@ -83,7 +84,10 @@ const TAG_STYLES: Record<string, { bg: string; text: string; border: string }> =
 
 export default function ClassroomDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user, isAuthenticated } = useAuth();
+  const { user: replitUser } = useAuth();
+  const { user: credUser } = useCredentialAuth();
+  const user = credUser || replitUser;
+  const isAuthenticated = !!user;
   const { toast } = useToast();
   const [bookingSlot, setBookingSlot] = useState<SlotWithCoach | null>(null);
   const [selectedChild, setSelectedChild] = useState("");
@@ -126,7 +130,7 @@ export default function ClassroomDetail() {
 
   const handleBook = (slot: SlotWithCoach) => {
     if (!isAuthenticated) {
-      window.location.href = "/api/login";
+      window.location.href = "/parent-login";
       return;
     }
     if (children.length === 0) {

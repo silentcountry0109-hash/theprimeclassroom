@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import ParentDashboard from "@/pages/parent-dashboard";
@@ -11,6 +12,7 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import FranchiseAdminDashboard from "@/pages/franchise-admin";
 import FranchiseLogin from "@/pages/franchise-login";
 import HqLogin from "@/pages/hq-login";
+import ParentLogin from "@/pages/parent-login";
 import SearchResults from "@/pages/search-results";
 import ClassroomDetail from "@/pages/classroom-detail";
 
@@ -41,13 +43,15 @@ function LoadingScreen() {
 }
 
 function HomePage() {
-  const { user, isLoading } = useAuth();
+  const { user: replitUser, isLoading: replitLoading } = useAuth();
+  const { user: credUser, isLoading: credLoading } = useCredentialAuth();
 
-  if (isLoading) {
+  if (replitLoading || credLoading) {
     return <LoadingScreen />;
   }
 
-  if (user) {
+  const user = credUser || replitUser;
+  if (user && user.role === "parent") {
     return <ParentDashboard />;
   }
 
@@ -61,6 +65,7 @@ function Router() {
       <Route path="/search" component={SearchResults} />
       <Route path="/classroom/:id" component={ClassroomDetail} />
       <Route path="/dashboard" component={ParentDashboard} />
+      <Route path="/parent-login" component={ParentLogin} />
       <Route path="/franchise-login" component={FranchiseLogin} />
       <Route path="/hq-login" component={HqLogin} />
       <Route path="/admin" component={AdminDashboard} />

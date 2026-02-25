@@ -11,6 +11,7 @@ export async function seedDatabase() {
       .from(franchises);
 
     if (Number(existing.count) > 0) {
+      await seedAccounts();
       return;
     }
 
@@ -424,8 +425,33 @@ export async function seedDatabase() {
     }
     console.log("Franchise admin accounts created");
 
+    await seedAccounts();
+
     console.log("Database seeded successfully!");
   } catch (error) {
     console.error("Error seeding database:", error);
+  }
+}
+
+async function seedAccounts() {
+  const parentAccounts = [
+    { username: "parent1", firstName: "王小明", email: "parent1@primemath.tw" },
+    { username: "parent2", firstName: "李美華", email: "parent2@primemath.tw" },
+    { username: "parent3", firstName: "張大偉", email: "parent3@primemath.tw" },
+  ];
+  for (const acct of parentAccounts) {
+    const [existing] = await db.select().from(users).where(eq(users.username, acct.username));
+    if (!existing) {
+      const hash = await bcrypt.hash("parent123", 10);
+      await db.insert(users).values({
+        id: `parent-${acct.username}`,
+        email: acct.email,
+        firstName: acct.firstName,
+        role: "parent",
+        username: acct.username,
+        passwordHash: hash,
+      });
+      console.log(`Parent account created: ${acct.username}`);
+    }
   }
 }

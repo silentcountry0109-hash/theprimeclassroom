@@ -78,7 +78,9 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
   - Default admin: username=admin, password=admin123
 
 ## User Roles
-- `parent` (default) - Manage children, book sessions via Replit Auth
+- `parent` (default) - Manage children, book sessions
+  - Login: /parent-login (supports both login and registration)
+  - Default seeded accounts: parent1, parent2, parent3 (password: `parent123`)
 - `admin` (總部管理員) - Full CMS management, franchise CRUD, user/director account management
   - Login: /hq-login → /admin
   - Default: username=`admin`, password=`admin123`
@@ -95,7 +97,11 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - GET /api/franchises/:id/detail
 - GET /api/search-slots?city=X (legacy)
 
-### Protected (requires auth)
+### Parent Auth
+- POST /api/parent-register (username, password, firstName, email?)
+- POST /api/credential-login (works for all roles including parent)
+
+### Protected (requires credential or Replit auth)
 - GET/POST/DELETE /api/children
 - GET/POST /api/bookings, PATCH /api/bookings/:id/cancel
 

@@ -91,8 +91,8 @@ export async function registerRoutes(
       if (!valid) {
         return res.status(401).json({ message: "帳號或密碼錯誤" });
       }
-      if (user.role !== "admin" && user.role !== "franchise_admin") {
-        return res.status(403).json({ message: "此帳號無管理權限" });
+      if (user.role !== "admin" && user.role !== "franchise_admin" && user.role !== "parent") {
+        return res.status(403).json({ message: "帳號或密碼錯誤" });
       }
       req.session.credentialUserId = user.id;
       req.session.save(() => {
@@ -122,6 +122,41 @@ export async function registerRoutes(
     req.session.save(() => {
       res.json({ success: true });
     });
+  });
+
+  app.post("/api/parent-register", async (req: any, res) => {
+    try {
+      const { username, password, firstName, email } = req.body;
+      if (!username || !password || !firstName) {
+        return res.status(400).json({ message: "請填寫所有必填欄位" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+      }
+      if (username.length < 3) {
+        return res.status(400).json({ message: "帳號至少需要 3 個字元" });
+      }
+      const [existing] = await db.select().from(users).where(eq(users.username, username));
+      if (existing) {
+        return res.status(400).json({ message: "此帳號已被使用" });
+      }
+      const hash = await bcrypt.hash(password, 10);
+      const [newUser] = await db.insert(users).values({
+        id: `parent-${username}-${Date.now()}`,
+        username,
+        passwordHash: hash,
+        firstName,
+        email: email || null,
+        role: "parent",
+      }).returning();
+      req.session.credentialUserId = newUser.id;
+      req.session.save(() => {
+        const { passwordHash: _, ...safeUser } = newUser;
+        res.json(safeUser);
+      });
+    } catch (error) {
+      res.status(500).json({ message: "註冊失敗，請稍後再試" });
+    }
   });
 
   app.post("/api/admin/create-credential-account", isAdmin, async (req: any, res) => {
@@ -254,9 +289,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/children", isAuthenticated, async (req: any, res) => {
+  app.get("/api/children", isCredentialOrAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.currentUser.id;
       const kids = await storage.getChildrenByParent(userId);
       res.json(kids);
     } catch (error) {
@@ -264,9 +299,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/children", isAuthenticated, async (req: any, res) => {
+  app.post("/api/children", isCredentialOrAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.currentUser.id;
       const child = await storage.createChild({
         ...req.body,
         parentId: userId,
@@ -277,7 +312,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/children/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/children/:id", isCredentialOrAuth, async (req: any, res) => {
     try {
       await storage.deleteChild(parseInt(req.params.id));
       res.json({ success: true });
@@ -286,9 +321,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/bookings", isAuthenticated, async (req: any, res) => {
+  app.get("/api/bookings", isCredentialOrAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.currentUser.id;
       const userBookings = await storage.getBookingsByParent(userId);
       res.json(userBookings);
     } catch (error) {
@@ -296,9 +331,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
+  app.post("/api/bookings", isCredentialOrAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.currentUser.id;
       const booking = await storage.createBooking({
         slotId: req.body.slotId,
         childId: req.body.childId,
@@ -310,7 +345,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/bookings/:id/cancel", isAuthenticated, async (req, res) => {
+  app.patch("/api/bookings/:id/cancel", isCredentialOrAuth, async (req: any, res) => {
     try {
       await storage.cancelBooking(parseInt(req.params.id));
       res.json({ success: true });
