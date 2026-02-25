@@ -81,6 +81,10 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        tiffany: "#81D8D0",
+        coral: "#FFB7B2",
+        "amber-warm": "#FFF9E5",
+        washi: "#FAF9F6",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
