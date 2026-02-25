@@ -343,19 +343,6 @@ function HeroSection() {
           </div>
         </div>
 
-        <motion.div
-          className="flex flex-wrap items-center justify-center gap-3 mt-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-        >
-          {["免費診斷", "無需綁約", "隨時取消"].map((text) => (
-            <span key={text} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CheckCircle className="w-3.5 h-3.5 text-tiffany" />
-              {text}
-            </span>
-          ))}
-        </motion.div>
       </motion.div>
 
       <motion.div
@@ -1592,20 +1579,6 @@ function CTASection() {
                   家長登入
                 </Button>
               </a>
-            </div>
-            <div className="flex items-center justify-center md:justify-start gap-5 mt-8 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4 text-tiffany" />
-                免費診斷
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4 text-tiffany" />
-                無需綁約
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4 text-tiffany" />
-                隨時取消
-              </span>
             </div>
           </motion.div>
         </div>
