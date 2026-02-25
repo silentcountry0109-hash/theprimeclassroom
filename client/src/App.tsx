@@ -21,7 +21,7 @@ function LoadingScreen() {
     <div className="min-h-screen bg-washi flex items-center justify-center">
       <div className="text-center">
         <h1 className="font-serif text-3xl tracking-[0.15em] text-foreground mb-6">
-          質數數學
+          質數教室
         </h1>
         <div className="flex gap-2 justify-center">
           <div

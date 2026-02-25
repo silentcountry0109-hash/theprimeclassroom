@@ -21,7 +21,7 @@ export async function seedDatabase() {
       .insert(franchises)
       .values([
         {
-          name: "質數數學 大安教室",
+          name: "質數教室 大安教室",
           address: "復興南路二段 100 號 3 樓",
           city: "台北市",
           district: "大安區",
@@ -35,7 +35,7 @@ export async function seedDatabase() {
           nearbySchools: ["大安國小", "建安國小", "幸安國小", "金華國小"],
         },
         {
-          name: "質數數學 信義教室",
+          name: "質數教室 信義教室",
           address: "忠孝東路五段 68 號 5 樓",
           city: "台北市",
           district: "信義區",
@@ -49,7 +49,7 @@ export async function seedDatabase() {
           nearbySchools: ["信義國小", "光復國小", "興雅國小", "博愛國小"],
         },
         {
-          name: "質數數學 中山教室",
+          name: "質數教室 中山教室",
           address: "南京東路二段 88 號 4 樓",
           city: "台北市",
           district: "中山區",
@@ -63,12 +63,12 @@ export async function seedDatabase() {
           nearbySchools: ["中山國小", "長安國小", "吉林國小"],
         },
         {
-          name: "質數數學 板橋教室",
+          name: "質數教室 板橋教室",
           address: "文化路一段 200 號 2 樓",
           city: "新北市",
           district: "板橋區",
           phone: "02-2952-9012",
-          description: "鄰近板橋火車站，寬敞舒適的學習環境。是新北市最早成立的質數數學教室。",
+          description: "鄰近板橋火車站，寬敞舒適的學習環境。是新北市最早成立的質數教室。",
           maxSeats: 5,
           isActive: true,
           tags: ["年度績優校區", "成績進步快速"],
@@ -77,7 +77,7 @@ export async function seedDatabase() {
           nearbySchools: ["板橋國小", "中山國小", "文化國小", "海山國小"],
         },
         {
-          name: "質數數學 永和教室",
+          name: "質數教室 永和教室",
           address: "中正路 50 號 3 樓",
           city: "新北市",
           district: "永和區",
@@ -91,7 +91,7 @@ export async function seedDatabase() {
           nearbySchools: ["永和國小", "秀朗國小", "頂溪國小"],
         },
         {
-          name: "質數數學 中壢教室",
+          name: "質數教室 中壢教室",
           address: "中山路 120 號 4 樓",
           city: "桃園市",
           district: "中壢區",
@@ -105,7 +105,7 @@ export async function seedDatabase() {
           nearbySchools: ["中壢國小", "新明國小", "中原國小", "自立國小"],
         },
         {
-          name: "質數數學 桃園教室",
+          name: "質數教室 桃園教室",
           address: "中正路 300 號 2 樓",
           city: "桃園市",
           district: "桃園區",
@@ -119,7 +119,7 @@ export async function seedDatabase() {
           nearbySchools: ["桃園國小", "東門國小", "建國國小"],
         },
         {
-          name: "質數數學 西屯教室",
+          name: "質數教室 西屯教室",
           address: "臺灣大道三段 500 號 6 樓",
           city: "台中市",
           district: "西屯區",
@@ -224,7 +224,7 @@ export async function seedDatabase() {
 
     await db.insert(faqs).values([
       {
-        question: "質數數學的上課方式是什麼？",
+        question: "質數教室的上課方式是什麼？",
         answer:
           "我們採用一對一至一對五的小班制個別指導模式。每位老師在同一時段最多指導 5 位學生，每位學生都有獨立的學習進度和教材，老師會依據每位學生的狀態給予個別指導。",
         category: "關於課程",
@@ -266,7 +266,7 @@ export async function seedDatabase() {
       {
         question: "老師的資格要求是什麼？",
         answer:
-          "所有老師均需通過總部的嚴格培訓課程，包含教學方法、兒童心理學、認知轉譯技巧等。通過考核後才能獲得「質數數學認證老師」資格。",
+          "所有老師均需通過總部的嚴格培訓課程，包含教學方法、兒童心理學、認知轉譯技巧等。通過考核後才能獲得「質數教室認證老師」資格。",
         category: "關於老師",
         sortOrder: 6,
         isActive: true,
@@ -295,7 +295,7 @@ export async function seedDatabase() {
         parentName: "王媽媽",
         grade: 3,
         testimonial:
-          "小明以前看到數學就排斥，上了質數數學後，陳老師用積木和遊戲帶他理解乘法概念，現在他居然會主動說要練習數學！成績也從 65 分進步到 92 分。",
+          "小明以前看到數學就排斥，上了質數教室後，陳老師用積木和遊戲帶他理解乘法概念，現在他居然會主動說要練習數學！成績也從 65 分進步到 92 分。",
         tags: ["成績進步", "學習態度改善"],
         isActive: true,
       },
@@ -304,7 +304,7 @@ export async function seedDatabase() {
         parentName: "張爸爸",
         grade: 5,
         testimonial:
-          "張老師真的很厲害，他能用小華聽得懂的方式解釋分數和小數的概念。以前小華最怕這個單元，現在反而成了他最有自信的部分。非常感謝質數數學！",
+          "張老師真的很厲害，他能用小華聽得懂的方式解釋分數和小數的概念。以前小華最怕這個單元，現在反而成了他最有自信的部分。非常感謝質數教室！",
         tags: ["概念突破", "專業老師"],
         isActive: true,
       },
@@ -322,7 +322,7 @@ export async function seedDatabase() {
         parentName: "李媽媽",
         grade: 2,
         testimonial:
-          "小傑每週最期待的就是去質數數學上課！老師會用很多有趣的教具，讓他在玩中學。回家後還會自己翻課本複習，這是以前不可能的事。",
+          "小傑每週最期待的就是去質數教室上課！老師會用很多有趣的教具，讓他在玩中學。回家後還會自己翻課本複習，這是以前不可能的事。",
         tags: ["學習動機", "低年級"],
         isActive: true,
       },

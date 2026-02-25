@@ -72,7 +72,7 @@ export default function ParentDashboard() {
       <div className="min-h-screen bg-washi flex items-center justify-center">
         <div className="text-center">
           <h1 className="font-serif text-2xl tracking-[0.15em] text-foreground mb-4">
-            質數數學
+            質數教室
           </h1>
           <Skeleton className="w-32 h-2 mx-auto" />
         </div>
@@ -163,7 +163,7 @@ export default function ParentDashboard() {
           <header className="flex items-center gap-2 p-4 border-b border-gray-100 bg-white">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <h2 className="font-serif text-lg tracking-wider text-foreground">
-              質數數學
+              質數教室
             </h2>
           </header>
           <main className="flex-1 overflow-auto p-6">

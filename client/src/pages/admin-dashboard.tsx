@@ -111,7 +111,7 @@ export default function AdminDashboard() {
           <SidebarContent>
             <div className="p-4 border-b border-sidebar-border">
               <p className="font-serif text-lg tracking-[0.1em] text-foreground">
-                質數數學
+                質數教室
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 總部管理系統
@@ -529,7 +529,7 @@ function FranchisesTab() {
     setDirectorFranchise(f);
     setDirUsername("");
     setDirPassword("");
-    setDirFirstName(f.name.replace("質數數學 ", "").replace("教室", ""));
+    setDirFirstName(f.name.replace("質數數學 ", "").replace("質數教室 ", "").replace("教室", ""));
     setShowDirectorDialog(true);
   };
 

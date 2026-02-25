@@ -1,4 +1,4 @@
-# 質數數學 The Prime Math
+# The Prime 質數教室
 
 ## Overview
 S2B2C education platform for elementary school math tutoring in Taiwan. Features a brand website, parent system, and HQ admin dashboard.

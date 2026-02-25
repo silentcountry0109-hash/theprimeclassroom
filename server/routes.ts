@@ -203,7 +203,7 @@ export async function registerRoutes(
       const hash = await bcrypt.hash(password, 10);
       const [newUser] = await db.insert(users).values({
         email: `${username}@primemath.tw`,
-        firstName: firstName || franchise.name.replace("質數數學 ", "").replace("教室", ""),
+        firstName: firstName || franchise.name.replace("質數數學 ", "").replace("質數教室 ", "").replace("教室", ""),
         lastName: lastName || "主任",
         role: "franchise_admin",
         franchiseId,

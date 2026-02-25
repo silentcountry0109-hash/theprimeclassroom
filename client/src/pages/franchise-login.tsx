@@ -55,7 +55,7 @@ export default function FranchiseLogin() {
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <h1 className="font-serif text-2xl tracking-[0.15em] text-foreground mb-2">
-              質數數學
+              質數教室
             </h1>
             <p className="text-sm text-muted-foreground">分校管理系統登入</p>
           </div>

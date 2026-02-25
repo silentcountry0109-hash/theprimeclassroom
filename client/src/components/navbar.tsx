@@ -43,7 +43,7 @@ export default function Navbar() {
             className="font-serif text-2xl tracking-[0.15em] text-foreground cursor-pointer"
             data-testid="link-home"
           >
-            質數數學
+            質數教室
           </span>
         </Link>
 

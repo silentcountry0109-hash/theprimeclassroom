@@ -118,7 +118,7 @@ export default function FranchiseAdminDashboard() {
         <Sidebar>
           <SidebarContent>
             <div className="p-4 border-b border-sidebar-border">
-              <p className="font-serif text-lg tracking-[0.1em] text-foreground">質數數學</p>
+              <p className="font-serif text-lg tracking-[0.1em] text-foreground">質數教室</p>
               {myFranchise ? (
                 <p className="text-xs text-tiffany font-medium mt-1" data-testid="sidebar-franchise-name">{myFranchise.name}</p>
               ) : (

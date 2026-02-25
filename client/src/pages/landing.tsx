@@ -124,7 +124,7 @@ function HeroSection() {
     return parts.length > 0 ? parts.join(" · ") : "";
   };
 
-  const titleChars = ["質", "數", "數", "學"];
+  const titleChars = ["質", "數", "教", "室"];
 
   return (
     <section
@@ -180,7 +180,7 @@ function HeroSection() {
           animate={{ opacity: 1, letterSpacing: "0.1em" }}
           transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
         >
-          The Prime Math
+          The Prime
         </motion.p>
         <motion.p
           className="text-base md:text-lg text-muted-foreground mb-2 tracking-wide"
@@ -409,7 +409,7 @@ function ClassroomShowcase() {
               溫暖的學習空間
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              每間質數數學教室都精心打造舒適的學習環境。明亮的自然光線、溫暖的木質桌椅、豐富的教具，讓孩子在輕鬆愉快的氛圍中專注學習。
+              每間質數教室都精心打造舒適的學習環境。明亮的自然光線、溫暖的木質桌椅、豐富的教具，讓孩子在輕鬆愉快的氛圍中專注學習。
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-3 bg-washi rounded-md p-3">
@@ -468,7 +468,7 @@ function FeaturesSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-16" {...fadeInUp}>
           <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
-            為什麼選擇質數數學
+            為什麼選擇質數教室
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             我們相信，每個孩子都值得一場不被干擾的學習對話
@@ -877,7 +877,7 @@ function FAQSection() {
             常見問題
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            關於質數數學，您可能想知道的事
+            關於質數教室，您可能想知道的事
           </p>
         </motion.div>
 
@@ -1013,10 +1013,10 @@ function FooterSection() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
           <div className="md:col-span-2">
             <h3 className="font-serif text-2xl tracking-[0.15em] text-white mb-3">
-              質數數學
+              質數教室
             </h3>
             <p className="text-sm text-white/50 mb-1 tracking-wide">
-              The Prime Math
+              The Prime
             </p>
             <p className="text-sm text-white/60 leading-relaxed mt-4 max-w-sm">
               不可拆解的對話，讓教學回歸「1 位老師」對「1
@@ -1080,7 +1080,7 @@ function FooterSection() {
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/40">
-            &copy; {new Date().getFullYear()} 質數數學 The Prime Math. All rights
+            &copy; {new Date().getFullYear()} The Prime 質數教室. All rights
             reserved.
           </p>
           <a
