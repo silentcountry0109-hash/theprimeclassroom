@@ -339,20 +339,6 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/children/:id", isCredentialOrAuth, async (req: any, res) => {
-    try {
-      const userId = req.currentUser.id;
-      const kids = await storage.getChildrenByParent(userId);
-      const childId = parseInt(req.params.id);
-      if (!kids.find((k: any) => k.id === childId)) {
-        return res.status(403).json({ message: "無權限刪除此孩子" });
-      }
-      await storage.deleteChild(childId);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete child" });
-    }
-  });
 
   app.get("/api/bookings", isCredentialOrAuth, async (req: any, res) => {
     try {

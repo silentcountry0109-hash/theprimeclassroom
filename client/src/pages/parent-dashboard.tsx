@@ -1131,7 +1131,7 @@ function ChildrenTab() {
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingChild, setEditingChild] = useState<Child | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Child | null>(null);
+
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
   const [school, setSchool] = useState("");
@@ -1162,20 +1162,6 @@ function ChildrenTab() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/children/${id}`);
-    },
-    onSuccess: () => {
-      toast({ title: "已刪除孩子資料" });
-      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      setDeleteTarget(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "刪除失敗", description: error.message, variant: "destructive" });
-    },
-  });
 
   const closeDialog = () => {
     setShowAddDialog(false);
@@ -1290,13 +1276,6 @@ function ChildrenTab() {
                     </div>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => setDeleteTarget(child)}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors"
-                      data-testid={`button-delete-child-${child.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1362,26 +1341,6 @@ function ChildrenTab() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>確認刪除</AlertDialogTitle>
-            <AlertDialogDescription>
-              確定要刪除「{deleteTarget?.name}」的資料嗎？相關的預約紀錄也會一併刪除，此操作無法復原。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-              className="bg-red-500 text-white hover:bg-red-600"
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "刪除中..." : "確認刪除"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
