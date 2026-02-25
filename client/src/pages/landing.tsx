@@ -714,6 +714,93 @@ function LearningMapSection() {
   );
 }
 
+function BookUnitPopover({ book, units, color }: { book: string; units: string[]; color: string }) {
+  const [open, setOpen] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setOpen(true);
+  };
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => setOpen(false), 150);
+  };
+  const handleClick = () => {
+    setOpen((prev) => !prev);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(`[data-book="${book}"]`)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("touchstart", handleOutside);
+    return () => document.removeEventListener("touchstart", handleOutside);
+  }, [open, book]);
+
+  return (
+    <div
+      className="relative flex-1"
+      data-book={book}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button
+        onClick={handleClick}
+        className={`w-full bg-white rounded-lg py-2.5 px-4 text-sm text-foreground border transition-all duration-200 text-center font-medium ${
+          open ? "border-tiffany/40 shadow-md ring-2 ring-tiffany/10" : "border-gray-100 hover:border-tiffany/30 hover:shadow-sm"
+        }`}
+        data-testid={`button-book-${book}`}
+      >
+        {book}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-30 w-52 sm:w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-3"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <p className={`text-xs font-semibold mb-2 px-1 ${color.includes("tiffany") ? "text-tiffany" : "text-coral"}`}>
+              {book} 單元內容
+            </p>
+            <ul className="space-y-1">
+              {units.map((unit, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground leading-relaxed px-1 py-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${color.includes("tiffany") ? "bg-tiffany/50" : "bg-coral/50"}`} />
+                  {unit}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+const BOOK_UNITS: Record<string, string[]> = {
+  "第1冊": ["10以內的數", "比長短", "排順序與比多少", "分與合", "方盒、圓罐、球", "30以內的數", "10以內的加法", "10以內的減法", "幾點鐘"],
+  "第2冊": ["18以內的加法", "18以內的減法", "圖形與分類", "幾月幾日", "100以內的數", "認識錢幣", "二位數的加法", "二位數的減法", "做紀錄"],
+  "第3冊": ["200以內的數", "二位數的加減", "幾公分", "容量與重量", "加減應用", "時間", "乘法（一）", "乘法（二）", "面的大小比較"],
+  "第4冊": ["1000以內的數", "加減應用", "公分和公尺", "乘法", "分東西", "公升和毫升", "三位數的加減", "年月日", "平面圖形與立體形體"],
+  "第5冊": ["10000以內的數", "四位數的加減", "乘法", "周長與面積", "除法", "公斤和公克", "分數", "時間", "圓和角"],
+  "第6冊": ["乘法", "除法", "公里", "分數", "小數", "統計圖表", "周界與周長", "面積", "時間"],
+  "第7冊": ["一億以內的數", "乘法與除法", "角度", "整數四則運算", "三角形", "分數", "小數", "統計圖", "周長與面積"],
+  "第8冊": ["大數", "概數", "分數的加減", "小數乘以整數", "長方體和正方體", "周長和面積", "整數四則", "規律", "時間的計算"],
+  "第9冊": ["小數的乘法", "因數和倍數", "擴分、約分和通分", "多邊形", "異分母分數的加減", "體積", "整數四則運算", "平均", "比率與百分率"],
+  "第10冊": ["分數的乘法", "小數的除法", "表面積", "線對稱圖形", "分數的除法", "比和比值", "圓", "統計圖表", "正比"],
+  "第11冊": ["最大公因數與最小公倍數", "分數的除法", "小數的除法", "比和比值", "圓的面積", "速率", "柱體的體積", "等量公理", "統計圖"],
+  "第12冊": ["小數與分數的四則運算", "概數與估算", "柱體與錐體", "比例尺", "正比與反比", "怎樣解題"],
+};
+
 function TextbookSection() {
   const grades = [
     { grade: "小一", books: ["第1冊", "第2冊"], color: "bg-tiffany/80" },
@@ -764,10 +851,11 @@ function TextbookSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <h3 className="font-serif text-xl tracking-wide text-foreground mb-6 flex items-center gap-2">
+            <h3 className="font-serif text-xl tracking-wide text-foreground mb-4 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-tiffany" />
               全套 12 冊教材
             </h3>
+            <p className="text-xs text-muted-foreground mb-6">點擊或移到各冊查看單元內容</p>
             <div className="space-y-3">
               {grades.map((g, i) => (
                 <motion.div
@@ -784,9 +872,7 @@ function TextbookSection() {
                   </div>
                   <div className="flex-1 flex gap-2">
                     {g.books.map((b) => (
-                      <div key={b} className="flex-1 bg-white rounded-lg py-2.5 px-4 text-sm text-foreground border border-gray-100 text-center font-medium">
-                        {b}
-                      </div>
+                      <BookUnitPopover key={b} book={b} units={BOOK_UNITS[b] || []} color={g.color} />
                     ))}
                   </div>
                 </motion.div>
