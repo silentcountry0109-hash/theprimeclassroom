@@ -3,7 +3,17 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, User, ArrowLeft, Mail, UserPlus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, User, ArrowLeft, Mail, UserPlus, Phone, MapPin, CheckCircle2 } from "lucide-react";
+
+const REFERRAL_OPTIONS = [
+  "網路搜尋（Google、Yahoo 等）",
+  "社群媒體（Facebook、Instagram、LINE 等）",
+  "親友推薦",
+  "學校老師推薦",
+  "路過看到教室",
+  "其他",
+];
 
 export default function ParentLogin() {
   const [, navigate] = useLocation();
@@ -12,15 +22,29 @@ export default function ParentLogin() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [referralSource, setReferralSource] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const resetForm = () => {
     setUsername("");
     setPassword("");
     setFirstName("");
     setEmail("");
+    setPhone("");
+    setAddress("");
+    setReferralSource([]);
     setError("");
+    setShowSuccess(false);
+  };
+
+  const toggleReferral = (option: string) => {
+    setReferralSource((prev) =>
+      prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]
+    );
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -60,7 +84,15 @@ export default function ParentLogin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, password, firstName, email: email || undefined }),
+        body: JSON.stringify({
+          username,
+          password,
+          firstName,
+          email,
+          phone,
+          address: address || undefined,
+          referralSource: referralSource.length > 0 ? referralSource : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -68,12 +100,36 @@ export default function ParentLogin() {
         setLoading(false);
         return;
       }
-      navigate("/dashboard");
+      setShowSuccess(true);
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 2000);
     } catch {
       setError("網路錯誤，請稍後再試");
     }
     setLoading(false);
   };
+
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-washi flex flex-col items-center justify-center px-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-10 text-center max-w-sm w-full">
+          <div className="w-16 h-16 rounded-full bg-tiffany/10 flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 className="w-8 h-8 text-tiffany" />
+          </div>
+          <h2 className="font-serif text-xl tracking-[0.08em] text-foreground mb-2" data-testid="text-register-success">
+            註冊成功！
+          </h2>
+          <p className="text-sm text-muted-foreground mb-1">
+            歡迎加入質數教室
+          </p>
+          <p className="text-xs text-muted-foreground/60">
+            正在為您導向家長後台...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-washi flex flex-col">
@@ -179,6 +235,50 @@ export default function ParentLogin() {
                   </div>
                 </div>
                 <div>
+                  <Label htmlFor="reg-phone" className="text-sm">手機號碼 <span className="text-coral">*</span></Label>
+                  <div className="relative mt-1.5">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="reg-phone"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="09XX-XXX-XXX"
+                      className="pl-10"
+                      data-testid="input-register-phone"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="reg-email" className="text-sm">Email <span className="text-coral">*</span></Label>
+                  <div className="relative mt-1.5">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="reg-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="pl-10"
+                      data-testid="input-register-email"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="reg-address" className="text-sm">地址（選填）</Label>
+                  <div className="relative mt-1.5">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="reg-address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="請輸入您的地址"
+                      className="pl-10"
+                      data-testid="input-register-address"
+                    />
+                  </div>
+                </div>
+                <div>
                   <Label htmlFor="reg-username" className="text-sm">帳號 <span className="text-coral">*</span></Label>
                   <div className="relative mt-1.5">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -210,18 +310,24 @@ export default function ParentLogin() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="reg-email" className="text-sm">Email（選填）</Label>
-                  <div className="relative mt-1.5">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="reg-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      className="pl-10"
-                      data-testid="input-register-email"
-                    />
+                  <Label className="text-sm mb-2 block">如何得知質數教室？（選填）</Label>
+                  <div className="space-y-2.5 mt-2">
+                    {REFERRAL_OPTIONS.map((option) => (
+                      <label
+                        key={option}
+                        className="flex items-center gap-2.5 cursor-pointer group"
+                        data-testid={`checkbox-referral-${option}`}
+                      >
+                        <Checkbox
+                          checked={referralSource.includes(option)}
+                          onCheckedChange={() => toggleReferral(option)}
+                          className="data-[state=checked]:bg-tiffany data-[state=checked]:border-tiffany"
+                        />
+                        <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                          {option}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
                 {error && (
@@ -232,7 +338,7 @@ export default function ParentLogin() {
                 <Button
                   type="submit"
                   className="w-full rounded-lg"
-                  disabled={loading || !username || !password || !firstName}
+                  disabled={loading || !username || !password || !firstName || !phone || !email}
                   data-testid="button-parent-register"
                 >
                   {loading ? "註冊中..." : "註冊"}

@@ -134,8 +134,8 @@ export async function registerRoutes(
 
   app.post("/api/parent-register", async (req: any, res) => {
     try {
-      const { username, password, firstName, email } = req.body;
-      if (!username || !password || !firstName) {
+      const { username, password, firstName, email, phone, address, referralSource } = req.body;
+      if (!username || !password || !firstName || !phone || !email) {
         return res.status(400).json({ message: "請填寫所有必填欄位" });
       }
       if (password.length < 6) {
@@ -155,6 +155,9 @@ export async function registerRoutes(
         passwordHash: hash,
         firstName,
         email: email || null,
+        phone: phone || null,
+        address: address || null,
+        referralSource: referralSource && referralSource.length > 0 ? referralSource : null,
         role: "parent",
       }).returning();
       req.session.credentialUserId = newUser.id;
