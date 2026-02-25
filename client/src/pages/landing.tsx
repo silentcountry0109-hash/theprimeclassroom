@@ -73,15 +73,7 @@ const STUDENT_PHOTOS: Record<string, string> = {
   "小芳": studentGirl2,
 };
 
-const CITIES = ["台北市", "新北市", "桃園市", "台中市", "台南市", "高雄市"];
-const GRADES = [
-  { value: "1", label: "一年級" },
-  { value: "2", label: "二年級" },
-  { value: "3", label: "三年級" },
-  { value: "4", label: "四年級" },
-  { value: "5", label: "五年級" },
-  { value: "6", label: "六年級" },
-];
+import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 30 },
@@ -93,13 +85,43 @@ const fadeInUp = {
 function HeroSection() {
   const [, navigate] = useLocation();
   const [city, setCity] = useState("");
-  const [grade, setGrade] = useState("");
+  const [district, setDistrict] = useState("");
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
+  const [showTimeFilter, setShowTimeFilter] = useState(false);
+
+  const districts = city ? TAIWAN_DISTRICTS[city] || [] : [];
+
+  const toggleDay = (day: string) => {
+    setSelectedDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
+
+  const togglePeriod = (period: string) => {
+    setSelectedPeriods((prev) =>
+      prev.includes(period) ? prev.filter((p) => p !== period) : [...prev, period]
+    );
+  };
 
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (city) params.set("city", city);
-    if (grade) params.set("grade", grade);
+    if (district) params.set("district", district);
+    if (selectedDays.length > 0) params.set("days", selectedDays.join(","));
+    if (selectedPeriods.length > 0) params.set("periods", selectedPeriods.join(","));
     navigate(`/search?${params.toString()}`);
+  };
+
+  const timeFilterLabel = () => {
+    const parts = [];
+    if (selectedDays.length > 0) {
+      parts.push(selectedDays.map((d) => DAY_LABELS[d]).join("、"));
+    }
+    if (selectedPeriods.length > 0) {
+      parts.push(selectedPeriods.map((p) => TIME_PERIODS.find((t) => t.value === p)?.label || "").join("、"));
+    }
+    return parts.length > 0 ? parts.join(" · ") : "";
   };
 
   const titleChars = ["質", "數", "數", "學"];
@@ -199,11 +221,11 @@ function HeroSection() {
             <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50">
               <div className="flex items-center gap-2 mb-1.5">
                 <MapPin className="w-4 h-4 text-tiffany" />
-                <span className="text-xs font-medium text-muted-foreground tracking-wide">地區</span>
+                <span className="text-xs font-medium text-muted-foreground tracking-wide">縣市</span>
               </div>
-              <Select value={city} onValueChange={setCity}>
+              <Select value={city} onValueChange={(val) => { setCity(val); setDistrict(""); }}>
                 <SelectTrigger className="border-0 p-0 h-auto shadow-none text-base font-medium focus:ring-0" data-testid="select-city">
-                  <SelectValue placeholder="選擇地區" />
+                  <SelectValue placeholder="選擇縣市" />
                 </SelectTrigger>
                 <SelectContent>
                   {CITIES.map((c) => (
@@ -215,19 +237,82 @@ function HeroSection() {
 
             <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50">
               <div className="flex items-center gap-2 mb-1.5">
-                <GraduationCap className="w-4 h-4 text-tiffany" />
-                <span className="text-xs font-medium text-muted-foreground tracking-wide">年級</span>
+                <Building2 className="w-4 h-4 text-tiffany" />
+                <span className="text-xs font-medium text-muted-foreground tracking-wide">區/鄉鎮</span>
               </div>
-              <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger className="border-0 p-0 h-auto shadow-none text-base font-medium focus:ring-0" data-testid="select-grade">
-                  <SelectValue placeholder="選擇年級" />
+              <Select value={district} onValueChange={setDistrict} disabled={!city}>
+                <SelectTrigger className="border-0 p-0 h-auto shadow-none text-base font-medium focus:ring-0" data-testid="select-district">
+                  <SelectValue placeholder={city ? "選擇區域" : "先選縣市"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {GRADES.map((g) => (
-                    <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                  {districts.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50 relative">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Clock className="w-4 h-4 text-tiffany" />
+                <span className="text-xs font-medium text-muted-foreground tracking-wide">時段</span>
+              </div>
+              <button
+                onClick={() => setShowTimeFilter(!showTimeFilter)}
+                className="w-full text-left text-base font-medium text-foreground flex items-center justify-between"
+                data-testid="button-time-filter"
+              >
+                <span className={timeFilterLabel() ? "text-foreground" : "text-muted-foreground"}>
+                  {timeFilterLabel() || "選擇時段"}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showTimeFilter ? "rotate-180" : ""}`} />
+              </button>
+              {showTimeFilter && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-gray-100 shadow-xl p-4 z-50 min-w-[280px]">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">星期</p>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {Object.entries(DAY_LABELS).map(([val, label]) => (
+                      <button
+                        key={val}
+                        onClick={() => toggleDay(val)}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+                          selectedDays.includes(val)
+                            ? "bg-tiffany text-white border-tiffany"
+                            : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany/50"
+                        }`}
+                        data-testid={`chip-day-${val}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">時段</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TIME_PERIODS.map((period) => (
+                      <button
+                        key={period.value}
+                        onClick={() => togglePeriod(period.value)}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+                          selectedPeriods.includes(period.value)
+                            ? "bg-tiffany text-white border-tiffany"
+                            : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany/50"
+                        }`}
+                        data-testid={`chip-period-${period.value}`}
+                      >
+                        {period.label}
+                        <span className="text-[10px] opacity-70 ml-1">{period.range}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShowTimeFilter(false)}
+                    className="w-full mt-3 text-xs text-tiffany font-medium py-1.5 rounded-lg hover:bg-tiffany/5 transition-colors"
+                    data-testid="button-time-filter-done"
+                  >
+                    完成
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center px-2 py-2">

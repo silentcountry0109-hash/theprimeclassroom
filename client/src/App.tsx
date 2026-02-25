@@ -9,6 +9,7 @@ import LandingPage from "@/pages/landing";
 import ParentDashboard from "@/pages/parent-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import SearchResults from "@/pages/search-results";
+import ClassroomDetail from "@/pages/classroom-detail";
 import type { User } from "@shared/models/auth";
 
 function LoadingScreen() {
@@ -60,6 +61,7 @@ function Router() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/search" component={SearchResults} />
+      <Route path="/classroom/:id" component={ClassroomDetail} />
       <Route path="/dashboard" component={ParentDashboard} />
       <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />

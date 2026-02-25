@@ -17,6 +17,10 @@ export const franchises = pgTable("franchises", {
   imageUrl: text("image_url"),
   maxSeats: integer("max_seats").default(5).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  tags: text("tags").array(),
+  rating: real("franchise_rating").default(0),
+  reviewCount: integer("franchise_review_count").default(0),
+  nearbySchools: text("nearby_schools").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -59,6 +59,32 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/search-franchises", async (req, res) => {
+    try {
+      const city = req.query.city as string | undefined;
+      const district = req.query.district as string | undefined;
+      const days = req.query.days ? (req.query.days as string).split(",") : undefined;
+      const periods = req.query.periods ? (req.query.periods as string).split(",") : undefined;
+      const results = await storage.searchFranchises({ city, district, days, periods });
+      res.json(results);
+    } catch (error: any) {
+      console.error("Search franchises error:", error);
+      res.status(500).json({ message: "Failed to search franchises" });
+    }
+  });
+
+  app.get("/api/franchises/:id/detail", async (req, res) => {
+    try {
+      const detail = await storage.getFranchiseDetail(parseInt(req.params.id));
+      if (!detail) {
+        return res.status(404).json({ message: "教室不存在" });
+      }
+      res.json(detail);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch franchise detail" });
+    }
+  });
+
   app.get("/api/children", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

@@ -10,7 +10,7 @@ import {
   type Announcement, type InsertAnnouncement,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getCoaches(): Promise<Coach[]>;
@@ -20,6 +20,19 @@ export interface IStorage {
   getFranchises(): Promise<Franchise[]>;
   getFranchise(id: number): Promise<Franchise | undefined>;
   createFranchise(franchise: InsertFranchise): Promise<Franchise>;
+
+  searchFranchises(filters: {
+    city?: string;
+    district?: string;
+    days?: string[];
+    periods?: string[];
+  }): Promise<any[]>;
+
+  getFranchiseDetail(id: number): Promise<{
+    franchise: Franchise;
+    coaches: Coach[];
+    timeSlots: any[];
+  } | null>;
 
   getChildrenByParent(parentId: string): Promise<Child[]>;
   createChild(child: InsertChild): Promise<Child>;
@@ -55,6 +68,20 @@ export interface IStorage {
   }>;
 }
 
+function getTimePeriodCondition(periods: string[]): string {
+  const conditions: string[] = [];
+  for (const period of periods) {
+    if (period === "morning") {
+      conditions.push(`(${timeSlots.startTime.name} >= '09:00' AND ${timeSlots.startTime.name} < '12:00')`);
+    } else if (period === "afternoon") {
+      conditions.push(`(${timeSlots.startTime.name} >= '13:00' AND ${timeSlots.startTime.name} < '17:00')`);
+    } else if (period === "evening") {
+      conditions.push(`(${timeSlots.startTime.name} >= '18:00' AND ${timeSlots.startTime.name} < '21:00')`);
+    }
+  }
+  return conditions.length > 0 ? `(${conditions.join(" OR ")})` : "TRUE";
+}
+
 export class DatabaseStorage implements IStorage {
   async getCoaches(): Promise<Coach[]> {
     return db.select().from(coaches).where(eq(coaches.isCertified, true));
@@ -84,6 +111,142 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async searchFranchises(filters: {
+    city?: string;
+    district?: string;
+    days?: string[];
+    periods?: string[];
+  }): Promise<any[]> {
+    const conditions = [eq(franchises.isActive, true)];
+
+    if (filters.city) {
+      conditions.push(eq(franchises.city, filters.city));
+    }
+    if (filters.district) {
+      conditions.push(eq(franchises.district, filters.district));
+    }
+
+    const matchingFranchises = await db
+      .select()
+      .from(franchises)
+      .where(and(...conditions));
+
+    const results = [];
+
+    for (const franchise of matchingFranchises) {
+      const slotConditions = [
+        eq(timeSlots.franchiseId, franchise.id),
+        eq(timeSlots.isActive, true),
+        sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`,
+      ];
+
+      if (filters.days && filters.days.length > 0) {
+        const dayConditions = filters.days.map((day) => {
+          return sql`EXTRACT(DOW FROM CAST(${timeSlots.date} AS date)) = ${parseInt(day)}`;
+        });
+        slotConditions.push(sql`(${sql.join(dayConditions, sql` OR `)})`);
+      }
+
+      if (filters.periods && filters.periods.length > 0) {
+        const periodConditions: any[] = [];
+        for (const period of filters.periods) {
+          if (period === "morning") {
+            periodConditions.push(sql`(${timeSlots.startTime} >= '09:00' AND ${timeSlots.startTime} < '12:00')`);
+          } else if (period === "afternoon") {
+            periodConditions.push(sql`(${timeSlots.startTime} >= '13:00' AND ${timeSlots.startTime} < '17:00')`);
+          } else if (period === "evening") {
+            periodConditions.push(sql`(${timeSlots.startTime} >= '18:00' AND ${timeSlots.startTime} < '21:00')`);
+          }
+        }
+        if (periodConditions.length > 0) {
+          slotConditions.push(sql`(${sql.join(periodConditions, sql` OR `)})`);
+        }
+      }
+
+      const availableSlots = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(timeSlots)
+        .where(and(...slotConditions));
+
+      const slotCount = Number(availableSlots[0].count);
+
+      const franchiseCoaches = await db
+        .select()
+        .from(coaches)
+        .where(eq(coaches.franchiseId, franchise.id));
+
+      const todayStr = new Date().toISOString().split("T")[0];
+      const nextSlot = await db
+        .select()
+        .from(timeSlots)
+        .where(and(
+          eq(timeSlots.franchiseId, franchise.id),
+          eq(timeSlots.isActive, true),
+          sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`,
+          sql`${timeSlots.date} >= ${todayStr}`
+        ))
+        .orderBy(timeSlots.date, timeSlots.startTime)
+        .limit(1);
+
+      results.push({
+        franchise,
+        availableSlots: slotCount,
+        coachCount: franchiseCoaches.length,
+        coaches: franchiseCoaches.map((c) => c.name),
+        nextAvailable: nextSlot.length > 0
+          ? `${nextSlot[0].date} ${nextSlot[0].startTime}`
+          : null,
+      });
+    }
+
+    return results.filter((r) => r.availableSlots > 0).sort((a, b) => {
+      const aScore = (a.franchise.rating || 0) * 10 + a.availableSlots;
+      const bScore = (b.franchise.rating || 0) * 10 + b.availableSlots;
+      return bScore - aScore;
+    });
+  }
+
+  async getFranchiseDetail(id: number): Promise<{
+    franchise: Franchise;
+    coaches: Coach[];
+    timeSlots: any[];
+  } | null> {
+    const franchise = await this.getFranchise(id);
+    if (!franchise) return null;
+
+    const franchiseCoaches = await db
+      .select()
+      .from(coaches)
+      .where(eq(coaches.franchiseId, id));
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const slots = await db
+      .select({
+        slot: timeSlots,
+        coach: coaches,
+      })
+      .from(timeSlots)
+      .leftJoin(coaches, eq(timeSlots.coachId, coaches.id))
+      .where(
+        and(
+          eq(timeSlots.franchiseId, id),
+          eq(timeSlots.isActive, true),
+          sql`${timeSlots.date} >= ${todayStr}`
+        )
+      )
+      .orderBy(timeSlots.date, timeSlots.startTime);
+
+    return {
+      franchise,
+      coaches: franchiseCoaches,
+      timeSlots: slots.map((s) => ({
+        ...s.slot,
+        coachName: s.coach?.name || null,
+        coachId: s.coach?.id || null,
+      })),
+    };
+  }
+
   async getChildrenByParent(parentId: string): Promise<Child[]> {
     return db.select().from(children).where(eq(children.parentId, parentId));
   }
@@ -98,47 +261,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchSlots(city?: string): Promise<any[]> {
-    const conditions = [eq(timeSlots.isActive, true)];
+    const conditions = [
+      eq(timeSlots.isActive, true),
+      eq(franchises.isActive, true),
+      sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`,
+    ];
 
-    let query;
     if (city) {
-      query = db
-        .select({
-          slot: timeSlots,
-          franchise: franchises,
-          coach: coaches,
-        })
-        .from(timeSlots)
-        .innerJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
-        .leftJoin(coaches, eq(timeSlots.coachId, coaches.id))
-        .where(
-          and(
-            eq(timeSlots.isActive, true),
-            eq(franchises.isActive, true),
-            eq(franchises.city, city),
-            sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`
-          )
-        );
-    } else {
-      query = db
-        .select({
-          slot: timeSlots,
-          franchise: franchises,
-          coach: coaches,
-        })
-        .from(timeSlots)
-        .innerJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
-        .leftJoin(coaches, eq(timeSlots.coachId, coaches.id))
-        .where(
-          and(
-            eq(timeSlots.isActive, true),
-            eq(franchises.isActive, true),
-            sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`
-          )
-        );
+      conditions.push(eq(franchises.city, city));
     }
 
-    return query;
+    return db
+      .select({
+        slot: timeSlots,
+        franchise: franchises,
+        coach: coaches,
+      })
+      .from(timeSlots)
+      .innerJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
+      .leftJoin(coaches, eq(timeSlots.coachId, coaches.id))
+      .where(and(...conditions));
   }
 
   async getSlotsByFranchise(franchiseId: number): Promise<TimeSlot[]> {

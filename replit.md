@@ -25,10 +25,17 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - student_boy_1/2/3.png, student_girl_1/2.png: Student portraits (1:1) for testimonials carousel
 - hero_classroom.png: Warm tutoring classroom scene (16:9)
 - learning_detail.png, parent_child.png: Section feature images (4:3)
-- Photos imported via `@assets/...` in landing.tsx and search-results.tsx
+- Photos imported via `@assets/...` in landing.tsx, search-results.tsx, classroom-detail.tsx
+
+## Search Flow (Franchise-Centric)
+1. Hero search: City → District (cascading dropdown) → Day/Time (chip selectors)
+2. Search results: Franchise/classroom cards with tags, ratings, available slot counts
+3. Click card → Classroom detail page with teacher list + bookable time slots
+- Search API: GET /api/search-franchises?city=&district=&days=&periods=
+- Detail API: GET /api/franchises/:id/detail
 
 ## Landing Page Sections (top to bottom)
-1. Hero - Animated title reveal + Skyscanner-style search with glowing CTA + social proof
+1. Hero - Animated title reveal + search bar (city/district/time) + social proof
 2. ClassroomShowcase - Photo + text about learning environment
 3. Features - 3 cards with photos (個別指導, 專業認證師資, 彈性預約制度)
 4. Coaches - Auto-sliding carousel with left/right navigation
@@ -40,22 +47,24 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 
 ## Key Files
 - `shared/models/auth.ts` - User/session tables (Replit Auth)
-- `shared/schema.ts` - All data models
+- `shared/schema.ts` - All data models (franchises now have tags, rating, reviewCount, nearbySchools)
+- `shared/constants.ts` - Taiwan city/district data, day labels, time period constants
 - `server/routes.ts` - All API routes
-- `server/storage.ts` - DatabaseStorage with CRUD methods
-- `server/seed.ts` - Seed data (uses 老師; 1:5 ratio only in FAQ answer)
+- `server/storage.ts` - DatabaseStorage with CRUD methods + searchFranchises + getFranchiseDetail
+- `server/seed.ts` - Seed data (8 franchises across 4 cities, 9 coaches)
 - `client/src/pages/landing.tsx` - Public landing page with carousels, animated hero
+- `client/src/pages/search-results.tsx` - Franchise card search results with sidebar filters
+- `client/src/pages/classroom-detail.tsx` - Franchise detail with coaches + bookable time slots
 - `client/src/pages/parent-dashboard.tsx` - Parent dashboard
 - `client/src/pages/admin-dashboard.tsx` - Admin CMS
-- `client/src/pages/search-results.tsx` - Search results with teacher avatars
 - `client/src/components/coach-card.tsx` - Coach card with photo + seat dots
 
 ## Database Tables
 - users, sessions (Replit Auth)
-- franchises (location-based classrooms)
+- franchises (location-based classrooms with tags, rating, reviewCount, nearbySchools)
 - coaches (certified instructors)
 - children (managed by parents)
-- time_slots (bookable time periods)
+- time_slots (bookable time periods, date stored as text YYYY-MM-DD)
 - bookings (parent-child-slot reservations)
 - faqs, success_stories, announcements (CMS content)
 
@@ -66,7 +75,9 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 ## API Routes
 ### Public
 - GET /api/coaches, /api/franchises, /api/faqs, /api/success-stories
-- GET /api/search-slots?city=X&grade=Y
+- GET /api/search-franchises?city=&district=&days=1,3,5&periods=morning,afternoon
+- GET /api/franchises/:id/detail
+- GET /api/search-slots?city=X (legacy)
 
 ### Protected (requires auth)
 - GET/POST/DELETE /api/children
@@ -76,3 +87,12 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - GET /api/admin/stats
 - CRUD: /api/admin/faqs, /api/admin/success-stories, /api/admin/announcements
 - GET /api/admin/franchises, /api/admin/coaches
+
+## Franchise Tags
+- 家長好評推薦 (amber styling)
+- 年度績優校區 (tiffany styling)
+- 成績進步快速 (coral styling)
+
+## Coach Photo Mapping (by name, not ID)
+- 林佳慧→teacher_1, 陳志明→teacher_2, 王雅琪→teacher_3
+- 張育銘→teacher_4, 李美玲→teacher_5, 黃建宏→teacher_6
