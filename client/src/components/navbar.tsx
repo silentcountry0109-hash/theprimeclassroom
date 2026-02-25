@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
@@ -39,14 +38,19 @@ export default function Navbar() {
       data-testid="navbar"
     >
       <div className="max-w-7xl mx-auto h-full flex items-center justify-between gap-4 px-4 md:px-6">
-        <Link href="/">
-          <span
-            className="font-serif text-xl md:text-2xl tracking-[0.15em] text-foreground cursor-pointer"
-            data-testid="link-home"
-          >
-            質數教室
-          </span>
-        </Link>
+        <span
+          className="font-serif text-xl md:text-2xl tracking-[0.15em] text-foreground cursor-pointer"
+          data-testid="link-home"
+          onClick={() => {
+            if (window.location.pathname === "/") {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              window.location.href = "/";
+            }
+          }}
+        >
+          質數教室
+        </span>
 
         <div className="hidden md:flex items-center gap-8">
           {NAV_LINKS.map((link) => (
