@@ -55,7 +55,7 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - `client/src/pages/landing.tsx` - Public landing page with carousels, animated hero
 - `client/src/pages/search-results.tsx` - Franchise card search results with sidebar filters
 - `client/src/pages/classroom-detail.tsx` - Franchise detail with coaches + bookable time slots
-- `client/src/pages/parent-dashboard.tsx` - Parent dashboard
+- `client/src/pages/parent-dashboard.tsx` - Parent dashboard (top-tab layout: 首頁/預約課程/我的孩子/預約紀錄)
 - `client/src/pages/admin-dashboard.tsx` - Admin CMS
 - `client/src/components/coach-card.tsx` - Coach card with photo + seat dots
 
@@ -142,6 +142,14 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - 師資管理: CRUD coaches for own franchise only
 - 時段管理: CRUD time slots for own franchise only
 - 預約管理: View bookings for own franchise (child name, grade, school, date/time, status)
+
+## Parent Dashboard UX (/dashboard or / when logged in)
+- Top tab navigation (mobile-friendly) instead of sidebar
+- **首頁 (Overview)**: Stats cards (children, upcoming, completed, quick-book), upcoming bookings timeline, onboarding prompt when no children
+- **預約課程 (Book)**: 3-step inline flow — search classrooms → select time slot → select child & confirm
+- **我的孩子 (Children)**: Child cards with booking stats per child, AlertDialog confirmation on delete
+- **預約紀錄 (Bookings)**: Filter tabs (全部/即將上課/已完成/已取消) with counts, AlertDialog confirmation on cancel
+- Confirmation dialogs (AlertDialog) for all destructive actions (delete child, cancel booking)
 
 ## Franchise Tags
 - 家長好評推薦 (amber styling)
