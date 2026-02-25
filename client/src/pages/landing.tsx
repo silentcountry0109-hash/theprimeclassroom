@@ -52,6 +52,7 @@ import {
 import type { Coach, Faq, SuccessStory } from "@shared/schema";
 
 import heroClassroomImg from "@assets/hero_classroom.png";
+import brandPhilosophyImg from "@assets/brand_philosophy.png";
 import learningDetailImg from "@assets/learning_detail.png";
 import parentChildImg from "@assets/parent_child.png";
 import teacher1Img from "@assets/teacher_1.png";
@@ -439,7 +440,7 @@ function BrandPhilosophySection() {
           transition={{ duration: 0.7 }}
         >
           <img
-            src={heroClassroomImg}
+            src={brandPhilosophyImg}
             alt="質數教室的溫暖教學環境"
             className="w-full h-[220px] sm:h-[300px] md:h-[400px] object-cover"
           />
