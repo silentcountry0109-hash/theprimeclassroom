@@ -646,50 +646,55 @@ function LearningMapCard() {
           <span className="ml-auto text-xs text-tiffany bg-tiffany/10 px-2 py-0.5 rounded-full">小三</span>
         </div>
 
-        <div
-          className="space-y-0 transition-opacity duration-700"
-          style={{ opacity: phase === "exiting" ? 0 : 1 }}
-        >
+        <div className="space-y-0 transition-opacity duration-700" style={{ opacity: phase === "exiting" ? 0 : 1 }}>
           {LEARNING_MAP_ITEMS.map((item, i) => {
             const show = visibleCount > i;
             return (
               <div
                 key={`${cycle}-${i}`}
-                className="flex items-center gap-3 transition-all duration-500"
-                style={{
-                  opacity: show ? 1 : 0,
-                  transform: show ? "translateX(0)" : "translateX(-20px)",
-                  transitionDelay: `${i * 50}ms`,
-                }}
+                className="flex items-center gap-3"
               >
                 <div className="flex flex-col items-center">
                   <div
-                    className={`w-3.5 h-3.5 rounded-full border-2 transition-transform duration-300 ${
-                      item.status === "completed" ? "bg-tiffany border-tiffany" :
-                      item.status === "current" ? "bg-white border-coral" :
-                      "bg-gray-100 border-gray-300"
+                    className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
+                      item.status === "completed" ? "border-tiffany" :
+                      item.status === "current" ? "border-coral" :
+                      "border-gray-300"
                     } ${item.status === "current" && show ? "animate-pulse-ring" : ""}`}
                     style={{
+                      backgroundColor: show
+                        ? (item.status === "completed" ? "#81D8D0" : item.status === "current" ? "white" : "#f3f4f6")
+                        : "transparent",
+                      borderColor: show
+                        ? undefined
+                        : "transparent",
                       transform: show ? "scale(1)" : "scale(0)",
                       transitionDelay: `${i * 50 + 100}ms`,
                     }}
                   />
                   {i < 4 && (
                     <div
-                      className={`w-0.5 origin-top transition-all duration-300 ${
-                        item.status === "completed" ? "bg-tiffany/40" : "bg-gray-200"
-                      }`}
+                      className="w-0.5 h-6 transition-colors duration-300"
                       style={{
-                        height: show ? 24 : 0,
+                        backgroundColor: show
+                          ? (item.status === "completed" ? "rgba(129,216,208,0.4)" : "#e5e7eb")
+                          : "transparent",
                         transitionDelay: `${i * 50 + 200}ms`,
                       }}
                     />
                   )}
                 </div>
-                <div className={`flex-1 flex items-center justify-between py-1 ${
-                  item.status === "current" ? "font-medium text-foreground" :
-                  item.status === "completed" ? "text-muted-foreground" : "text-muted-foreground/60"
-                }`}>
+                <div
+                  className={`flex-1 flex items-center justify-between py-1 transition-all duration-500 ${
+                    item.status === "current" ? "font-medium text-foreground" :
+                    item.status === "completed" ? "text-muted-foreground" : "text-muted-foreground/60"
+                  }`}
+                  style={{
+                    opacity: show ? 1 : 0,
+                    transform: show ? "translateX(0)" : "translateX(-12px)",
+                    transitionDelay: `${i * 50}ms`,
+                  }}
+                >
                   <span className="text-sm">{item.unit}</span>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full transition-all duration-300 ${
