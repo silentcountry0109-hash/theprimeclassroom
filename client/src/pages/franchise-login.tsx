@@ -3,7 +3,7 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, User, ArrowLeft } from "lucide-react";
+import { Lock, User, ArrowLeft, Building2, ShieldCheck } from "lucide-react";
 
 export default function FranchiseLogin() {
   const [, navigate] = useLocation();
@@ -41,53 +41,68 @@ export default function FranchiseLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-washi flex flex-col">
-      <div className="p-6">
+    <div className="min-h-screen bg-[#1a2332] flex flex-col relative overflow-hidden">
+      <div className="absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(129,216,208,0.5) 1px, transparent 0)`,
+          backgroundSize: "32px 32px",
+        }}
+      />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-tiffany/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/4" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-tiffany/3 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/4" />
+
+      <div className="relative z-10 p-6">
         <Link href="/">
-          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer" data-testid="link-back-home">
+          <span className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition-colors cursor-pointer" data-testid="link-back-home">
             <ArrowLeft className="w-4 h-4" />
             返回官網
           </span>
         </Link>
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-4 pb-20">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 pb-20">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <h1 className="font-serif text-2xl tracking-[0.15em] text-foreground mb-2">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-tiffany/10 border border-tiffany/20 mb-4">
+              <Building2 className="w-7 h-7 text-tiffany" />
+            </div>
+            <h1 className="font-serif text-2xl tracking-[0.15em] text-white mb-2">
               質數教室
             </h1>
-            <p className="text-sm text-muted-foreground">分校管理系統登入</p>
+            <div className="inline-flex items-center gap-1.5 text-tiffany text-sm font-medium">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              分校管理系統
+            </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-[#222f3e] rounded-xl border border-white/10 shadow-2xl p-6 backdrop-blur-sm">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="username" className="text-sm">帳號</Label>
+                <Label htmlFor="username" className="text-sm text-gray-300">帳號</Label>
                 <div className="relative mt-1.5">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <Input
                     id="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="請輸入帳號"
-                    className="pl-10"
+                    placeholder="請輸入分校帳號"
+                    className="pl-10 bg-[#1a2332] border-white/10 text-white placeholder:text-gray-500 focus:border-tiffany/50 focus:ring-tiffany/20"
                     autoComplete="username"
                     data-testid="input-franchise-username"
                   />
                 </div>
               </div>
               <div>
-                <Label htmlFor="password" className="text-sm">密碼</Label>
+                <Label htmlFor="password" className="text-sm text-gray-300">密碼</Label>
                 <div className="relative mt-1.5">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <Input
                     id="password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="請輸入密碼"
-                    className="pl-10"
+                    className="pl-10 bg-[#1a2332] border-white/10 text-white placeholder:text-gray-500 focus:border-tiffany/50 focus:ring-tiffany/20"
                     autoComplete="current-password"
                     data-testid="input-franchise-password"
                   />
@@ -95,23 +110,23 @@ export default function FranchiseLogin() {
               </div>
 
               {error && (
-                <p className="text-sm text-red-500 bg-red-50 rounded-md px-3 py-2" data-testid="text-login-error">
+                <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2" data-testid="text-login-error">
                   {error}
                 </p>
               )}
 
               <Button
                 type="submit"
-                className="w-full rounded-lg"
+                className="w-full rounded-lg bg-tiffany hover:bg-tiffany/90 text-[#1a2332] font-semibold"
                 disabled={loading || !username || !password}
                 data-testid="button-franchise-login"
               >
-                {loading ? "登入中..." : "登入"}
+                {loading ? "登入中..." : "登入管理系統"}
               </Button>
             </form>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-6">
+          <p className="text-center text-xs text-gray-500 mt-6">
             如需開通帳號，請聯繫總部管理員
           </p>
         </div>
