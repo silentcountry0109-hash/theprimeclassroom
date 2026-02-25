@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
@@ -27,6 +27,8 @@ import {
   Target,
   Shield,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Star,
   Quote,
   Phone,
@@ -34,19 +36,25 @@ import {
   Clock,
   ArrowRight,
   CheckCircle,
+  Sparkles,
+  Building2,
 } from "lucide-react";
 import type { Coach, Faq, SuccessStory } from "@shared/schema";
 
 import heroClassroomImg from "@assets/hero_classroom.png";
 import learningDetailImg from "@assets/learning_detail.png";
 import parentChildImg from "@assets/parent_child.png";
-import studentSuccessImg from "@assets/student_success.png";
 import teacher1Img from "@assets/teacher_1.png";
 import teacher2Img from "@assets/teacher_2.png";
 import teacher3Img from "@assets/teacher_3.png";
 import teacher4Img from "@assets/teacher_4.png";
 import teacher5Img from "@assets/teacher_5.png";
 import teacher6Img from "@assets/teacher_6.png";
+import studentBoy1 from "@assets/student_boy_1.png";
+import studentBoy2 from "@assets/student_boy_2.png";
+import studentGirl1 from "@assets/student_girl_1.png";
+import studentBoy3 from "@assets/student_boy_3.png";
+import studentGirl2 from "@assets/student_girl_2.png";
 
 const TEACHER_PHOTOS: Record<string, string> = {
   "林佳慧": teacher1Img,
@@ -55,6 +63,14 @@ const TEACHER_PHOTOS: Record<string, string> = {
   "張育銘": teacher4Img,
   "李美玲": teacher5Img,
   "黃建宏": teacher6Img,
+};
+
+const STUDENT_PHOTOS: Record<string, string> = {
+  "小明": studentBoy1,
+  "小華": studentBoy2,
+  "小美": studentGirl1,
+  "小傑": studentBoy3,
+  "小芳": studentGirl2,
 };
 
 const CITIES = ["台北市", "新北市", "桃園市", "台中市", "台南市", "高雄市"];
@@ -86,6 +102,8 @@ function HeroSection() {
     navigate(`/search?${params.toString()}`);
   };
 
+  const titleChars = ["質", "數", "數", "學"];
+
   return (
     <section
       className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-20 pb-16"
@@ -99,80 +117,97 @@ function HeroSection() {
       }}
     >
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        <span className="absolute top-[12%] left-[6%] text-8xl text-tiffany/[0.06] font-serif rotate-[-15deg]">
-          +
-        </span>
-        <span className="absolute top-[22%] right-[10%] text-7xl text-coral/[0.08] font-serif rotate-[20deg]">
-          ×
-        </span>
-        <span className="absolute bottom-[35%] left-[12%] text-6xl text-tiffany/[0.05] font-serif rotate-[10deg]">
-          ÷
-        </span>
-        <span className="absolute bottom-[18%] right-[6%] text-9xl text-tiffany/[0.05] font-serif rotate-[-8deg]">
-          −
-        </span>
-        <span className="absolute top-[50%] left-[3%] text-5xl text-coral/[0.06] font-serif rotate-[25deg]">
-          ∑
-        </span>
-        <span className="absolute top-[65%] right-[4%] text-6xl text-tiffany/[0.04] font-serif rotate-[-20deg]">
-          π
-        </span>
-        <span className="absolute top-[35%] right-[25%] text-4xl text-tiffany/[0.05] font-serif rotate-[15deg]">
-          ∞
-        </span>
-        <span className="absolute bottom-[45%] left-[30%] text-5xl text-coral/[0.05] font-serif rotate-[-10deg]">
-          √
-        </span>
+        <span className="absolute top-[12%] left-[6%] text-8xl text-tiffany/[0.06] font-serif rotate-[-15deg]">+</span>
+        <span className="absolute top-[22%] right-[10%] text-7xl text-coral/[0.08] font-serif rotate-[20deg]">×</span>
+        <span className="absolute bottom-[35%] left-[12%] text-6xl text-tiffany/[0.05] font-serif rotate-[10deg]">÷</span>
+        <span className="absolute bottom-[18%] right-[6%] text-9xl text-tiffany/[0.05] font-serif rotate-[-8deg]">−</span>
+        <span className="absolute top-[50%] left-[3%] text-5xl text-coral/[0.06] font-serif rotate-[25deg]">∑</span>
+        <span className="absolute top-[65%] right-[4%] text-6xl text-tiffany/[0.04] font-serif rotate-[-20deg]">π</span>
+        <span className="absolute top-[35%] right-[25%] text-4xl text-tiffany/[0.05] font-serif rotate-[15deg]">∞</span>
+        <span className="absolute bottom-[45%] left-[30%] text-5xl text-coral/[0.05] font-serif rotate-[-10deg]">√</span>
       </div>
 
-      <motion.div
-        className="text-center max-w-4xl mx-auto z-10"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-      >
-        <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl tracking-[0.15em] text-foreground mb-4">
-          質數數學
+      <div className="text-center max-w-4xl mx-auto z-10">
+        <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl tracking-[0.15em] text-foreground mb-4 overflow-hidden">
+          {titleChars.map((char, i) => (
+            <motion.span
+              key={i}
+              className="inline-block"
+              initial={{ opacity: 0, y: 40, rotateX: -90 }}
+              animate={{ opacity: 1, y: 0, rotateX: 0 }}
+              transition={{
+                duration: 0.7,
+                delay: 0.15 + i * 0.12,
+                ease: [0.215, 0.61, 0.355, 1],
+              }}
+            >
+              {char}
+            </motion.span>
+          ))}
         </h1>
-        <p className="text-lg md:text-xl text-tiffany font-medium tracking-[0.1em] mb-3">
+        <motion.p
+          className="text-lg md:text-xl text-tiffany font-medium tracking-[0.1em] mb-3"
+          initial={{ opacity: 0, letterSpacing: "0.4em" }}
+          animate={{ opacity: 1, letterSpacing: "0.1em" }}
+          transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
+        >
           The Prime Math
-        </p>
-        <p className="text-base md:text-lg text-muted-foreground mb-2 tracking-wide">
+        </motion.p>
+        <motion.p
+          className="text-base md:text-lg text-muted-foreground mb-2 tracking-wide"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 1.0 }}
+        >
           國小數學個別指導
-        </p>
-        <p className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-14 leading-relaxed">
+        </motion.p>
+        <motion.p
+          className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-14 leading-relaxed"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 1.2 }}
+        >
           不可拆解的對話，讓教學回歸「1 位老師」對「1 位學生」的學習體驗
-        </p>
-      </motion.div>
+        </motion.p>
+      </div>
 
       <motion.div
         id="hero-search"
         className="w-full max-w-3xl mx-auto z-10"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
       >
-        <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/50 shadow-xl p-2 md:p-3">
+        <motion.p
+          className="text-center text-sm text-muted-foreground mb-4 flex items-center justify-center gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.0 }}
+        >
+          <Sparkles className="w-4 h-4 text-tiffany" />
+          找到最適合孩子的數學老師，立即預約免費診斷
+        </motion.p>
+
+        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-tiffany/15 shadow-[0_8px_40px_rgba(129,216,208,0.12)] p-2 md:p-3 relative">
+          <div className="absolute -top-3 left-8">
+            <span className="inline-flex items-center gap-1 text-xs font-medium bg-coral/90 text-white px-3 py-1 rounded-full shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              免費試聽
+            </span>
+          </div>
           <div className="flex flex-col md:flex-row items-stretch">
             <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50">
               <div className="flex items-center gap-2 mb-1.5">
                 <MapPin className="w-4 h-4 text-tiffany" />
-                <span className="text-xs font-medium text-muted-foreground tracking-wide">
-                  地區
-                </span>
+                <span className="text-xs font-medium text-muted-foreground tracking-wide">地區</span>
               </div>
               <Select value={city} onValueChange={setCity}>
-                <SelectTrigger
-                  className="border-0 p-0 h-auto shadow-none text-base font-medium focus:ring-0"
-                  data-testid="select-city"
-                >
+                <SelectTrigger className="border-0 p-0 h-auto shadow-none text-base font-medium focus:ring-0" data-testid="select-city">
                   <SelectValue placeholder="選擇地區" />
                 </SelectTrigger>
                 <SelectContent>
                   {CITIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -181,22 +216,15 @@ function HeroSection() {
             <div className="flex-1 px-4 py-3 md:border-r border-gray-200/50">
               <div className="flex items-center gap-2 mb-1.5">
                 <GraduationCap className="w-4 h-4 text-tiffany" />
-                <span className="text-xs font-medium text-muted-foreground tracking-wide">
-                  年級
-                </span>
+                <span className="text-xs font-medium text-muted-foreground tracking-wide">年級</span>
               </div>
               <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger
-                  className="border-0 p-0 h-auto shadow-none text-base font-medium focus:ring-0"
-                  data-testid="select-grade"
-                >
+                <SelectTrigger className="border-0 p-0 h-auto shadow-none text-base font-medium focus:ring-0" data-testid="select-grade">
                   <SelectValue placeholder="選擇年級" />
                 </SelectTrigger>
                 <SelectContent>
                   {GRADES.map((g) => (
-                    <SelectItem key={g.value} value={g.value}>
-                      {g.label}
-                    </SelectItem>
+                    <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -205,23 +233,38 @@ function HeroSection() {
             <div className="flex items-center px-2 py-2">
               <Button
                 onClick={handleSearch}
-                className="rounded-full w-full md:w-auto px-8 py-6 text-base font-medium"
+                className="rounded-full w-full md:w-auto px-8 py-6 text-base font-medium relative group"
                 style={{ backgroundColor: "#81D8D0", color: "white" }}
                 data-testid="button-hero-search"
               >
-                <Search className="w-5 h-5 mr-2" />
-                搜尋
+                <span className="absolute inset-0 rounded-full bg-tiffany/20 animate-ping opacity-30 group-hover:opacity-0" />
+                <Search className="w-5 h-5 mr-2 relative z-10" />
+                <span className="relative z-10">搜尋</span>
               </Button>
             </div>
           </div>
         </div>
+
+        <motion.div
+          className="flex flex-wrap items-center justify-center gap-3 mt-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+        >
+          {["免費診斷", "無需綁約", "隨時取消"].map((text) => (
+            <span key={text} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CheckCircle className="w-3.5 h-3.5 text-tiffany" />
+              {text}
+            </span>
+          ))}
+        </motion.div>
       </motion.div>
 
       <motion.div
-        className="flex items-center justify-center gap-3 mt-12 z-10"
+        className="flex items-center justify-center gap-3 mt-10 z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.6, duration: 0.8 }}
+        transition={{ delay: 1.4, duration: 0.8 }}
       >
         <div className="flex -space-x-3">
           <img src={teacher1Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
@@ -288,8 +331,8 @@ function ClassroomShowcase() {
                   <Users className="w-5 h-5 text-tiffany" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">小班制</p>
-                  <p className="text-xs text-muted-foreground">最多 5 位學生</p>
+                  <p className="text-sm font-medium text-foreground">個別指導</p>
+                  <p className="text-xs text-muted-foreground">專屬學習進度</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 bg-washi rounded-md p-3">
@@ -313,9 +356,9 @@ function FeaturesSection() {
   const features = [
     {
       icon: Users,
-      title: "一對一個別指導",
+      title: "個別指導",
       description:
-        "每位老師最多同時指導 5 位學生，確保每個孩子都能獲得充分的關注與即時回饋。",
+        "每位學生都有獨立的學習進度與教材，老師會依據學生狀態即時調整教學，確保每個孩子都能獲得充分的關注。",
       image: learningDetailImg,
     },
     {
@@ -386,44 +429,119 @@ function CoachesSection() {
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({
     queryKey: ["/api/coaches"],
   });
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const cardWidth = 256;
+  const gap = 24;
+  const step = cardWidth + gap;
+
+  const maxIndex = Math.max(0, coaches.length - 1);
+
+  const goNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
+  }, [maxIndex]);
+
+  const goPrev = useCallback(() => {
+    setCurrentIndex((prev) => (prev <= 0 ? maxIndex : prev - 1));
+  }, [maxIndex]);
+
+  useEffect(() => {
+    if (isPaused || coaches.length <= 3) return;
+    const interval = setInterval(goNext, 4000);
+    return () => clearInterval(interval);
+  }, [isPaused, coaches.length, goNext]);
 
   return (
     <section id="about" className="py-24 px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-16" {...fadeInUp}>
           <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
-            推薦老師
+            推薦師資
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             經過嚴格培訓與認證的專業老師團隊
           </p>
         </motion.div>
 
-        <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide justify-center flex-wrap">
-          {isLoading
-            ? Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="w-60 flex-shrink-0">
-                  <Skeleton className="aspect-[3/4] rounded-2xl" />
-                  <div className="flex justify-center gap-2 mt-3">
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <Skeleton key={j} className="w-2.5 h-2.5 rounded-full" />
-                    ))}
+        <div
+          className="relative"
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+          ref={containerRef}
+        >
+          {coaches.length > 3 && (
+            <>
+              <button
+                onClick={goPrev}
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-coaches-prev"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={goNext}
+                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-coaches-next"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </>
+          )}
+
+          <div className="overflow-hidden">
+            {isLoading ? (
+              <div className="flex gap-6 justify-center">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="w-60 flex-shrink-0">
+                    <Skeleton className="aspect-[3/4] rounded-2xl" />
+                    <div className="flex justify-center gap-2 mt-3">
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <Skeleton key={j} className="w-2.5 h-2.5 rounded-full" />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
-            : coaches.map((coach) => (
-                <CoachCard
-                  key={coach.id}
-                  name={coach.name}
-                  photoUrl={TEACHER_PHOTOS[coach.name] || coach.photoUrl}
-                  specialties={coach.specialties}
-                  rating={coach.rating}
-                  reviewCount={coach.reviewCount}
-                  bookedSeats={2}
-                  maxSeats={5}
-                  isCertified={coach.isCertified}
+                ))}
+              </div>
+            ) : (
+              <motion.div
+                className="flex gap-6"
+                animate={{ x: -currentIndex * step }}
+                transition={{ type: "spring", stiffness: 120, damping: 22 }}
+              >
+                {coaches.map((coach) => (
+                  <div key={coach.id} className="flex-shrink-0" style={{ width: cardWidth }}>
+                    <CoachCard
+                      name={coach.name}
+                      photoUrl={TEACHER_PHOTOS[coach.name] || coach.photoUrl}
+                      specialties={coach.specialties}
+                      rating={coach.rating}
+                      reviewCount={coach.reviewCount}
+                      bookedSeats={2}
+                      maxSeats={5}
+                      isCertified={coach.isCertified}
+                    />
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </div>
+
+          {coaches.length > 3 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              {coaches.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentIndex(i)}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    i === currentIndex ? "bg-tiffany w-6" : "bg-gray-300"
+                  }`}
+                  data-testid={`dot-coach-${i}`}
                 />
               ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -454,7 +572,7 @@ function ProcessSection() {
       icon: GraduationCap,
       number: "04",
       title: "開始學習",
-      description: "孩子享受一對一的專業數學指導",
+      description: "孩子享受專業的數學個別指導",
     },
   ];
 
@@ -509,18 +627,29 @@ function TestimonialsSection() {
   const { data: stories = [], isLoading } = useQuery<SuccessStory[]>({
     queryKey: ["/api/success-stories"],
   });
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const maxIndex = Math.max(0, stories.length - 1);
+
+  const goNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
+  }, [maxIndex]);
+
+  const goPrev = useCallback(() => {
+    setCurrentIndex((prev) => (prev <= 0 ? maxIndex : prev - 1));
+  }, [maxIndex]);
+
+  useEffect(() => {
+    if (isPaused || stories.length <= 1) return;
+    const interval = setInterval(goNext, 5000);
+    return () => clearInterval(interval);
+  }, [isPaused, stories.length, goNext]);
 
   return (
     <section id="testimonials" className="py-24 px-6 bg-washi">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <motion.div className="text-center mb-16" {...fadeInUp}>
-          <div className="inline-block mb-6">
-            <img
-              src={studentSuccessImg}
-              alt="孩子的學習成就"
-              className="w-full max-w-md h-48 object-cover rounded-2xl mx-auto shadow-md"
-            />
-          </div>
           <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
             家長好評
           </h2>
@@ -529,62 +658,119 @@ function TestimonialsSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {isLoading
-            ? Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-48 rounded-md" />
-              ))
-            : stories.map((story, i) => (
-                <motion.div
-                  key={story.id}
-                  className="bg-white rounded-md border border-gray-100 p-6"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
+        {isLoading ? (
+          <Skeleton className="h-64 rounded-2xl" />
+        ) : (
+          <div
+            className="relative"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            {stories.length > 1 && (
+              <>
+                <button
+                  onClick={goPrev}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 md:-translate-x-6 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="button-testimonials-prev"
                 >
-                  <Quote className="w-8 h-8 text-tiffany/20 mb-4" />
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                    {story.testimonial}
-                  </p>
-                  <div className="flex items-center gap-3 pt-4 border-t border-gray-50">
-                    <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center">
-                      <span className="text-sm font-medium text-tiffany">
-                        {story.studentName[0]}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {story.studentName}
-                        {story.parentName && (
-                          <span className="text-muted-foreground font-normal">
-                            {" "}
-                            的家長
-                          </span>
-                        )}
-                      </p>
-                      {story.grade && (
-                        <p className="text-xs text-muted-foreground">
-                          {story.grade} 年級
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={goNext}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 md:translate-x-6 z-20 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="button-testimonials-next"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+
+            <div className="overflow-hidden rounded-2xl">
+              <AnimatePresence mode="wait">
+                {stories[currentIndex] && (
+                  <motion.div
+                    key={stories[currentIndex].id}
+                    className="bg-white rounded-2xl border border-gray-100 p-8 md:p-12"
+                    initial={{ opacity: 0, x: 80 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -80 }}
+                    transition={{ duration: 0.4, ease: "easeInOut" }}
+                  >
+                    <div className="flex flex-col md:flex-row gap-8 items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-tiffany/20 shadow-md">
+                          {STUDENT_PHOTOS[stories[currentIndex].studentName] ? (
+                            <img
+                              src={STUDENT_PHOTOS[stories[currentIndex].studentName]}
+                              alt={stories[currentIndex].studentName}
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          ) : (
+                            <div className="w-full h-full rounded-full bg-tiffany/10 flex items-center justify-center">
+                              <span className="text-3xl font-serif text-tiffany">
+                                {stories[currentIndex].studentName[0]}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1 text-center md:text-left">
+                        <Quote className="w-10 h-10 text-tiffany/15 mb-4 mx-auto md:mx-0" />
+                        <p className="text-base md:text-lg text-muted-foreground leading-relaxed mb-6">
+                          {stories[currentIndex].testimonial}
                         </p>
-                      )}
+                        <div className="flex items-center gap-3 justify-center md:justify-start">
+                          <div>
+                            <p className="text-base font-medium text-foreground">
+                              {stories[currentIndex].studentName}
+                              {stories[currentIndex].parentName && (
+                                <span className="text-muted-foreground font-normal">
+                                  {" "}的家長
+                                </span>
+                              )}
+                            </p>
+                            {stories[currentIndex].grade && (
+                              <p className="text-sm text-muted-foreground">
+                                {stories[currentIndex].grade} 年級
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {stories[currentIndex].tags && stories[currentIndex].tags!.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
+                            {stories[currentIndex].tags!.map((tag) => (
+                              <span
+                                key={tag}
+                                className="text-xs bg-amber-warm text-foreground/70 px-3 py-1 rounded-full"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  {story.tags && story.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {story.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-xs bg-amber-warm text-foreground/70 px-2 py-0.5 rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-        </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {stories.length > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                {stories.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentIndex(i)}
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                      i === currentIndex ? "bg-tiffany w-6" : "bg-gray-300"
+                    }`}
+                    data-testid={`dot-testimonial-${i}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -758,38 +944,22 @@ function FooterSection() {
             </h4>
             <ul className="space-y-2.5">
               <li>
-                <a
-                  href="#about"
-                  className="text-sm text-white/60 transition-colors"
-                  data-testid="footer-link-about"
-                >
+                <a href="#about" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-about">
                   認識質數
                 </a>
               </li>
               <li>
-                <a
-                  href="#features"
-                  className="text-sm text-white/60 transition-colors"
-                  data-testid="footer-link-features"
-                >
+                <a href="#features" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-features">
                   課程資訊
                 </a>
               </li>
               <li>
-                <a
-                  href="#testimonials"
-                  className="text-sm text-white/60 transition-colors"
-                  data-testid="footer-link-testimonials"
-                >
+                <a href="#testimonials" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-testimonials">
                   成功案例
                 </a>
               </li>
               <li>
-                <a
-                  href="#faq"
-                  className="text-sm text-white/60 transition-colors"
-                  data-testid="footer-link-faq"
-                >
+                <a href="#faq" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-faq">
                   常見問題
                 </a>
               </li>
@@ -817,11 +987,19 @@ function FooterSection() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 pt-8 text-center">
+        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/40">
             &copy; {new Date().getFullYear()} 質數數學 The Prime Math. All rights
             reserved.
           </p>
+          <a
+            href="/api/login"
+            className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-tiffany transition-colors border border-white/15 rounded-full px-5 py-2 hover:border-tiffany/40"
+            data-testid="link-franchise-admin"
+          >
+            <Building2 className="w-4 h-4" />
+            分校管理
+          </a>
         </div>
       </div>
     </footer>

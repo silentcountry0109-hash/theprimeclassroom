@@ -21,25 +21,34 @@ S2B2C education platform for elementary school math tutoring in Taiwan. Features
 - Code-level variable names still use "coach" in schema/routes for backward compatibility
 
 ## Warm Photos (attached_assets/)
-- teacher_1-6.png: AI-generated teacher portraits (3:4), mapped to coaches by ID
+- teacher_1-6.png: Teacher portraits (3:4), mapped by name in TEACHER_PHOTOS constant
+- student_boy_1/2/3.png, student_girl_1/2.png: Student portraits (1:1) for testimonials carousel
 - hero_classroom.png: Warm tutoring classroom scene (16:9)
-- learning_detail.png: Close-up of child doing math (4:3)
-- parent_child.png: Parent-child learning together (4:3)
-- student_success.png: Student celebrating achievement (4:3)
+- learning_detail.png, parent_child.png: Section feature images (4:3)
 - Photos imported via `@assets/...` in landing.tsx and search-results.tsx
+
+## Landing Page Sections (top to bottom)
+1. Hero - Animated title reveal + Skyscanner-style search with glowing CTA + social proof
+2. ClassroomShowcase - Photo + text about learning environment
+3. Features - 3 cards with photos (個別指導, 專業認證師資, 彈性預約制度)
+4. Coaches - Auto-sliding carousel with left/right navigation
+5. Process - 4-step "如何開始" flow
+6. Testimonials - Auto-sliding single-card carousel with student photos
+7. FAQ - Accordion grouped by category
+8. CTA - Parent-child photo + booking call-to-action
+9. Footer - Links + contact info + 分校管理 button for franchise owners
 
 ## Key Files
 - `shared/models/auth.ts` - User/session tables (Replit Auth)
-- `shared/schema.ts` - All data models (franchises, coaches, children, time_slots, bookings, faqs, success_stories, announcements)
+- `shared/schema.ts` - All data models
 - `server/routes.ts` - All API routes
 - `server/storage.ts` - DatabaseStorage with CRUD methods
-- `server/seed.ts` - Seed data for development (uses 老師 terminology)
-- `client/src/pages/landing.tsx` - Public landing page with warm photos, Skyscanner-style search
-- `client/src/pages/parent-dashboard.tsx` - Parent dashboard (manage children, bookings)
-- `client/src/pages/admin-dashboard.tsx` - Admin CMS (FAQs, stories, franchises, coaches, announcements)
-- `client/src/pages/search-results.tsx` - Search results with teacher avatars and booking dialog
-- `client/src/components/navbar.tsx` - Public navigation bar
-- `client/src/components/coach-card.tsx` - Coach card with seat indicator dots and teacher photo
+- `server/seed.ts` - Seed data (uses 老師; 1:5 ratio only in FAQ answer)
+- `client/src/pages/landing.tsx` - Public landing page with carousels, animated hero
+- `client/src/pages/parent-dashboard.tsx` - Parent dashboard
+- `client/src/pages/admin-dashboard.tsx` - Admin CMS
+- `client/src/pages/search-results.tsx` - Search results with teacher avatars
+- `client/src/components/coach-card.tsx` - Coach card with photo + seat dots
 
 ## Database Tables
 - users, sessions (Replit Auth)
