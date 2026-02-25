@@ -48,6 +48,7 @@ import {
   Compass,
   Milestone,
   Eye,
+  XCircle,
 } from "lucide-react";
 import type { Coach, Faq, SuccessStory } from "@shared/schema";
 
@@ -808,12 +809,15 @@ function LearningMapSection() {
 function BookUnitPopover({ book, units, color }: { book: string; units: string[]; color: string }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   const handleMouseEnter = () => {
+    if (isMobile) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setOpen(true);
   };
   const handleMouseLeave = () => {
+    if (isMobile) return;
     timeoutRef.current = setTimeout(() => setOpen(false), 150);
   };
   const handleClick = () => {
@@ -821,16 +825,16 @@ function BookUnitPopover({ book, units, color }: { book: string; units: string[]
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !isMobile) return;
     const handleOutside = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest(`[data-book="${book}"]`)) {
+      if (!target.closest(`[data-book-popup="${book}"]`) && !target.closest(`[data-book="${book}"]`)) {
         setOpen(false);
       }
     };
     document.addEventListener("touchstart", handleOutside);
     return () => document.removeEventListener("touchstart", handleOutside);
-  }, [open, book]);
+  }, [open, book, isMobile]);
 
   return (
     <div
@@ -850,27 +854,70 @@ function BookUnitPopover({ book, units, color }: { book: string; units: string[]
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-30 w-52 sm:w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-3"
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-          >
-            <p className={`text-xs font-semibold mb-2 px-1 ${color.includes("tiffany") ? "text-tiffany" : "text-coral"}`}>
-              {book} 單元內容
-            </p>
-            <ul className="space-y-1">
-              {units.map((unit, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground leading-relaxed px-1 py-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${color.includes("tiffany") ? "bg-tiffany/50" : "bg-coral/50"}`} />
-                  {unit}
-                </li>
-              ))}
-            </ul>
-          </motion.div>
+          <>
+            <div className="hidden md:block">
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-30 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-3"
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+              >
+                <p className={`text-xs font-semibold mb-2 px-1 ${color.includes("tiffany") ? "text-tiffany" : "text-coral"}`}>
+                  {book} 單元內容
+                </p>
+                <ul className="space-y-1">
+                  {units.map((unit, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground leading-relaxed px-1 py-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${color.includes("tiffany") ? "bg-tiffany/50" : "bg-coral/50"}`} />
+                      {unit}
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            </div>
+            <div className="md:hidden">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center px-6"
+                onClick={() => setOpen(false)}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="bg-white rounded-xl shadow-2xl border border-gray-100 p-4 w-full max-w-xs relative"
+                  data-book-popup={book}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                    data-testid={`button-close-popup-${book}`}
+                  >
+                    <XCircle className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <p className={`text-sm font-semibold mb-3 ${color.includes("tiffany") ? "text-tiffany" : "text-coral"}`}>
+                    {book} 單元內容
+                  </p>
+                  <ul className="space-y-1.5">
+                    {units.map((unit, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground leading-relaxed py-0.5">
+                        <span className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${color.includes("tiffany") ? "bg-tiffany/50" : "bg-coral/50"}`} />
+                        {unit}
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              </motion.div>
+            </div>
+          </>
         )}
       </AnimatePresence>
     </div>
