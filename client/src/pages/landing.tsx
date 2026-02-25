@@ -268,7 +268,7 @@ function HeroSection() {
                 <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showTimeFilter ? "rotate-180" : ""}`} />
               </button>
               {showTimeFilter && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-gray-100 shadow-xl p-4 z-50 min-w-[280px]">
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl border border-gray-100 shadow-xl p-4 z-50 min-w-[280px]">
                   <p className="text-xs font-medium text-muted-foreground mb-2">星期</p>
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {Object.entries(DAY_LABELS).map(([val, label]) => (
