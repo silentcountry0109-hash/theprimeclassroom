@@ -81,7 +81,7 @@ export default function AdminDashboard() {
     { id: "faqs", label: "常見問題", icon: HelpCircle },
     { id: "stories", label: "成功案例", icon: Star },
     { id: "franchises", label: "加盟分校", icon: Building2 },
-    { id: "coaches", label: "教練管理", icon: GraduationCap },
+    { id: "coaches", label: "老師管理", icon: GraduationCap },
     { id: "announcements", label: "公告管理", icon: Megaphone },
   ];
 
@@ -168,7 +168,7 @@ function OverviewTab() {
       color: "bg-tiffany/10 text-tiffany",
     },
     {
-      label: "認證教練",
+      label: "認證老師",
       value: stats?.totalCoaches ?? 0,
       icon: GraduationCap,
       color: "bg-coral/10 text-coral",
@@ -337,7 +337,7 @@ function FaqsTab() {
                   <SelectValue placeholder="選擇分類" />
                 </SelectTrigger>
                 <SelectContent>
-                  {["關於課程", "關於費用", "關於教練", "關於預約"].map((c) => (
+                  {["關於課程", "關於費用", "關於老師", "關於預約"].map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -609,8 +609,8 @@ function CoachesTab() {
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-foreground">教練管理</h1>
-        <p className="text-sm text-muted-foreground">認證教練一覽</p>
+        <h1 className="text-xl font-semibold text-foreground">老師管理</h1>
+        <p className="text-sm text-muted-foreground">認證老師一覽</p>
       </div>
 
       {isLoading ? (

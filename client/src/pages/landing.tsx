@@ -37,6 +37,26 @@ import {
 } from "lucide-react";
 import type { Coach, Faq, SuccessStory } from "@shared/schema";
 
+import heroClassroomImg from "@assets/hero_classroom.png";
+import learningDetailImg from "@assets/learning_detail.png";
+import parentChildImg from "@assets/parent_child.png";
+import studentSuccessImg from "@assets/student_success.png";
+import teacher1Img from "@assets/teacher_1.png";
+import teacher2Img from "@assets/teacher_2.png";
+import teacher3Img from "@assets/teacher_3.png";
+import teacher4Img from "@assets/teacher_4.png";
+import teacher5Img from "@assets/teacher_5.png";
+import teacher6Img from "@assets/teacher_6.png";
+
+const TEACHER_PHOTOS: Record<string, string> = {
+  "林佳慧": teacher1Img,
+  "陳志明": teacher2Img,
+  "王雅琪": teacher3Img,
+  "張育銘": teacher4Img,
+  "李美玲": teacher5Img,
+  "黃建宏": teacher6Img,
+};
+
 const CITIES = ["台北市", "新北市", "桃園市", "台中市", "台南市", "高雄市"];
 const GRADES = [
   { value: "1", label: "一年級" },
@@ -121,7 +141,7 @@ function HeroSection() {
           國小數學個別指導
         </p>
         <p className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-14 leading-relaxed">
-          不可拆解的對話，讓教學回歸「1 位教練」對「1 位學生」的學習體驗
+          不可拆解的對話，讓教學回歸「1 位老師」對「1 位學生」的學習體驗
         </p>
       </motion.div>
 
@@ -198,6 +218,29 @@ function HeroSection() {
       </motion.div>
 
       <motion.div
+        className="flex items-center justify-center gap-3 mt-12 z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6, duration: 0.8 }}
+      >
+        <div className="flex -space-x-3">
+          <img src={teacher1Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
+          <img src={teacher2Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
+          <img src={teacher3Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
+          <img src={teacher4Img} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover" />
+        </div>
+        <div className="text-left">
+          <p className="text-sm font-semibold text-foreground">200+ 位家長推薦</p>
+          <div className="flex items-center gap-0.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+            ))}
+            <span className="text-xs text-muted-foreground ml-1">4.8 / 5</span>
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.div
         className="absolute bottom-10 left-1/2 -translate-x-1/2"
         animate={{ y: [0, 8, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
@@ -208,25 +251,86 @@ function HeroSection() {
   );
 }
 
+function ClassroomShowcase() {
+  return (
+    <section className="relative">
+      <div className="max-w-7xl mx-auto px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <motion.div
+            className="relative rounded-2xl shadow-lg"
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7 }}
+          >
+            <img
+              src={heroClassroomImg}
+              alt="溫暖明亮的教室環境"
+              className="w-full h-[320px] md:h-[400px] object-cover rounded-2xl"
+            />
+          </motion.div>
+          <motion.div
+            className="space-y-6"
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.15 }}
+          >
+            <h2 className="font-serif text-2xl md:text-3xl tracking-[0.1em] text-foreground">
+              溫暖的學習空間
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              每間質數數學教室都精心打造舒適的學習環境。明亮的自然光線、溫暖的木質桌椅、豐富的教具，讓孩子在輕鬆愉快的氛圍中專注學習。
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-3 bg-washi rounded-md p-3">
+                <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5 text-tiffany" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">小班制</p>
+                  <p className="text-xs text-muted-foreground">最多 5 位學生</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 bg-washi rounded-md p-3">
+                <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-5 h-5 text-coral" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">安全環境</p>
+                  <p className="text-xs text-muted-foreground">安心學習空間</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FeaturesSection() {
   const features = [
     {
       icon: Users,
       title: "一對一個別指導",
       description:
-        "每位教練最多同時指導 5 位學生，確保每個孩子都能獲得充分的關注與即時回饋。",
+        "每位老師最多同時指導 5 位學生，確保每個孩子都能獲得充分的關注與即時回饋。",
+      image: learningDetailImg,
     },
     {
       icon: Shield,
-      title: "專業認證教練",
+      title: "專業認證師資",
       description:
-        "所有教練均通過總部嚴格培訓與認證，深諳認知轉譯技巧，能以孩子的語言解釋數學概念。",
+        "所有老師均通過總部嚴格培訓與認證，深諳認知轉譯技巧，能以孩子的語言解釋數學概念。",
+      image: teacher1Img,
     },
     {
       icon: Target,
       title: "彈性預約制度",
       description:
-        "如同訂機票般簡單，家長可自由選擇教室、時段與教練，完全配合家庭的作息安排。",
+        "如同訂機票般簡單，家長可自由選擇教室、時段與老師，完全配合家庭的作息安排。",
+      image: parentChildImg,
     },
   ];
 
@@ -246,21 +350,30 @@ function FeaturesSection() {
           {features.map((feature, i) => (
             <motion.div
               key={feature.title}
-              className="text-center p-8 rounded-md border border-gray-100 bg-washi/50"
+              className="rounded-md border border-gray-100 bg-washi/50"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: i * 0.15 }}
             >
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-tiffany/10 mb-6">
-                <feature.icon className="w-7 h-7 text-tiffany" />
+              <div className="h-40 rounded-t-md">
+                <img
+                  src={feature.image}
+                  alt={feature.title}
+                  className="w-full h-full object-cover rounded-t-md"
+                />
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-3">
-                {feature.title}
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {feature.description}
-              </p>
+              <div className="p-6 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-tiffany/10 mb-4 -mt-10 relative z-10 border-4 border-white">
+                  <feature.icon className="w-5 h-5 text-tiffany" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-3">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {feature.description}
+                </p>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -279,10 +392,10 @@ function CoachesSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-16" {...fadeInUp}>
           <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
-            推薦教練
+            推薦老師
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            經過嚴格培訓與認證的專業教練團隊
+            經過嚴格培訓與認證的專業老師團隊
           </p>
         </motion.div>
 
@@ -302,7 +415,7 @@ function CoachesSection() {
                 <CoachCard
                   key={coach.id}
                   name={coach.name}
-                  photoUrl={coach.photoUrl}
+                  photoUrl={TEACHER_PHOTOS[coach.name] || coach.photoUrl}
                   specialties={coach.specialties}
                   rating={coach.rating}
                   reviewCount={coach.reviewCount}
@@ -328,8 +441,8 @@ function ProcessSection() {
     {
       icon: Users,
       number: "02",
-      title: "選擇教練",
-      description: "瀏覽教練資歷與評價，選擇最適合的教練",
+      title: "選擇老師",
+      description: "瀏覽老師資歷與評價，選擇最適合的老師",
     },
     {
       icon: Clock,
@@ -401,6 +514,13 @@ function TestimonialsSection() {
     <section id="testimonials" className="py-24 px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-16" {...fadeInUp}>
+          <div className="inline-block mb-6">
+            <img
+              src={studentSuccessImg}
+              alt="孩子的學習成就"
+              className="w-full max-w-md h-48 object-cover rounded-2xl mx-auto shadow-md"
+            />
+          </div>
           <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
             家長好評
           </h2>
@@ -545,49 +665,71 @@ function CTASection() {
         backgroundSize: "20px 20px",
       }}
     >
-      <motion.div className="max-w-2xl mx-auto text-center" {...fadeInUp}>
-        <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
-          立即預約免費診斷
-        </h2>
-        <p className="text-muted-foreground mb-8 leading-relaxed">
-          讓我們的認證教練為您的孩子進行一次免費的數學能力適性診斷，
-          了解孩子的學習狀態，制定最適合的學習計畫。
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Button
-            size="lg"
-            className="rounded-full px-10 py-6 text-base"
-            style={{ backgroundColor: "#81D8D0", color: "white" }}
-            onClick={() => {
-              const el = document.querySelector("#hero-search");
-              if (el) el.scrollIntoView({ behavior: "smooth" });
-            }}
-            data-testid="button-cta-book"
+      <div className="max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7 }}
           >
-            立即預約
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-          <a href="/api/login" data-testid="link-login-cta">
-            <Button variant="outline" size="lg" className="rounded-full px-10 py-6 text-base">
-              家長登入
-            </Button>
-          </a>
+            <img
+              src={parentChildImg}
+              alt="家長與孩子一起學習"
+              className="w-full h-[300px] md:h-[360px] object-cover rounded-2xl shadow-lg"
+            />
+          </motion.div>
+          <motion.div
+            className="text-center md:text-left"
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.15 }}
+          >
+            <h2 className="font-serif text-3xl md:text-4xl tracking-[0.1em] text-foreground mb-4">
+              立即預約免費診斷
+            </h2>
+            <p className="text-muted-foreground mb-8 leading-relaxed">
+              讓我們的認證老師為您的孩子進行一次免費的數學能力適性診斷，
+              了解孩子的學習狀態，制定最適合的學習計畫。
+            </p>
+            <div className="flex flex-col sm:flex-row items-center md:items-start gap-4">
+              <Button
+                size="lg"
+                className="rounded-full px-10 py-6 text-base"
+                style={{ backgroundColor: "#81D8D0", color: "white" }}
+                onClick={() => {
+                  const el = document.querySelector("#hero-search");
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
+                data-testid="button-cta-book"
+              >
+                立即預約
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              <a href="/api/login" data-testid="link-login-cta">
+                <Button variant="outline" size="lg" className="rounded-full px-10 py-6 text-base">
+                  家長登入
+                </Button>
+              </a>
+            </div>
+            <div className="flex items-center justify-center md:justify-start gap-5 mt-8 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-tiffany" />
+                免費診斷
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-tiffany" />
+                無需綁約
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-tiffany" />
+                隨時取消
+              </span>
+            </div>
+          </motion.div>
         </div>
-        <div className="flex items-center justify-center gap-6 mt-8 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <CheckCircle className="w-4 h-4 text-tiffany" />
-            免費診斷
-          </span>
-          <span className="flex items-center gap-1.5">
-            <CheckCircle className="w-4 h-4 text-tiffany" />
-            無需綁約
-          </span>
-          <span className="flex items-center gap-1.5">
-            <CheckCircle className="w-4 h-4 text-tiffany" />
-            隨時取消
-          </span>
-        </div>
-      </motion.div>
+      </div>
     </section>
   );
 }
@@ -605,7 +747,7 @@ function FooterSection() {
               The Prime Math
             </p>
             <p className="text-sm text-white/60 leading-relaxed mt-4 max-w-sm">
-              不可拆解的對話，讓教學回歸「1 位教練」對「1
+              不可拆解的對話，讓教學回歸「1 位老師」對「1
               位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。
             </p>
           </div>
@@ -691,6 +833,7 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <Navbar />
       <HeroSection />
+      <ClassroomShowcase />
       <FeaturesSection />
       <CoachesSection />
       <ProcessSection />

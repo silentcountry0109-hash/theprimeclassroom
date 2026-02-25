@@ -558,7 +558,7 @@ function BookingsTab() {
                     {booking.slotDate} {booking.slotStartTime}
                   </span>
                   {booking.childName && <span>{booking.childName}</span>}
-                  {booking.coachName && <span>教練：{booking.coachName}</span>}
+                  {booking.coachName && <span>老師：{booking.coachName}</span>}
                 </div>
               </div>
               {booking.status === "confirmed" && (

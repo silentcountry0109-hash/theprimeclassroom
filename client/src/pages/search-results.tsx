@@ -33,6 +33,22 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Child } from "@shared/schema";
 
+import teacher1Img from "@assets/teacher_1.png";
+import teacher2Img from "@assets/teacher_2.png";
+import teacher3Img from "@assets/teacher_3.png";
+import teacher4Img from "@assets/teacher_4.png";
+import teacher5Img from "@assets/teacher_5.png";
+import teacher6Img from "@assets/teacher_6.png";
+
+const TEACHER_PHOTOS: Record<string, string> = {
+  "林佳慧": teacher1Img,
+  "陳志明": teacher2Img,
+  "王雅琪": teacher3Img,
+  "張育銘": teacher4Img,
+  "李美玲": teacher5Img,
+  "黃建宏": teacher6Img,
+};
+
 interface SlotResult {
   slot: {
     id: number;
@@ -194,6 +210,15 @@ export default function SearchResults() {
                   className="bg-white rounded-md border border-gray-100 p-5 flex flex-col md:flex-row md:items-center gap-4"
                   data-testid={`slot-card-${result.slot.id}`}
                 >
+                  {result.coach && TEACHER_PHOTOS[result.coach.name] && (
+                    <div className="flex-shrink-0">
+                      <img
+                        src={TEACHER_PHOTOS[result.coach.name]}
+                        alt={result.coach.name}
+                        className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover border-2 border-tiffany/20"
+                      />
+                    </div>
+                  )}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h3 className="text-base font-semibold text-foreground">
@@ -202,7 +227,7 @@ export default function SearchResults() {
                       {result.coach?.isCertified && (
                         <span className="inline-flex items-center gap-1 text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">
                           <Award className="w-3 h-3" />
-                          認證教練
+                          認證老師
                         </span>
                       )}
                     </div>
@@ -294,7 +319,7 @@ export default function SearchResults() {
                 </p>
                 {bookingSlot.coach && (
                   <p>
-                    <span className="text-muted-foreground">教練：</span>
+                    <span className="text-muted-foreground">老師：</span>
                     {bookingSlot.coach.name}
                   </p>
                 )}
