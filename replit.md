@@ -31,6 +31,8 @@ The design aesthetic is Japanese minimalist, featuring a grid paper background p
 - **E-commerce**: Integrated product catalog, shopping cart, and order management system.
 - **Contact Books**: Digital contact books for coaches to record lesson progress and for parents to track their children's performance.
 - **ICS Calendar Export**: Parents can export confirmed bookings to their calendars with reminder alarms.
+- **Favorite Franchises**: Parents can toggle a heart icon on franchise search cards to mark favorites. Favorited classrooms are pinned to the top of search results with a coral highlight. Data stored in `favoriteFranchises` table (userId + franchiseId). API: GET/POST/DELETE `/api/favorite-franchises/:franchiseId`.
+- **HQ Admin Analytics Dashboard**: The admin OverviewTab displays 6 summary stat cards (students, coaches, franchises, bookings, avg occupancy, this-month bookings) plus a per-franchise analytics breakdown with sortable/filterable cards showing coaches, students, bookings, occupancy rate, upcoming slots, and monthly metrics. API: GET `/api/admin/franchise-analytics`.
 
 ## External Dependencies
 - **Replit Auth**: Used for OpenID Connect based authentication for parent users.

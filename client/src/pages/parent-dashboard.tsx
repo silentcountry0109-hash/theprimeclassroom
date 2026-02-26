@@ -78,6 +78,7 @@ import {
   Phone,
   Award,
   UserCircle,
+  Heart,
 } from "lucide-react";
 import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -700,6 +701,26 @@ function BookingFlowTab() {
   const [recurringLoading, setRecurringLoading] = useState(false);
 
   const districts = city ? TAIWAN_DISTRICTS[city] || [] : [];
+
+  const { data: favoriteIds = [] } = useQuery<number[]>({
+    queryKey: ["/api/favorite-franchises"],
+  });
+
+  const favoriteMutation = useMutation({
+    mutationFn: async ({ franchiseId, isFavorite }: { franchiseId: number; isFavorite: boolean }) => {
+      if (isFavorite) {
+        await apiRequest("DELETE", `/api/favorite-franchises/${franchiseId}`);
+      } else {
+        await apiRequest("POST", `/api/favorite-franchises/${franchiseId}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/favorite-franchises"] });
+    },
+    onError: () => {
+      toast({ title: "操作失敗", variant: "destructive" });
+    },
+  });
 
   const queryParams = new URLSearchParams();
   if (city) queryParams.set("city", city);
@@ -1392,28 +1413,59 @@ function BookingFlowTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {results.map((result) => {
+          {[...results]
+            .sort((a, b) => {
+              const aFav = favoriteIds.includes(a.franchise.id) ? 1 : 0;
+              const bFav = favoriteIds.includes(b.franchise.id) ? 1 : 0;
+              return bFav - aFav;
+            })
+            .map((result) => {
             const f = result.franchise;
+            const isFav = favoriteIds.includes(f.id);
             return (
-              <button
+              <div
                 key={f.id}
-                onClick={() => selectFranchise(f.id)}
-                className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden text-left hover:border-tiffany/30 hover:shadow-sm transition-all group"
+                className={`w-full bg-white rounded-xl border overflow-hidden text-left hover:border-tiffany/30 hover:shadow-sm transition-all group ${isFav ? "border-coral/30 ring-1 ring-coral/10" : "border-gray-100"}`}
                 data-testid={`franchise-card-${f.id}`}
               >
                 {(() => {
                   const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null);
                   return coverImg ? (
-                    <div className="relative">
-                      <img src={coverImg} alt={f.name} className="w-full h-36 object-cover" />
+                    <div className="relative cursor-pointer" onClick={() => selectFranchise(f.id)}>
+                      <img src={coverImg} alt={f.name} className="w-full aspect-[16/9] object-cover" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate({ franchiseId: f.id, isFavorite: isFav }); }}
+                        className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isFav ? "bg-coral/90 text-white" : "bg-black/30 text-white/80 hover:bg-coral/70 hover:text-white"}`}
+                        data-testid={`button-favorite-${f.id}`}
+                      >
+                        <Heart className={`w-4 h-4 ${isFav ? "fill-white" : ""}`} />
+                      </button>
                     </div>
-                  ) : null;
+                  ) : (
+                    <div className="relative">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate({ franchiseId: f.id, isFavorite: isFav }); }}
+                        className="absolute top-2 right-2 z-10"
+                        data-testid={`button-favorite-${f.id}`}
+                      >
+                        <Heart className={`w-5 h-5 transition-colors ${isFav ? "fill-coral text-coral" : "text-muted-foreground/40 hover:text-coral"}`} />
+                      </button>
+                    </div>
+                  );
                 })()}
+                <button
+                  onClick={() => selectFranchise(f.id)}
+                  className="w-full text-left"
+                  data-testid={`button-select-franchise-${f.id}`}
+                >
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-base font-semibold text-foreground group-hover:text-tiffany transition-colors">
-                      {f.name}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      {isFav && <Heart className="w-3.5 h-3.5 fill-coral text-coral flex-shrink-0" />}
+                      <h3 className="text-base font-semibold text-foreground group-hover:text-tiffany transition-colors">
+                        {f.name}
+                      </h3>
+                    </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground/40 group-hover:text-tiffany transition-colors" />
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-1">
@@ -1447,7 +1499,8 @@ function BookingFlowTab() {
                     )}
                   </div>
                 </div>
-              </button>
+                </button>
+              </div>
             );
           })}
         </div>

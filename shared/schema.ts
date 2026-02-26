@@ -202,6 +202,17 @@ export const insertContactBookSchema = createInsertSchema(contactBooks).omit({ i
 export type ContactBook = typeof contactBooks.$inferSelect;
 export type InsertContactBook = z.infer<typeof insertContactBookSchema>;
 
+export const favoriteFranchises = pgTable("favorite_franchises", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  franchiseId: integer("franchise_id").references(() => franchises.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFavoriteFranchiseSchema = createInsertSchema(favoriteFranchises).omit({ id: true, createdAt: true });
+export type FavoriteFranchise = typeof favoriteFranchises.$inferSelect;
+export type InsertFavoriteFranchise = z.infer<typeof insertFavoriteFranchiseSchema>;
+
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({ id: true, createdAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });

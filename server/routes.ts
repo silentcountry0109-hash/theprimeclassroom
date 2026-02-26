@@ -1414,6 +1414,50 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/franchise-analytics", isAdmin, async (_req, res) => {
+    try {
+      const analytics = await storage.getAllFranchiseAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ message: "取得分校分析資料失敗" });
+    }
+  });
+
+  app.get("/api/favorite-franchises", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = getSessionUserId(req);
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const favorites = await storage.getFavoriteFranchises(userId);
+      res.json(favorites);
+    } catch (error) {
+      res.status(500).json({ message: "取得收藏失敗" });
+    }
+  });
+
+  app.post("/api/favorite-franchises/:franchiseId", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = getSessionUserId(req);
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const franchiseId = parseInt(req.params.franchiseId);
+      const result = await storage.addFavoriteFranchise(userId, franchiseId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "收藏失敗" });
+    }
+  });
+
+  app.delete("/api/favorite-franchises/:franchiseId", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = getSessionUserId(req);
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const franchiseId = parseInt(req.params.franchiseId);
+      await storage.removeFavoriteFranchise(userId, franchiseId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "取消收藏失敗" });
+    }
+  });
+
   app.post("/api/admin/promote-grades", isAdmin, async (_req, res) => {
     try {
       const now = new Date();

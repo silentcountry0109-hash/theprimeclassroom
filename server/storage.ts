@@ -1,6 +1,6 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
-  products, cartItems, orders, orderItems, siteContent, contactBooks,
+  products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -17,6 +17,7 @@ import {
   type User,
   type SiteContent,
   type ContactBook, type InsertContactBook,
+  type FavoriteFranchise,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte } from "drizzle-orm";
@@ -138,6 +139,12 @@ export interface IStorage {
   getSiteContent(sectionKey: string): Promise<SiteContent | undefined>;
   upsertSiteContent(sectionKey: string, value: string): Promise<SiteContent>;
   promoteAllGrades(): Promise<number>;
+
+  getFavoriteFranchises(userId: string): Promise<number[]>;
+  addFavoriteFranchise(userId: string, franchiseId: number): Promise<FavoriteFranchise>;
+  removeFavoriteFranchise(userId: string, franchiseId: number): Promise<void>;
+
+  getAllFranchiseAnalytics(): Promise<any[]>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -1091,6 +1098,100 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(contactBooks.createdAt));
+  }
+
+  async getFavoriteFranchises(userId: string): Promise<number[]> {
+    const results = await db
+      .select({ franchiseId: favoriteFranchises.franchiseId })
+      .from(favoriteFranchises)
+      .where(eq(favoriteFranchises.userId, userId));
+    return results.map(r => r.franchiseId);
+  }
+
+  async addFavoriteFranchise(userId: string, franchiseId: number): Promise<FavoriteFranchise> {
+    const existing = await db
+      .select()
+      .from(favoriteFranchises)
+      .where(and(eq(favoriteFranchises.userId, userId), eq(favoriteFranchises.franchiseId, franchiseId)));
+    if (existing.length > 0) return existing[0];
+    const [created] = await db.insert(favoriteFranchises).values({ userId, franchiseId }).returning();
+    return created;
+  }
+
+  async removeFavoriteFranchise(userId: string, franchiseId: number): Promise<void> {
+    await db.delete(favoriteFranchises).where(
+      and(eq(favoriteFranchises.userId, userId), eq(favoriteFranchises.franchiseId, franchiseId))
+    );
+  }
+
+  async getAllFranchiseAnalytics(): Promise<any[]> {
+    const allFranchises = await db.select().from(franchises).orderBy(franchises.id);
+    const allSlots = await db.select().from(timeSlots);
+    const allBookingsData = await db.select().from(bookings);
+    const allCoachesData = await db.select().from(coaches);
+    const allChildrenData = await db.select().from(children);
+
+    const slotsByFranchise = new Map<number, typeof allSlots>();
+    for (const slot of allSlots) {
+      const arr = slotsByFranchise.get(slot.franchiseId) || [];
+      arr.push(slot);
+      slotsByFranchise.set(slot.franchiseId, arr);
+    }
+
+    const bookingsBySlot = new Map<number, typeof allBookingsData>();
+    for (const booking of allBookingsData) {
+      const arr = bookingsBySlot.get(booking.slotId) || [];
+      arr.push(booking);
+      bookingsBySlot.set(booking.slotId, arr);
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    return allFranchises.map(f => {
+      const fSlots = slotsByFranchise.get(f.id) || [];
+      const fCoaches = allCoachesData.filter(c => c.franchiseId === f.id);
+      const fSlotIds = new Set(fSlots.map(s => s.id));
+      const fBookings = allBookingsData.filter(b => fSlotIds.has(b.slotId));
+      const confirmedBookings = fBookings.filter(b => b.status === "confirmed").length;
+      const cancelledBookings = fBookings.filter(b => b.status === "cancelled").length;
+      const totalSeats = fSlots.reduce((s, sl) => s + sl.maxSeats, 0);
+      const bookedSeats = fSlots.reduce((s, sl) => s + sl.bookedSeats, 0);
+      const occupancyRate = totalSeats > 0 ? Math.round((bookedSeats / totalSeats) * 100) : 0;
+
+      const uniqueChildIds = new Set(fBookings.map(b => b.childId));
+      const uniqueParentIds = new Set(fBookings.map(b => b.parentId));
+
+      const upcomingSlots = fSlots.filter(s => s.date >= today && s.isActive).length;
+
+      const thisMonth = today.substring(0, 7);
+      const thisMonthBookings = fBookings.filter(b => {
+        const slot = fSlots.find(s => s.id === b.slotId);
+        return slot && slot.date.startsWith(thisMonth);
+      }).length;
+
+      return {
+        franchiseId: f.id,
+        franchiseName: f.name,
+        city: f.city,
+        district: f.district,
+        isActive: f.isActive,
+        totalCoaches: fCoaches.length,
+        certifiedCoaches: fCoaches.filter(c => c.isCertified).length,
+        totalSlots: fSlots.length,
+        upcomingSlots,
+        totalBookings: fBookings.length,
+        confirmedBookings,
+        cancelledBookings,
+        thisMonthBookings,
+        totalSeats,
+        bookedSeats,
+        occupancyRate,
+        uniqueStudents: uniqueChildIds.size,
+        uniqueParents: uniqueParentIds.size,
+        rating: f.rating,
+        reviewCount: f.reviewCount,
+      };
+    });
   }
 }
 

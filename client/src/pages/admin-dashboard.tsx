@@ -187,75 +187,214 @@ export default function AdminDashboard() {
   );
 }
 
+interface FranchiseAnalytics {
+  franchiseId: number;
+  franchiseName: string;
+  city: string;
+  district: string;
+  isActive: boolean;
+  totalCoaches: number;
+  certifiedCoaches: number;
+  totalSlots: number;
+  upcomingSlots: number;
+  totalBookings: number;
+  confirmedBookings: number;
+  cancelledBookings: number;
+  thisMonthBookings: number;
+  totalSeats: number;
+  bookedSeats: number;
+  occupancyRate: number;
+  uniqueStudents: number;
+  uniqueParents: number;
+  rating: number | null;
+  reviewCount: number | null;
+}
+
 function OverviewTab() {
   const { data: stats, isLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
   });
 
+  const { data: analytics = [], isLoading: analyticsLoading } = useQuery<FranchiseAnalytics[]>({
+    queryKey: ["/api/admin/franchise-analytics"],
+  });
+
+  const [sortBy, setSortBy] = useState<string>("bookings");
+  const [filterCity, setFilterCity] = useState<string>("all");
+
+  const cities = [...new Set(analytics.map(a => a.city))].sort();
+
+  const filtered = filterCity === "all" ? analytics : analytics.filter(a => a.city === filterCity);
+
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sortBy) {
+      case "bookings": return b.totalBookings - a.totalBookings;
+      case "occupancy": return b.occupancyRate - a.occupancyRate;
+      case "students": return b.uniqueStudents - a.uniqueStudents;
+      case "coaches": return b.totalCoaches - a.totalCoaches;
+      case "month": return b.thisMonthBookings - a.thisMonthBookings;
+      default: return 0;
+    }
+  });
+
+  const totalOccupancy = analytics.length > 0
+    ? Math.round(analytics.reduce((s, a) => s + a.occupancyRate, 0) / analytics.length)
+    : 0;
+  const totalUniqueStudents = analytics.reduce((s, a) => s + a.uniqueStudents, 0);
+  const totalUpcoming = analytics.reduce((s, a) => s + a.upcomingSlots, 0);
+  const totalThisMonth = analytics.reduce((s, a) => s + a.thisMonthBookings, 0);
+
   const statCards = [
-    {
-      label: "學生人數",
-      value: stats?.totalStudents ?? 0,
-      icon: Users,
-      color: "bg-tiffany/10 text-tiffany",
-    },
-    {
-      label: "認證老師",
-      value: stats?.totalCoaches ?? 0,
-      icon: GraduationCap,
-      color: "bg-coral/10 text-coral",
-    },
-    {
-      label: "加盟分校",
-      value: stats?.totalFranchises ?? 0,
-      icon: Building2,
-      color: "bg-amber-warm text-amber-700",
-    },
-    {
-      label: "總預約數",
-      value: stats?.totalBookings ?? 0,
-      icon: CalendarCheck,
-      color: "bg-tiffany/10 text-tiffany",
-    },
+    { label: "學生人數", value: stats?.totalStudents ?? 0, icon: Users, color: "bg-tiffany/10 text-tiffany" },
+    { label: "認證老師", value: stats?.totalCoaches ?? 0, icon: GraduationCap, color: "bg-coral/10 text-coral" },
+    { label: "加盟分校", value: stats?.totalFranchises ?? 0, icon: Building2, color: "bg-amber-warm text-amber-700" },
+    { label: "總預約數", value: stats?.totalBookings ?? 0, icon: CalendarCheck, color: "bg-tiffany/10 text-tiffany" },
+    { label: "平均滿班率", value: `${totalOccupancy}%`, icon: BarChart3, color: "bg-green-50 text-green-600" },
+    { label: "本月預約", value: totalThisMonth, icon: Clock, color: "bg-purple-50 text-purple-600" },
   ];
 
   return (
-    <div className="max-w-5xl">
-      <h1 className="text-xl font-semibold text-foreground mb-1">
+    <div className="max-w-6xl">
+      <h1 className="text-xl font-semibold text-foreground mb-1" data-testid="text-overview-title">
         營運總覽
       </h1>
-      <p className="text-sm text-muted-foreground mb-8">
+      <p className="text-sm text-muted-foreground mb-6">
         全國營運數據一覽
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
         {statCards.map((card) => (
           <div
             key={card.label}
-            className="bg-white rounded-md border border-gray-100 p-5"
+            className="bg-white rounded-md border border-gray-100 p-4"
             data-testid={`stat-${card.label}`}
           >
             {isLoading ? (
-              <Skeleton className="h-16" />
+              <Skeleton className="h-14" />
             ) : (
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center ${card.color}`}
-                >
-                  <card.icon className="w-6 h-6" />
+              <div className="flex items-center gap-2.5">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${card.color}`}>
+                  <card.icon className="w-5 h-5" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">
-                    {card.value}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {card.label}
-                  </p>
+                <div className="min-w-0">
+                  <p className="text-xl font-bold text-foreground truncate">{card.value}</p>
+                  <p className="text-[11px] text-muted-foreground">{card.label}</p>
                 </div>
               </div>
             )}
           </div>
         ))}
+      </div>
+
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-foreground" data-testid="text-franchise-analytics-title">
+            分校營運分析
+          </h2>
+          <div className="flex items-center gap-2">
+            <Select value={filterCity} onValueChange={setFilterCity}>
+              <SelectTrigger className="h-8 text-xs w-28" data-testid="select-filter-city">
+                <SelectValue placeholder="全部縣市" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部縣市</SelectItem>
+                {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-8 text-xs w-28" data-testid="select-sort-by">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bookings">總預約排序</SelectItem>
+                <SelectItem value="occupancy">滿班率排序</SelectItem>
+                <SelectItem value="students">學生數排序</SelectItem>
+                <SelectItem value="coaches">師資數排序</SelectItem>
+                <SelectItem value="month">本月預約排序</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {analyticsLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 rounded-md" />)}
+          </div>
+        ) : sorted.length === 0 ? (
+          <div className="text-center py-12 text-sm text-muted-foreground">尚無分校資料</div>
+        ) : (
+          <div className="space-y-3">
+            {sorted.map((f) => {
+              const occupancyColor = f.occupancyRate >= 70 ? "text-green-600 bg-green-50" : f.occupancyRate >= 40 ? "text-amber-600 bg-amber-50" : "text-gray-500 bg-gray-50";
+              return (
+                <div
+                  key={f.franchiseId}
+                  className="bg-white rounded-md border border-gray-100 p-4"
+                  data-testid={`analytics-card-${f.franchiseId}`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-foreground" data-testid={`text-franchise-name-${f.franchiseId}`}>
+                          {f.franchiseName}
+                        </h3>
+                        {!f.isActive && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground">停用</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" />
+                        {f.city} {f.district}
+                      </p>
+                    </div>
+                    <div className={`px-2.5 py-1 rounded-full text-xs font-semibold ${occupancyColor}`} data-testid={`text-occupancy-${f.franchiseId}`}>
+                      滿班率 {f.occupancyRate}%
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                    <div className="text-center p-2 rounded bg-gray-50">
+                      <p className="text-lg font-bold text-foreground" data-testid={`text-coaches-${f.franchiseId}`}>{f.totalCoaches}</p>
+                      <p className="text-[10px] text-muted-foreground">老師 ({f.certifiedCoaches} 認證)</p>
+                    </div>
+                    <div className="text-center p-2 rounded bg-gray-50">
+                      <p className="text-lg font-bold text-foreground" data-testid={`text-students-${f.franchiseId}`}>{f.uniqueStudents}</p>
+                      <p className="text-[10px] text-muted-foreground">學生數</p>
+                    </div>
+                    <div className="text-center p-2 rounded bg-gray-50">
+                      <p className="text-lg font-bold text-foreground" data-testid={`text-bookings-${f.franchiseId}`}>{f.totalBookings}</p>
+                      <p className="text-[10px] text-muted-foreground">總預約</p>
+                    </div>
+                    <div className="text-center p-2 rounded bg-gray-50">
+                      <p className="text-lg font-bold text-tiffany" data-testid={`text-confirmed-${f.franchiseId}`}>{f.confirmedBookings}</p>
+                      <p className="text-[10px] text-muted-foreground">已確認</p>
+                    </div>
+                    <div className="text-center p-2 rounded bg-gray-50">
+                      <p className="text-lg font-bold text-foreground" data-testid={`text-this-month-${f.franchiseId}`}>{f.thisMonthBookings}</p>
+                      <p className="text-[10px] text-muted-foreground">本月預約</p>
+                    </div>
+                    <div className="text-center p-2 rounded bg-gray-50">
+                      <p className="text-lg font-bold text-foreground" data-testid={`text-upcoming-${f.franchiseId}`}>{f.upcomingSlots}</p>
+                      <p className="text-[10px] text-muted-foreground">即將開課</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>座位：{f.bookedSeats}/{f.totalSeats}</span>
+                    <span>取消：{f.cancelledBookings}</span>
+                    <span>家長：{f.uniqueParents} 位</span>
+                    {f.rating && (
+                      <span className="flex items-center gap-0.5">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        {f.rating.toFixed(1)} ({f.reviewCount ?? 0})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
