@@ -1041,6 +1041,10 @@ export async function registerRoutes(
   app.get("/api/coach/slots/:slotId/students", isCoach, async (req: any, res) => {
     try {
       const slotId = parseInt(req.params.slotId);
+      const slot = await storage.getTimeSlot(slotId);
+      if (!slot || slot.coachId !== req.coach.id) {
+        return res.status(403).json({ message: "此時段不屬於您" });
+      }
       const students = await storage.getSlotStudents(slotId);
       res.json(students);
     } catch (error) {
@@ -1076,6 +1080,15 @@ export async function registerRoutes(
       }
       const results = [];
       for (const entry of entries) {
+        if (entry.bookingId) {
+          const booking = await storage.getBooking(entry.bookingId);
+          if (booking) {
+            const slot = await storage.getTimeSlot(booking.slotId);
+            if (!slot || slot.coachId !== req.coach.id) {
+              return res.status(403).json({ message: "此預約不屬於您的時段" });
+            }
+          }
+        }
         const created = await storage.createContactBook({
           ...entry,
           coachId: req.coach.id,
@@ -1091,6 +1104,10 @@ export async function registerRoutes(
   app.patch("/api/coach/contact-books/:id", isCoach, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const existing = await storage.getContactBook(id);
+      if (!existing || existing.coachId !== req.coach.id) {
+        return res.status(403).json({ message: "此聯絡簿不屬於您" });
+      }
       const updated = await storage.updateContactBook(id, req.body);
       res.json(updated);
     } catch (error) {

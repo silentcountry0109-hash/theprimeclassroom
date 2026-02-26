@@ -62,6 +62,7 @@ export interface IStorage {
   createSlot(slot: InsertTimeSlot): Promise<TimeSlot>;
   deleteSlot(id: number): Promise<void>;
 
+  getBooking(id: number): Promise<any | undefined>;
   getBookingsByParent(parentId: string): Promise<any[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   hasExistingBooking(slotId: number, childId: number): Promise<boolean>;
@@ -122,8 +123,10 @@ export interface IStorage {
   createCoachAccount(coachId: number, userId: string): Promise<Coach>;
   getCoachByUserId(userId: string): Promise<Coach | undefined>;
   getCoachSlots(coachId: number, year: number, month: number): Promise<any[]>;
+  getTimeSlot(id: number): Promise<any | undefined>;
   getSlotStudents(slotId: number): Promise<any[]>;
   createContactBook(data: InsertContactBook): Promise<ContactBook>;
+  getContactBook(id: number): Promise<ContactBook | undefined>;
   updateContactBook(id: number, data: Partial<InsertContactBook>): Promise<ContactBook>;
   getContactBooksBySlot(slotId: number, coachId: number): Promise<any[]>;
   getContactBooksByChild(childId: number): Promise<any[]>;
@@ -449,6 +452,11 @@ export class DatabaseStorage implements IStorage {
   async deleteSlot(id: number): Promise<void> {
     await db.delete(bookings).where(eq(bookings.slotId, id));
     await db.delete(timeSlots).where(eq(timeSlots.id, id));
+  }
+
+  async getBooking(id: number): Promise<any | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+    return booking;
   }
 
   async getBookingsByParent(parentId: string): Promise<any[]> {
@@ -935,6 +943,11 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getTimeSlot(id: number): Promise<any | undefined> {
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, id));
+    return slot;
+  }
+
   async getSlotStudents(slotId: number): Promise<any[]> {
     const results = await db.select({
       booking: bookings,
@@ -962,6 +975,11 @@ export class DatabaseStorage implements IStorage {
   async createContactBook(data: InsertContactBook): Promise<ContactBook> {
     const [created] = await db.insert(contactBooks).values(data).returning();
     return created;
+  }
+
+  async getContactBook(id: number): Promise<ContactBook | undefined> {
+    const [book] = await db.select().from(contactBooks).where(eq(contactBooks.id, id));
+    return book;
   }
 
   async updateContactBook(id: number, data: Partial<InsertContactBook>): Promise<ContactBook> {
