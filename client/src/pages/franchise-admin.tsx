@@ -823,6 +823,20 @@ function CoachesTab() {
     },
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ coachId, isActive }: { coachId: number; isActive: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/franchise-admin/coaches/${coachId}`, { isActive });
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      toast({ title: variables.isActive ? "老師已啟用" : "老師已停用" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
+    },
+    onError: () => {
+      toast({ title: "操作失敗", variant: "destructive" });
+    },
+  });
+
   const createAccountMutation = useMutation({
     mutationFn: async ({ coachId, username, password }: { coachId: number; username: string; password: string }) => {
       const res = await apiRequest("POST", `/api/franchise-admin/coaches/${coachId}/account`, { username, password });
@@ -882,14 +896,17 @@ function CoachesTab() {
       ) : (
         <div className="space-y-3">
           {coaches.map((coach) => (
-            <div key={coach.id} className="bg-white rounded-md border border-gray-100 p-4 flex items-center gap-4" data-testid={`franchise-coach-${coach.id}`}>
-              <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center">
-                <span className="text-lg font-serif text-tiffany">{coach.name[0]}</span>
+            <div key={coach.id} className={`bg-white rounded-md border p-4 flex items-center gap-4 ${coach.isActive === false ? "border-gray-200 opacity-60" : "border-gray-100"}`} data-testid={`franchise-coach-${coach.id}`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${coach.isActive === false ? "bg-gray-100" : "bg-tiffany/10"}`}>
+                <span className={`text-lg font-serif ${coach.isActive === false ? "text-gray-400" : "text-tiffany"}`}>{coach.name[0]}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-foreground">{coach.name}</p>
                   {coach.isCertified && <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">已認證</span>}
+                  {coach.isActive === false && (
+                    <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full" data-testid={`coach-inactive-badge-${coach.id}`}>已停用</span>
+                  )}
                   {coach.userId ? (
                     <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-account-status-${coach.id}`}>
                       <ShieldCheck className="w-3 h-3" />帳號已建立
@@ -911,6 +928,14 @@ function CoachesTab() {
                     </div>
                   </div>
                 )}
+                <div className="flex items-center gap-1.5 mr-1" data-testid={`toggle-coach-active-${coach.id}`}>
+                  <Switch
+                    checked={coach.isActive !== false}
+                    onCheckedChange={(checked) => toggleActiveMutation.mutate({ coachId: coach.id, isActive: checked })}
+                    data-testid={`switch-coach-active-${coach.id}`}
+                  />
+                  <span className="text-[11px] text-muted-foreground w-6">{coach.isActive !== false ? "啟用" : "停用"}</span>
+                </div>
                 {coach.userId ? (
                   <Button variant="outline" size="sm" onClick={() => openResetPassword(coach)} data-testid={`button-reset-password-coach-${coach.id}`}>
                     <KeyRound className="w-4 h-4 mr-1" />重設密碼

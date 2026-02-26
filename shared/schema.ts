@@ -35,6 +35,7 @@ export const coaches = pgTable("coaches", {
   photoUrl: text("photo_url"),
   specialties: text("specialties").array(),
   isCertified: boolean("is_certified").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
   rating: real("rating").default(0),
   reviewCount: integer("review_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
