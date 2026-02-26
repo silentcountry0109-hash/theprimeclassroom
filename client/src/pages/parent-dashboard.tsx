@@ -79,6 +79,7 @@ import {
   Award,
   UserCircle,
   Heart,
+  Building2,
 } from "lucide-react";
 import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -1422,83 +1423,75 @@ function BookingFlowTab() {
             .map((result) => {
             const f = result.franchise;
             const isFav = favoriteIds.includes(f.id);
+            const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null);
             return (
               <div
                 key={f.id}
-                className={`w-full bg-white rounded-xl border overflow-hidden text-left hover:border-tiffany/30 hover:shadow-sm transition-all group ${isFav ? "border-coral/30 ring-1 ring-coral/10" : "border-gray-100"}`}
+                className={`w-full bg-white rounded-xl border overflow-hidden text-left hover:border-tiffany/30 hover:shadow-sm transition-all group flex ${isFav ? "border-coral/30 ring-1 ring-coral/10" : "border-gray-100"}`}
                 data-testid={`franchise-card-${f.id}`}
               >
-                {(() => {
-                  const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null);
-                  return coverImg ? (
-                    <div className="relative cursor-pointer" onClick={() => selectFranchise(f.id)}>
-                      <img src={coverImg} alt={f.name} className="w-full aspect-[16/9] object-cover" />
-                      <button
-                        onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate({ franchiseId: f.id, isFavorite: isFav }); }}
-                        className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isFav ? "bg-coral/90 text-white" : "bg-black/30 text-white/80 hover:bg-coral/70 hover:text-white"}`}
-                        data-testid={`button-favorite-${f.id}`}
-                      >
-                        <Heart className={`w-4 h-4 ${isFav ? "fill-white" : ""}`} />
-                      </button>
-                    </div>
+                <div className="relative flex-shrink-0 w-28 sm:w-36 cursor-pointer" onClick={() => selectFranchise(f.id)}>
+                  {coverImg ? (
+                    <img src={coverImg} alt={f.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="relative">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate({ franchiseId: f.id, isFavorite: isFav }); }}
-                        className="absolute top-2 right-2 z-10"
-                        data-testid={`button-favorite-${f.id}`}
-                      >
-                        <Heart className={`w-5 h-5 transition-colors ${isFav ? "fill-coral text-coral" : "text-muted-foreground/40 hover:text-coral"}`} />
-                      </button>
+                    <div className="w-full h-full bg-gradient-to-br from-tiffany/5 to-tiffany/10 flex items-center justify-center">
+                      <Building2 className="w-8 h-8 text-tiffany/30" />
                     </div>
-                  );
-                })()}
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate({ franchiseId: f.id, isFavorite: isFav }); }}
+                    className={`absolute top-1.5 left-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all ${isFav ? "bg-coral/90 text-white" : "bg-black/30 text-white/80 hover:bg-coral/70 hover:text-white"}`}
+                    data-testid={`button-favorite-${f.id}`}
+                  >
+                    <Heart className={`w-3.5 h-3.5 ${isFav ? "fill-white" : ""}`} />
+                  </button>
+                </div>
                 <button
                   onClick={() => selectFranchise(f.id)}
-                  className="w-full text-left"
+                  className="flex-1 min-w-0 text-left"
                   data-testid={`button-select-franchise-${f.id}`}
                 >
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      {isFav && <Heart className="w-3.5 h-3.5 fill-coral text-coral flex-shrink-0" />}
-                      <h3 className="text-base font-semibold text-foreground group-hover:text-tiffany transition-colors">
-                        {f.name}
-                      </h3>
+                  <div className="p-3 sm:p-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {isFav && <Heart className="w-3 h-3 fill-coral text-coral flex-shrink-0" />}
+                        <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-tiffany transition-colors truncate">
+                          {f.name}
+                        </h3>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-tiffany transition-colors flex-shrink-0" />
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground/40 group-hover:text-tiffany transition-colors" />
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-1">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {f.address || `${f.city} ${f.district}`}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-2">
-                    {f.phone && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs sm:text-sm text-muted-foreground mb-1">
                       <span className="flex items-center gap-1">
-                        <Phone className="w-3.5 h-3.5" />
-                        {f.phone}
+                        <MapPin className="w-3 h-3" />
+                        {f.address || `${f.city} ${f.district}`}
                       </span>
-                    )}
-                    <span className="flex items-center gap-1">
-                      <GraduationCap className="w-3.5 h-3.5" />
-                      {result.coachCount} 位老師
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-tiffany flex items-center gap-1">
-                      <CalendarCheck className="w-3.5 h-3.5" />
-                      {result.availableSlots} 個可預約時段
-                    </span>
-                    {(f.rating ?? 0) >= 4.5 && (
-                      <span className="text-xs text-amber-600 flex items-center gap-0.5">
-                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                        {f.rating?.toFixed(1)}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs sm:text-sm text-muted-foreground mb-1.5">
+                      {f.phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {f.phone}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <GraduationCap className="w-3 h-3" />
+                        {result.coachCount} 位老師
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-tiffany flex items-center gap-1">
+                        <CalendarCheck className="w-3 h-3" />
+                        {result.availableSlots} 個可預約時段
+                      </span>
+                      {(f.rating ?? 0) >= 4.5 && (
+                        <span className="text-xs text-amber-600 flex items-center gap-0.5">
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          {f.rating?.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
                 </button>
               </div>
             );
