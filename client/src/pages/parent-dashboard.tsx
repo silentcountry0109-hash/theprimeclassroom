@@ -196,6 +196,7 @@ const TAB_ITEMS = [
   { id: "book", label: "預約課程", icon: CalendarDays },
   { id: "children", label: "我的孩子", icon: Users },
   { id: "bookings", label: "預約紀錄", icon: CalendarCheck },
+  { id: "contact-book", label: "聯絡簿", icon: BookOpen },
   { id: "shop", label: "商城", icon: ShoppingBag },
 ];
 
@@ -296,6 +297,7 @@ export default function ParentDashboard() {
         {activeTab === "book" && <BookingFlowTab />}
         {activeTab === "children" && <ChildrenTab />}
         {activeTab === "bookings" && <BookingsTab />}
+        {activeTab === "contact-book" && <ContactBookTab />}
         {activeTab === "shop" && <ShopTab />}
       </main>
     </div>
@@ -2334,6 +2336,229 @@ interface CartItemWithProduct extends CartItem {
 interface OrderWithItems extends Order {
   items?: OrderItem[];
   userName?: string;
+}
+
+interface ContactBookWithDetails {
+  id: number;
+  bookingId: number | null;
+  coachId: number;
+  childId: number;
+  lessonDate: string;
+  lessonUnit: string;
+  lessonProgress: string | null;
+  performance: string;
+  classNotes: string | null;
+  quizScore: number | null;
+  quizTotal: number | null;
+  homework: string | null;
+  teacherRemarks: string | null;
+  createdAt: string | null;
+  coachName: string;
+  childName?: string;
+  childGrade?: number;
+  childGender?: string;
+}
+
+const PERFORMANCE_MAP: Record<string, { label: string; color: string; bgColor: string }> = {
+  excellent: { label: "優秀", color: "text-green-700 dark:text-green-300", bgColor: "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700" },
+  good: { label: "良好", color: "text-tiffany dark:text-tiffany", bgColor: "bg-tiffany/10 border-tiffany/20" },
+  fair: { label: "尚可", color: "text-amber-700 dark:text-amber-300", bgColor: "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700" },
+  needs_improvement: { label: "需加強", color: "text-red-700 dark:text-red-300", bgColor: "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700" },
+};
+
+function ContactBookTab() {
+  const [selectedChildId, setSelectedChildId] = useState<string>("all");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const { data: childrenList = [] } = useQuery<Child[]>({
+    queryKey: ["/api/children"],
+  });
+
+  const { data: contactBooksRaw = [], isLoading } = useQuery<ContactBookWithDetails[]>({
+    queryKey: ["/api/parent/contact-books"],
+  });
+
+  const contactBooks = useMemo(() => {
+    if (selectedChildId === "all") return contactBooksRaw;
+    return contactBooksRaw.filter((cb) => cb.childId === parseInt(selectedChildId));
+  }, [contactBooksRaw, selectedChildId]);
+
+  const toggleExpand = (id: number) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2" data-testid="text-contact-book-title">
+          <BookOpen className="w-5 h-5 text-tiffany" />
+          聯絡簿
+        </h2>
+        {childrenList.length > 1 && (
+          <Select value={selectedChildId} onValueChange={setSelectedChildId}>
+            <SelectTrigger className="w-36" data-testid="select-contact-book-child">
+              <SelectValue placeholder="所有孩子" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">所有孩子</SelectItem>
+              {childrenList.map((child) => (
+                <SelectItem key={child.id} value={child.id.toString()}>
+                  {child.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {contactBooks.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center" data-testid="contact-book-empty">
+          <BookOpen className="w-12 h-12 text-muted-foreground/15 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-foreground mb-1">
+            目前還沒有聯絡簿
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            老師在上課後會為孩子填寫聯絡簿，屆時會顯示在這裡
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {contactBooks.map((cb) => {
+            const perf = PERFORMANCE_MAP[cb.performance] || { label: cb.performance, color: "text-muted-foreground", bgColor: "bg-gray-50 border-gray-200" };
+            const isExpanded = expandedId === cb.id;
+            const avatarSrc = cb.childGender === "female" ? avatarGirlPath : avatarBoyPath;
+            const dateObj = new Date(cb.lessonDate + "T00:00:00");
+            const dateLabel = `${dateObj.getFullYear()}/${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+
+            return (
+              <button
+                key={cb.id}
+                onClick={() => toggleExpand(cb.id)}
+                className="w-full text-left bg-white rounded-xl border border-gray-100 hover:border-tiffany/20 transition-colors"
+                data-testid={`contact-book-card-${cb.id}`}
+              >
+                <div className="p-4">
+                  <div className="flex items-start gap-3">
+                    {cb.childName && (
+                      <img
+                        src={avatarSrc}
+                        alt={cb.childName}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 mt-0.5"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {cb.childName && (
+                            <span className="text-sm font-semibold text-foreground truncate" data-testid={`text-cb-child-${cb.id}`}>
+                              {cb.childName}
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border ${perf.bgColor} ${perf.color}`} data-testid={`badge-performance-${cb.id}`}>
+                            {perf.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0">
+                          <CalendarDays className="w-3 h-3" />
+                          <span data-testid={`text-cb-date-${cb.id}`}>{dateLabel}</span>
+                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </div>
+                      </div>
+                      <div className="mt-1.5 space-y-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">單元：</span>
+                          <span className="text-foreground font-medium truncate" data-testid={`text-cb-unit-${cb.id}`}>{cb.lessonUnit}</span>
+                        </div>
+                        {cb.lessonProgress && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">進度：</span>
+                            <span className="text-foreground truncate" data-testid={`text-cb-progress-${cb.id}`}>{cb.lessonProgress}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 text-xs flex-wrap">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <GraduationCap className="w-3 h-3 text-tiffany" />
+                            {cb.coachName} 老師
+                          </span>
+                          {cb.quizScore !== null && cb.quizScore !== undefined && (
+                            <span className="flex items-center gap-1 text-muted-foreground" data-testid={`text-cb-score-${cb.id}`}>
+                              <FileText className="w-3 h-3" />
+                              小考 {cb.quizScore}/{cb.quizTotal || 100}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-4 pt-3 border-t border-gray-50 space-y-3" data-testid={`contact-book-detail-${cb.id}`}>
+                      {cb.classNotes && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                            <Pencil className="w-3 h-3" />
+                            課堂筆記
+                          </p>
+                          <p className="text-sm text-foreground leading-relaxed bg-gray-50/80 rounded-lg p-3" data-testid={`text-cb-notes-${cb.id}`}>
+                            {cb.classNotes}
+                          </p>
+                        </div>
+                      )}
+                      {cb.homework && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                            <FileText className="w-3 h-3" />
+                            回家作業
+                          </p>
+                          <p className="text-sm text-foreground leading-relaxed bg-gray-50/80 rounded-lg p-3" data-testid={`text-cb-homework-${cb.id}`}>
+                            {cb.homework}
+                          </p>
+                        </div>
+                      )}
+                      {cb.teacherRemarks && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                            <Bell className="w-3 h-3" />
+                            老師備註
+                          </p>
+                          <p className="text-sm text-foreground leading-relaxed bg-tiffany/5 rounded-lg p-3 border border-tiffany/10" data-testid={`text-cb-remarks-${cb.id}`}>
+                            {cb.teacherRemarks}
+                          </p>
+                        </div>
+                      )}
+                      {cb.quizScore !== null && cb.quizScore !== undefined && (
+                        <div className="flex items-center gap-3 p-3 bg-gray-50/80 rounded-lg">
+                          <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                            <Award className="w-5 h-5 text-tiffany" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">小考成績</p>
+                            <p className="text-lg font-bold text-foreground" data-testid={`text-cb-score-detail-${cb.id}`}>
+                              {cb.quizScore} <span className="text-sm font-normal text-muted-foreground">/ {cb.quizTotal || 100}</span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatPrice(cents: number) {

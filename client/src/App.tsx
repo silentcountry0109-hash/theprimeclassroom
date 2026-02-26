@@ -15,6 +15,8 @@ import HqLogin from "@/pages/hq-login";
 import ParentLogin from "@/pages/parent-login";
 import SearchResults from "@/pages/search-results";
 import ClassroomDetail from "@/pages/classroom-detail";
+import CoachLogin from "@/pages/coach-login";
+import CoachDashboard from "@/pages/coach-dashboard";
 
 function LoadingScreen() {
   return (
@@ -70,6 +72,8 @@ function Router() {
       <Route path="/hq-login" component={HqLogin} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/franchise-admin" component={FranchiseAdminDashboard} />
+      <Route path="/coach-login" component={CoachLogin} />
+      <Route path="/coach-dashboard" component={CoachDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

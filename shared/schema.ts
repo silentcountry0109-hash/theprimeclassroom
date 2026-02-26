@@ -181,6 +181,27 @@ export const insertSiteContentSchema = createInsertSchema(siteContent).omit({ id
 export type SiteContent = typeof siteContent.$inferSelect;
 export type InsertSiteContent = z.infer<typeof insertSiteContentSchema>;
 
+export const contactBooks = pgTable("contact_books", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").references(() => bookings.id),
+  coachId: integer("coach_id").references(() => coaches.id).notNull(),
+  childId: integer("child_id").references(() => children.id).notNull(),
+  lessonDate: text("lesson_date").notNull(),
+  lessonUnit: text("lesson_unit").notNull(),
+  lessonProgress: text("lesson_progress"),
+  performance: text("performance").notNull(),
+  classNotes: text("class_notes"),
+  quizScore: integer("quiz_score"),
+  quizTotal: integer("quiz_total").default(100),
+  homework: text("homework"),
+  teacherRemarks: text("teacher_remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertContactBookSchema = createInsertSchema(contactBooks).omit({ id: true, createdAt: true });
+export type ContactBook = typeof contactBooks.$inferSelect;
+export type InsertContactBook = z.infer<typeof insertContactBookSchema>;
+
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({ id: true, createdAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });

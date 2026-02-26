@@ -1,6 +1,6 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
-  products, cartItems, orders, orderItems, siteContent,
+  products, cartItems, orders, orderItems, siteContent, contactBooks,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -16,6 +16,7 @@ import {
   type OrderItem, type InsertOrderItem,
   type User,
   type SiteContent,
+  type ContactBook, type InsertContactBook,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte } from "drizzle-orm";
@@ -117,6 +118,18 @@ export interface IStorage {
   getOrder(id: number): Promise<Order | undefined>;
   getOrderItems(orderId: number): Promise<OrderItem[]>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
+
+  createCoachAccount(coachId: number, userId: string): Promise<Coach>;
+  getCoachByUserId(userId: string): Promise<Coach | undefined>;
+  getCoachSlots(coachId: number, year: number, month: number): Promise<any[]>;
+  getSlotStudents(slotId: number): Promise<any[]>;
+  createContactBook(data: InsertContactBook): Promise<ContactBook>;
+  updateContactBook(id: number, data: Partial<InsertContactBook>): Promise<ContactBook>;
+  getContactBooksBySlot(slotId: number, coachId: number): Promise<any[]>;
+  getContactBooksByChild(childId: number): Promise<any[]>;
+  getContactBooksByParent(parentId: string): Promise<any[]>;
+  getCoachStudents(coachId: number): Promise<any[]>;
+  getStudentContactBookHistory(coachId: number, childId: number): Promise<any[]>;
 
   getAllSiteContent(): Promise<SiteContent[]>;
   getSiteContent(sectionKey: string): Promise<SiteContent | undefined>;
@@ -883,6 +896,183 @@ export class DatabaseStorage implements IStorage {
       .where(lte(children.grade, 6))
       .returning();
     return result.length;
+  }
+
+  async createCoachAccount(coachId: number, userId: string): Promise<Coach> {
+    const [updated] = await db.update(coaches).set({ userId }).where(eq(coaches.id, coachId)).returning();
+    return updated;
+  }
+
+  async getCoachByUserId(userId: string): Promise<Coach | undefined> {
+    const [coach] = await db.select().from(coaches).where(eq(coaches.userId, userId));
+    return coach;
+  }
+
+  async getCoachSlots(coachId: number, year: number, month: number): Promise<any[]> {
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endYear = month === 12 ? year + 1 : year;
+    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+
+    const slots = await db.select({
+      slot: timeSlots,
+      franchise: franchises,
+    })
+      .from(timeSlots)
+      .leftJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
+      .where(
+        and(
+          eq(timeSlots.coachId, coachId),
+          gte(timeSlots.date, startDate),
+          sql`${timeSlots.date} < ${endDate}`
+        )
+      )
+      .orderBy(timeSlots.date, timeSlots.startTime);
+
+    return slots.map(s => ({
+      ...s.slot,
+      franchiseName: s.franchise?.name,
+    }));
+  }
+
+  async getSlotStudents(slotId: number): Promise<any[]> {
+    const results = await db.select({
+      booking: bookings,
+      child: children,
+    })
+      .from(bookings)
+      .innerJoin(children, eq(bookings.childId, children.id))
+      .where(
+        and(
+          eq(bookings.slotId, slotId),
+          eq(bookings.status, "confirmed")
+        )
+      );
+
+    return results.map(r => ({
+      bookingId: r.booking.id,
+      childId: r.child.id,
+      childName: r.child.name,
+      childGrade: r.child.grade,
+      childGender: r.child.gender,
+      parentId: r.booking.parentId,
+    }));
+  }
+
+  async createContactBook(data: InsertContactBook): Promise<ContactBook> {
+    const [created] = await db.insert(contactBooks).values(data).returning();
+    return created;
+  }
+
+  async updateContactBook(id: number, data: Partial<InsertContactBook>): Promise<ContactBook> {
+    const [updated] = await db.update(contactBooks).set(data).where(eq(contactBooks.id, id)).returning();
+    return updated;
+  }
+
+  async getContactBooksBySlot(slotId: number, coachId: number): Promise<any[]> {
+    const slotBookings = await db.select().from(bookings).where(
+      and(eq(bookings.slotId, slotId), eq(bookings.status, "confirmed"))
+    );
+    const bookingIds = slotBookings.map(b => b.id);
+    if (bookingIds.length === 0) return [];
+
+    const results = await db.select({
+      contactBook: contactBooks,
+      child: children,
+    })
+      .from(contactBooks)
+      .innerJoin(children, eq(contactBooks.childId, children.id))
+      .where(
+        and(
+          eq(contactBooks.coachId, coachId),
+          inArray(contactBooks.bookingId, bookingIds)
+        )
+      );
+
+    return results.map(r => ({
+      ...r.contactBook,
+      childName: r.child.name,
+      childGrade: r.child.grade,
+      childGender: r.child.gender,
+    }));
+  }
+
+  async getContactBooksByChild(childId: number): Promise<any[]> {
+    const results = await db.select({
+      contactBook: contactBooks,
+      coach: coaches,
+    })
+      .from(contactBooks)
+      .innerJoin(coaches, eq(contactBooks.coachId, coaches.id))
+      .where(eq(contactBooks.childId, childId))
+      .orderBy(desc(contactBooks.createdAt));
+
+    return results.map(r => ({
+      ...r.contactBook,
+      coachName: r.coach.name,
+    }));
+  }
+
+  async getContactBooksByParent(parentId: string): Promise<any[]> {
+    const parentChildren = await db.select().from(children).where(eq(children.parentId, parentId));
+    if (parentChildren.length === 0) return [];
+
+    const childIds = parentChildren.map(c => c.id);
+    const results = await db.select({
+      contactBook: contactBooks,
+      coach: coaches,
+      child: children,
+    })
+      .from(contactBooks)
+      .innerJoin(coaches, eq(contactBooks.coachId, coaches.id))
+      .innerJoin(children, eq(contactBooks.childId, children.id))
+      .where(inArray(contactBooks.childId, childIds))
+      .orderBy(desc(contactBooks.createdAt));
+
+    return results.map(r => ({
+      ...r.contactBook,
+      coachName: r.coach.name,
+      childName: r.child.name,
+      childGrade: r.child.grade,
+      childGender: r.child.gender,
+    }));
+  }
+
+  async getCoachStudents(coachId: number): Promise<any[]> {
+    const coachSlots = await db.select({ id: timeSlots.id }).from(timeSlots).where(eq(timeSlots.coachId, coachId));
+    if (coachSlots.length === 0) return [];
+
+    const slotIds = coachSlots.map(s => s.id);
+    const results = await db.select({
+      child: children,
+      bookingCount: sql<number>`count(${bookings.id})::int`,
+    })
+      .from(bookings)
+      .innerJoin(children, eq(bookings.childId, children.id))
+      .where(
+        and(
+          inArray(bookings.slotId, slotIds),
+          eq(bookings.status, "confirmed")
+        )
+      )
+      .groupBy(children.id);
+
+    return results.map(r => ({
+      ...r.child,
+      bookingCount: r.bookingCount,
+    }));
+  }
+
+  async getStudentContactBookHistory(coachId: number, childId: number): Promise<any[]> {
+    return db.select()
+      .from(contactBooks)
+      .where(
+        and(
+          eq(contactBooks.coachId, coachId),
+          eq(contactBooks.childId, childId)
+        )
+      )
+      .orderBy(desc(contactBooks.createdAt));
   }
 }
 

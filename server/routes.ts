@@ -66,6 +66,18 @@ const isFranchiseAdmin: RequestHandler = async (req: any, res, next) => {
   next();
 };
 
+const isCoach: RequestHandler = async (req: any, res, next) => {
+  const userId = getSessionUserId(req);
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  const user = await authStorage.getUser(userId);
+  if (!user || user.role !== "coach") return res.status(403).json({ message: "Forbidden" });
+  const coach = await storage.getCoachByUserId(userId);
+  if (!coach) return res.status(403).json({ message: "找不到老師資料" });
+  req.currentUser = user;
+  req.coach = coach;
+  next();
+};
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -91,7 +103,7 @@ export async function registerRoutes(
       if (!valid) {
         return res.status(401).json({ message: "帳號或密碼錯誤" });
       }
-      if (user.role !== "admin" && user.role !== "franchise_admin" && user.role !== "parent") {
+      if (user.role !== "admin" && user.role !== "franchise_admin" && user.role !== "parent" && user.role !== "coach") {
         return res.status(403).json({ message: "帳號或密碼錯誤" });
       }
       req.session.credentialUserId = user.id;
@@ -944,6 +956,201 @@ export async function registerRoutes(
       res.json(bookingList);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // ========== Franchise Admin: Coach Account Management ==========
+  app.post("/api/franchise-admin/coaches/:id/account", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coachId = parseInt(req.params.id);
+      const { username, password } = req.body;
+      if (!username || !password) return res.status(400).json({ message: "請輸入帳號和密碼" });
+      if (password.length < 6) return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+
+      const coach = await storage.getCoach(coachId);
+      if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
+      if (coach.userId) return res.status(400).json({ message: "此老師已有帳號" });
+
+      const [existing] = await db.select().from(users).where(eq(users.username, username));
+      if (existing) return res.status(400).json({ message: "此帳號已被使用" });
+
+      const hash = await bcrypt.hash(password, 10);
+      const userId = `coach-${username}-${Date.now()}`;
+      await db.insert(users).values({
+        id: userId,
+        username,
+        passwordHash: hash,
+        firstName: coach.name,
+        role: "coach",
+        franchiseId: req.franchiseId,
+      });
+
+      const updated = await storage.createCoachAccount(coachId, userId);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "建立帳號失敗" });
+    }
+  });
+
+  app.patch("/api/franchise-admin/coaches/:id/account", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coachId = parseInt(req.params.id);
+      const { password } = req.body;
+      if (!password) return res.status(400).json({ message: "請輸入新密碼" });
+      if (password.length < 6) return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+
+      const coach = await storage.getCoach(coachId);
+      if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
+      if (!coach.userId) return res.status(400).json({ message: "此老師尚未建立帳號" });
+
+      const hash = await bcrypt.hash(password, 10);
+      await db.update(users).set({ passwordHash: hash }).where(eq(users.id, coach.userId));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "重設密碼失敗" });
+    }
+  });
+
+  // ========== Coach: Auth ==========
+  app.get("/api/coach-user", async (req: any, res) => {
+    const credId = req.session?.credentialUserId;
+    if (!credId) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const user = await authStorage.getUser(credId);
+      if (!user || user.role !== "coach") return res.status(401).json({ message: "Unauthorized" });
+      const coach = await storage.getCoachByUserId(credId);
+      const { passwordHash: _, ...safeUser } = user as any;
+      res.json({ ...safeUser, coach });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // ========== Coach: Calendar & Students ==========
+  app.get("/api/coach/calendar/:year/:month", isCoach, async (req: any, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      const slots = await storage.getCoachSlots(req.coach.id, year, month);
+      res.json(slots);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch calendar" });
+    }
+  });
+
+  app.get("/api/coach/slots/:slotId/students", isCoach, async (req: any, res) => {
+    try {
+      const slotId = parseInt(req.params.slotId);
+      const students = await storage.getSlotStudents(slotId);
+      res.json(students);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  app.get("/api/coach/students", isCoach, async (req: any, res) => {
+    try {
+      const students = await storage.getCoachStudents(req.coach.id);
+      res.json(students);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  app.get("/api/coach/students/:childId/history", isCoach, async (req: any, res) => {
+    try {
+      const childId = parseInt(req.params.childId);
+      const history = await storage.getStudentContactBookHistory(req.coach.id, childId);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch history" });
+    }
+  });
+
+  // ========== Coach: Contact Books ==========
+  app.post("/api/coach/contact-books", isCoach, async (req: any, res) => {
+    try {
+      const { entries } = req.body;
+      if (!entries || !Array.isArray(entries) || entries.length === 0) {
+        return res.status(400).json({ message: "請提供聯絡簿內容" });
+      }
+      const results = [];
+      for (const entry of entries) {
+        const created = await storage.createContactBook({
+          ...entry,
+          coachId: req.coach.id,
+        });
+        results.push(created);
+      }
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ message: "儲存聯絡簿失敗" });
+    }
+  });
+
+  app.patch("/api/coach/contact-books/:id", isCoach, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateContactBook(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "更新聯絡簿失敗" });
+    }
+  });
+
+  app.get("/api/coach/contact-books/slot/:slotId", isCoach, async (req: any, res) => {
+    try {
+      const slotId = parseInt(req.params.slotId);
+      const books = await storage.getContactBooksBySlot(slotId, req.coach.id);
+      res.json(books);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contact books" });
+    }
+  });
+
+  // ========== Parent: Contact Books ==========
+  app.get("/api/parent/contact-books", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const books = await storage.getContactBooksByParent(userId);
+      res.json(books);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contact books" });
+    }
+  });
+
+  app.get("/api/parent/contact-books/child/:childId", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const childId = parseInt(req.params.childId);
+      const parentChildren = await storage.getChildrenByParent(req.currentUser.id);
+      if (!parentChildren.some(c => c.id === childId)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const books = await storage.getContactBooksByChild(childId);
+      res.json(books);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contact books" });
+    }
+  });
+
+  // ========== Coach: Profile ==========
+  app.get("/api/coach/my-info", isCoach, async (req: any, res) => {
+    try {
+      const coach = req.coach;
+      const franchise = coach.franchiseId ? await storage.getFranchise(coach.franchiseId) : null;
+      res.json({ coach, franchise });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch info" });
+    }
+  });
+
+  app.patch("/api/coach/my-info", isCoach, async (req: any, res) => {
+    try {
+      const { bio, specialties } = req.body;
+      const updated = await storage.updateCoach(req.coach.id, { bio, specialties });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "更新資料失敗" });
     }
   });
 

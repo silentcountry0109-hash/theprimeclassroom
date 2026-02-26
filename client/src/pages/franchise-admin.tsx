@@ -57,6 +57,9 @@ import {
   Calendar,
   Percent,
   ChevronRight,
+  KeyRound,
+  UserPlus,
+  ShieldCheck,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -750,12 +753,23 @@ function CoachesTab() {
   });
   const [specialtyInput, setSpecialtyInput] = useState("");
 
+  const [accountDialogCoach, setAccountDialogCoach] = useState<Coach | null>(null);
+  const [accountMode, setAccountMode] = useState<"create" | "reset">("create");
+  const [accountUsername, setAccountUsername] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
 
   const resetForm = () => {
     setFormData({ name: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0 });
     setSpecialtyInput("");
     setEditingCoach(null);
+  };
+
+  const resetAccountForm = () => {
+    setAccountDialogCoach(null);
+    setAccountUsername("");
+    setAccountPassword("");
   };
 
   const openAdd = () => { resetForm(); setShowDialog(true); };
@@ -766,6 +780,20 @@ function CoachesTab() {
       isCertified: c.isCertified, rating: c.rating || 0, reviewCount: c.reviewCount || 0,
     });
     setShowDialog(true);
+  };
+
+  const openCreateAccount = (c: Coach) => {
+    setAccountMode("create");
+    setAccountDialogCoach(c);
+    setAccountUsername("");
+    setAccountPassword("");
+  };
+
+  const openResetPassword = (c: Coach) => {
+    setAccountMode("reset");
+    setAccountDialogCoach(c);
+    setAccountUsername("");
+    setAccountPassword("");
   };
 
   const saveMutation = useMutation({
@@ -792,6 +820,43 @@ function CoachesTab() {
       toast({ title: "老師已刪除" });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
+    },
+  });
+
+  const createAccountMutation = useMutation({
+    mutationFn: async ({ coachId, username, password }: { coachId: number; username: string; password: string }) => {
+      const res = await apiRequest("POST", `/api/franchise-admin/coaches/${coachId}/account`, { username, password });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "建立帳號失敗");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "帳號建立成功", description: "老師現在可以使用帳號密碼登入系統" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
+      resetAccountForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "建立帳號失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ coachId, password }: { coachId: number; password: string }) => {
+      const res = await apiRequest("PATCH", `/api/franchise-admin/coaches/${coachId}/account`, { password });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "重設密碼失敗");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "密碼已重設", description: "請通知老師使用新密碼登入" });
+      resetAccountForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "重設密碼失敗", description: error.message, variant: "destructive" });
     },
   });
 
@@ -825,6 +890,15 @@ function CoachesTab() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-foreground">{coach.name}</p>
                   {coach.isCertified && <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">已認證</span>}
+                  {coach.userId ? (
+                    <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-account-status-${coach.id}`}>
+                      <ShieldCheck className="w-3 h-3" />帳號已建立
+                    </span>
+                  ) : (
+                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" data-testid={`coach-account-status-${coach.id}`}>
+                      未建立帳號
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">{coach.specialties?.join(" · ") || "一般數學教學"}</p>
               </div>
@@ -836,6 +910,15 @@ function CoachesTab() {
                       <span className="text-sm font-medium">{Number(coach.rating).toFixed(1)}</span>
                     </div>
                   </div>
+                )}
+                {coach.userId ? (
+                  <Button variant="outline" size="sm" onClick={() => openResetPassword(coach)} data-testid={`button-reset-password-coach-${coach.id}`}>
+                    <KeyRound className="w-4 h-4 mr-1" />重設密碼
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => openCreateAccount(coach)} data-testid={`button-create-account-coach-${coach.id}`}>
+                    <UserPlus className="w-4 h-4 mr-1" />建立帳號
+                  </Button>
                 )}
                 <Button variant="outline" size="icon" onClick={() => openEdit(coach)} data-testid={`button-edit-franchise-coach-${coach.id}`}>
                   <Edit className="w-4 h-4" />
@@ -890,6 +973,77 @@ function CoachesTab() {
             <Button onClick={() => saveMutation.mutate(formData)} disabled={!formData.name || saveMutation.isPending} data-testid="button-submit-franchise-coach">
               {saveMutation.isPending ? "儲存中..." : editingCoach ? "更新" : "新增"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!accountDialogCoach} onOpenChange={(open) => { if (!open) resetAccountForm(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {accountMode === "create" ? "建立老師帳號" : "重設老師密碼"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-md">
+              <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center">
+                <span className="text-base font-serif text-tiffany">{accountDialogCoach?.name[0]}</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground" data-testid="account-dialog-coach-name">{accountDialogCoach?.name}</p>
+                <p className="text-xs text-muted-foreground">{accountDialogCoach?.specialties?.join(" · ") || "一般數學教學"}</p>
+              </div>
+            </div>
+            {accountMode === "create" && (
+              <div>
+                <Label>帳號 *</Label>
+                <Input
+                  value={accountUsername}
+                  onChange={(e) => setAccountUsername(e.target.value)}
+                  placeholder="設定登入帳號"
+                  data-testid="input-coach-account-username"
+                />
+                <p className="text-xs text-muted-foreground mt-1">帳號建立後無法變更</p>
+              </div>
+            )}
+            <div>
+              <Label>{accountMode === "create" ? "密碼 *" : "新密碼 *"}</Label>
+              <Input
+                type="password"
+                value={accountPassword}
+                onChange={(e) => setAccountPassword(e.target.value)}
+                placeholder={accountMode === "create" ? "設定登入密碼（至少 6 個字元）" : "輸入新密碼（至少 6 個字元）"}
+                data-testid="input-coach-account-password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={resetAccountForm} data-testid="button-cancel-coach-account">取消</Button>
+            {accountMode === "create" ? (
+              <Button
+                onClick={() => {
+                  if (accountDialogCoach) {
+                    createAccountMutation.mutate({ coachId: accountDialogCoach.id, username: accountUsername, password: accountPassword });
+                  }
+                }}
+                disabled={!accountUsername || accountPassword.length < 6 || createAccountMutation.isPending}
+                data-testid="button-submit-coach-account"
+              >
+                {createAccountMutation.isPending ? "建立中..." : "建立帳號"}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  if (accountDialogCoach) {
+                    resetPasswordMutation.mutate({ coachId: accountDialogCoach.id, password: accountPassword });
+                  }
+                }}
+                disabled={accountPassword.length < 6 || resetPasswordMutation.isPending}
+                data-testid="button-submit-reset-password"
+              >
+                {resetPasswordMutation.isPending ? "重設中..." : "重設密碼"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
