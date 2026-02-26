@@ -70,7 +70,7 @@ export default function CoachDashboard() {
 
   const handleLogout = async () => {
     await fetch("/api/credential-logout", { method: "POST", credentials: "include" });
-    navigate("/coach-login");
+    navigate("/franchise-login");
   };
 
   if (isLoading) {
@@ -89,7 +89,7 @@ export default function CoachDashboard() {
   }
 
   if (!userData) {
-    navigate("/coach-login");
+    navigate("/franchise-login");
     return null;
   }
 

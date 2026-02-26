@@ -3,14 +3,25 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, User, ArrowLeft, Building2, ShieldCheck } from "lucide-react";
+import { Lock, User, ArrowLeft, Building2, ShieldCheck, GraduationCap, BookOpen } from "lucide-react";
+
+type LoginMode = "franchise" | "coach";
 
 export default function FranchiseLogin() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const initialMode: LoginMode = location === "/coach-login" ? "coach" : "franchise";
+  const [mode, setMode] = useState<LoginMode>(initialMode);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const switchMode = (newMode: LoginMode) => {
+    setMode(newMode);
+    setUsername("");
+    setPassword("");
+    setError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,16 +40,26 @@ export default function FranchiseLogin() {
         setLoading(false);
         return;
       }
-      if (data.role === "franchise_admin") {
-        navigate("/franchise-admin");
+      if (mode === "franchise") {
+        if (data.role === "franchise_admin") {
+          navigate("/franchise-admin");
+        } else {
+          setError("此帳號不是分校管理帳號");
+        }
       } else {
-        setError("此帳號不是分校管理帳號");
+        if (data.role === "coach") {
+          navigate("/coach-dashboard");
+        } else {
+          setError("此帳號不是老師帳號");
+        }
       }
     } catch {
       setError("網路錯誤，請稍後再試");
     }
     setLoading(false);
   };
+
+  const isFranchise = mode === "franchise";
 
   return (
     <div className="min-h-screen bg-[#1a2332] flex flex-col relative overflow-hidden">
@@ -64,15 +85,49 @@ export default function FranchiseLogin() {
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-tiffany/10 border border-tiffany/20 mb-4">
-              <Building2 className="w-7 h-7 text-tiffany" />
+              {isFranchise
+                ? <Building2 className="w-7 h-7 text-tiffany" />
+                : <GraduationCap className="w-7 h-7 text-tiffany" />
+              }
             </div>
             <h1 className="font-serif text-2xl tracking-[0.15em] text-white mb-2">
               質數教室
             </h1>
             <div className="inline-flex items-center gap-1.5 text-tiffany text-sm font-medium">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              分校管理系統
+              {isFranchise
+                ? <><ShieldCheck className="w-3.5 h-3.5" />分校管理系統</>
+                : <><BookOpen className="w-3.5 h-3.5" />老師登入</>
+              }
             </div>
+          </div>
+
+          <div className="flex mb-4 bg-[#222f3e] rounded-lg border border-white/10 p-1">
+            <button
+              type="button"
+              onClick={() => switchMode("franchise")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-sm font-medium transition-all ${
+                isFranchise
+                  ? "bg-tiffany text-[#1a2332]"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+              data-testid="tab-franchise-login"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              分校主任
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode("coach")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-sm font-medium transition-all ${
+                !isFranchise
+                  ? "bg-tiffany text-[#1a2332]"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+              data-testid="tab-coach-login"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              老師
+            </button>
           </div>
 
           <div className="bg-[#222f3e] rounded-xl border border-white/10 shadow-2xl p-6 backdrop-blur-sm">
@@ -85,7 +140,7 @@ export default function FranchiseLogin() {
                     id="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="請輸入分校帳號"
+                    placeholder={isFranchise ? "請輸入分校帳號" : "請輸入老師帳號"}
                     className="pl-10 bg-[#1a2332] border-white/10 text-white placeholder:text-gray-500 focus:border-tiffany/50 focus:ring-tiffany/20"
                     autoComplete="username"
                     data-testid="input-franchise-username"
@@ -121,13 +176,16 @@ export default function FranchiseLogin() {
                 disabled={loading || !username || !password}
                 data-testid="button-franchise-login"
               >
-                {loading ? "登入中..." : "登入管理系統"}
+                {loading ? "登入中..." : isFranchise ? "登入管理系統" : "登入"}
               </Button>
             </form>
           </div>
 
           <p className="text-center text-xs text-gray-500 mt-6">
-            如需開通帳號，請聯繫總部管理員
+            {isFranchise
+              ? "如需開通帳號，請聯繫總部管理員"
+              : "如需開通帳號，請聯繫分校主任"
+            }
           </p>
         </div>
       </div>
