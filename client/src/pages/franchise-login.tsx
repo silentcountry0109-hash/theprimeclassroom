@@ -3,7 +3,8 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, User, ArrowLeft, Building2, ShieldCheck, GraduationCap, BookOpen } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, User, ArrowLeft, Building2, ShieldCheck, GraduationCap, BookOpen, Eye, EyeOff } from "lucide-react";
 
 type LoginMode = "franchise" | "coach";
 
@@ -11,15 +12,23 @@ export default function FranchiseLogin() {
   const [location, navigate] = useLocation();
   const initialMode: LoginMode = location === "/coach-login" ? "coach" : "franchise";
   const [mode, setMode] = useState<LoginMode>(initialMode);
-  const [username, setUsername] = useState("");
+  const lsKey = mode === "franchise" ? "rememberedFranchiseUsername" : "rememberedCoachUsername";
+  const savedUsername = localStorage.getItem(lsKey) || "";
+  const [username, setUsername] = useState(savedUsername);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(!!savedUsername);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const switchMode = (newMode: LoginMode) => {
     setMode(newMode);
-    setUsername("");
+    const key = newMode === "franchise" ? "rememberedFranchiseUsername" : "rememberedCoachUsername";
+    const saved = localStorage.getItem(key) || "";
+    setUsername(saved);
+    setRememberMe(!!saved);
     setPassword("");
+    setShowPassword(false);
     setError("");
   };
 
@@ -39,6 +48,12 @@ export default function FranchiseLogin() {
         setError(data.message || "登入失敗");
         setLoading(false);
         return;
+      }
+      const currentKey = mode === "franchise" ? "rememberedFranchiseUsername" : "rememberedCoachUsername";
+      if (rememberMe) {
+        localStorage.setItem(currentKey, username);
+      } else {
+        localStorage.removeItem(currentKey);
       }
       if (mode === "franchise") {
         if (data.role === "franchise_admin") {
@@ -153,16 +168,41 @@ export default function FranchiseLogin() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="請輸入密碼"
-                    className="pl-10 bg-[#1a2332] border-white/10 text-white placeholder:text-gray-500 focus:border-tiffany/50 focus:ring-tiffany/20"
+                    className="pl-10 pr-10 bg-[#1a2332] border-white/10 text-white placeholder:text-gray-500 focus:border-tiffany/50 focus:ring-tiffany/20"
                     autoComplete="current-password"
                     data-testid="input-franchise-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                    tabIndex={-1}
+                    data-testid="button-toggle-password"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => {
+                    setRememberMe(!!checked);
+                    if (!checked) {
+                      const key = mode === "franchise" ? "rememberedFranchiseUsername" : "rememberedCoachUsername";
+                      localStorage.removeItem(key);
+                    }
+                  }}
+                  className="data-[state=checked]:bg-tiffany data-[state=checked]:border-tiffany border-white/20"
+                  data-testid="checkbox-remember-me"
+                />
+                <span className="text-sm text-gray-400">記住帳號</span>
+              </label>
 
               {error && (
                 <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2" data-testid="text-login-error">

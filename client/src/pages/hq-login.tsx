@@ -3,12 +3,16 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, User, ArrowLeft, Crown, Shield } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, User, ArrowLeft, Crown, Shield, Eye, EyeOff } from "lucide-react";
 
 export default function HqLogin() {
   const [, navigate] = useLocation();
-  const [username, setUsername] = useState("");
+  const savedHqUsername = localStorage.getItem("rememberedHqUsername") || "";
+  const [username, setUsername] = useState(savedHqUsername);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(!!savedHqUsername);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -30,6 +34,11 @@ export default function HqLogin() {
         return;
       }
       if (data.role === "admin") {
+        if (rememberMe) {
+          localStorage.setItem("rememberedHqUsername", username);
+        } else {
+          localStorage.removeItem("rememberedHqUsername");
+        }
         navigate("/admin");
       } else {
         setError("此帳號不是總部管理員帳號");
@@ -97,16 +106,38 @@ export default function HqLogin() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="請輸入密碼"
-                    className="pl-10 bg-[#0f1419] border-white/10 text-white placeholder:text-gray-600 focus:border-amber-500/50 focus:ring-amber-500/20"
+                    className="pl-10 pr-10 bg-[#0f1419] border-white/10 text-white placeholder:text-gray-600 focus:border-amber-500/50 focus:ring-amber-500/20"
                     autoComplete="current-password"
                     data-testid="input-hq-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors"
+                    tabIndex={-1}
+                    data-testid="button-toggle-password"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => {
+                    setRememberMe(!!checked);
+                    if (!checked) localStorage.removeItem("rememberedHqUsername");
+                  }}
+                  className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 border-white/20"
+                  data-testid="checkbox-remember-me"
+                />
+                <span className="text-sm text-gray-400">記住帳號</span>
+              </label>
 
               {error && (
                 <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2" data-testid="text-hq-login-error">

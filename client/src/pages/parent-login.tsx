@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Lock, User, ArrowLeft, Mail, UserPlus, Phone, MapPin, CheckCircle2 } from "lucide-react";
+import { Lock, User, ArrowLeft, Mail, UserPlus, Phone, MapPin, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 const REFERRAL_OPTIONS = [
   "網路搜尋（Google、Yahoo 等）",
@@ -18,8 +18,12 @@ const REFERRAL_OPTIONS = [
 export default function ParentLogin() {
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [username, setUsername] = useState("");
+  const savedUsername = localStorage.getItem("rememberedParentUsername") || "";
+  const [username, setUsername] = useState(savedUsername);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(!!savedUsername);
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -65,6 +69,11 @@ export default function ParentLogin() {
         return;
       }
       if (data.role === "parent") {
+        if (rememberMe) {
+          localStorage.setItem("rememberedParentUsername", username);
+        } else {
+          localStorage.removeItem("rememberedParentUsername");
+        }
         navigate("/dashboard");
       } else {
         setError("請使用家長帳號登入");
@@ -194,16 +203,37 @@ export default function ParentLogin() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="請輸入密碼"
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       autoComplete="current-password"
                       data-testid="input-parent-password"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                      data-testid="button-toggle-password"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => {
+                      setRememberMe(!!checked);
+                      if (!checked) localStorage.removeItem("rememberedParentUsername");
+                    }}
+                    className="data-[state=checked]:bg-tiffany data-[state=checked]:border-tiffany"
+                    data-testid="checkbox-remember-me"
+                  />
+                  <span className="text-sm text-muted-foreground">記住帳號</span>
+                </label>
                 {error && (
                   <p className="text-sm text-red-500 bg-red-50 rounded-md px-3 py-2" data-testid="text-login-error">
                     {error}
@@ -299,14 +329,23 @@ export default function ParentLogin() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="reg-password"
-                      type="password"
+                      type={showRegPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="至少 6 個字元"
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       autoComplete="new-password"
                       data-testid="input-register-password"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                      data-testid="button-toggle-reg-password"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
                 <div>
