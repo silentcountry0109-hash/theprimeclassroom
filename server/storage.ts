@@ -144,6 +144,10 @@ export interface IStorage {
   addFavoriteFranchise(userId: string, franchiseId: number): Promise<FavoriteFranchise>;
   removeFavoriteFranchise(userId: string, franchiseId: number): Promise<void>;
 
+  getCoachScheduleAcrossFranchises(coachId: number): Promise<any[]>;
+  getOverlappingSlots(franchiseId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]>;
+  getCoachOverlappingSlots(coachId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<any[]>;
+
   getAllFranchiseAnalytics(): Promise<any[]>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
@@ -485,6 +489,65 @@ export class DatabaseStorage implements IStorage {
   async deleteSlot(id: number): Promise<void> {
     await db.delete(bookings).where(eq(bookings.slotId, id));
     await db.delete(timeSlots).where(eq(timeSlots.id, id));
+  }
+
+  async getCoachScheduleAcrossFranchises(coachId: number): Promise<any[]> {
+    const rows = await db
+      .select({
+        slotId: timeSlots.id,
+        franchiseId: timeSlots.franchiseId,
+        franchiseName: franchises.name,
+        date: timeSlots.date,
+        startTime: timeSlots.startTime,
+        endTime: timeSlots.endTime,
+        maxSeats: timeSlots.maxSeats,
+        bookedSeats: timeSlots.bookedSeats,
+      })
+      .from(timeSlots)
+      .innerJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
+      .where(and(eq(timeSlots.coachId, coachId), eq(timeSlots.isActive, true)))
+      .orderBy(timeSlots.date, timeSlots.startTime);
+    return rows;
+  }
+
+  async getOverlappingSlots(franchiseId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]> {
+    const conditions = [
+      eq(timeSlots.franchiseId, franchiseId),
+      eq(timeSlots.date, date),
+      eq(timeSlots.isActive, true),
+      sql`${timeSlots.startTime} < ${endTime}`,
+      sql`${timeSlots.endTime} > ${startTime}`,
+    ];
+    if (excludeSlotId) {
+      conditions.push(sql`${timeSlots.id} != ${excludeSlotId}`);
+    }
+    return db.select().from(timeSlots).where(and(...conditions));
+  }
+
+  async getCoachOverlappingSlots(coachId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<any[]> {
+    const conditions = [
+      eq(timeSlots.coachId, coachId),
+      eq(timeSlots.date, date),
+      eq(timeSlots.isActive, true),
+      sql`${timeSlots.startTime} < ${endTime}`,
+      sql`${timeSlots.endTime} > ${startTime}`,
+    ];
+    if (excludeSlotId) {
+      conditions.push(sql`${timeSlots.id} != ${excludeSlotId}`);
+    }
+    const rows = await db
+      .select({
+        slotId: timeSlots.id,
+        franchiseId: timeSlots.franchiseId,
+        franchiseName: franchises.name,
+        date: timeSlots.date,
+        startTime: timeSlots.startTime,
+        endTime: timeSlots.endTime,
+      })
+      .from(timeSlots)
+      .innerJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
+      .where(and(...conditions));
+    return rows;
   }
 
   async getBooking(id: number): Promise<any | undefined> {

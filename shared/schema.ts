@@ -31,6 +31,7 @@ export const coaches = pgTable("coaches", {
   userId: varchar("user_id").references(() => users.id),
   franchiseId: integer("franchise_id").references(() => franchises.id),
   name: text("name").notNull(),
+  phone: text("phone"),
   bio: text("bio"),
   photoUrl: text("photo_url"),
   specialties: text("specialties").array(),

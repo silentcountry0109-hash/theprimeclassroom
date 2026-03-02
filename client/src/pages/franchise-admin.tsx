@@ -60,6 +60,8 @@ import {
   KeyRound,
   UserPlus,
   ShieldCheck,
+  CalendarDays,
+  AlertTriangle,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -749,9 +751,12 @@ function CoachesTab() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingCoach, setEditingCoach] = useState<Coach | null>(null);
   const [formData, setFormData] = useState({
-    name: "", bio: "", specialties: [] as string[], isCertified: true, rating: 0, reviewCount: 0,
+    name: "", phone: "", bio: "", specialties: [] as string[], isCertified: true, rating: 0, reviewCount: 0,
   });
   const [specialtyInput, setSpecialtyInput] = useState("");
+  const [scheduleCoach, setScheduleCoach] = useState<Coach | null>(null);
+  const [scheduleData, setScheduleData] = useState<any[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
   const [accountDialogCoach, setAccountDialogCoach] = useState<Coach | null>(null);
   const [accountMode, setAccountMode] = useState<"create" | "reset">("create");
@@ -761,7 +766,7 @@ function CoachesTab() {
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
 
   const resetForm = () => {
-    setFormData({ name: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0 });
+    setFormData({ name: "", phone: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0 });
     setSpecialtyInput("");
     setEditingCoach(null);
   };
@@ -776,7 +781,7 @@ function CoachesTab() {
   const openEdit = (c: Coach) => {
     setEditingCoach(c);
     setFormData({
-      name: c.name, bio: c.bio || "", specialties: c.specialties || [],
+      name: c.name, phone: c.phone || "", bio: c.bio || "", specialties: c.specialties || [],
       isCertified: c.isCertified, rating: c.rating || 0, reviewCount: c.reviewCount || 0,
     });
     setShowDialog(true);
@@ -794,6 +799,21 @@ function CoachesTab() {
     setAccountDialogCoach(c);
     setAccountUsername("");
     setAccountPassword("");
+  };
+
+  const openSchedule = async (c: Coach) => {
+    setScheduleCoach(c);
+    setScheduleLoading(true);
+    try {
+      const res = await fetch(`/api/franchise-admin/coaches/${c.id}/schedule`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setScheduleData(data.schedule || []);
+      }
+    } catch {
+      toast({ title: "載入課表失敗", variant: "destructive" });
+    }
+    setScheduleLoading(false);
   };
 
   const saveMutation = useMutation({
@@ -918,6 +938,11 @@ function CoachesTab() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">{coach.specialties?.join(" · ") || "一般數學教學"}</p>
+                {coach.phone && (
+                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                    <Phone className="w-3 h-3" />{coach.phone}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {coach.rating != null && coach.rating > 0 && (
@@ -945,6 +970,9 @@ function CoachesTab() {
                     <UserPlus className="w-4 h-4 mr-1" />建立帳號
                   </Button>
                 )}
+                <Button variant="outline" size="icon" onClick={() => openSchedule(coach)} title="查看課表" data-testid={`button-schedule-coach-${coach.id}`}>
+                  <CalendarDays className="w-4 h-4" />
+                </Button>
                 <Button variant="outline" size="icon" onClick={() => openEdit(coach)} data-testid={`button-edit-franchise-coach-${coach.id}`}>
                   <Edit className="w-4 h-4" />
                 </Button>
@@ -964,6 +992,10 @@ function CoachesTab() {
             <div>
               <Label>姓名 *</Label>
               <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="老師姓名" data-testid="input-franchise-coach-name" />
+            </div>
+            <div>
+              <Label>手機號碼</Label>
+              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="例：0912-345-678" data-testid="input-franchise-coach-phone" />
             </div>
             <div>
               <Label>簡介</Label>
@@ -1072,6 +1104,51 @@ function CoachesTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!scheduleCoach} onOpenChange={(open) => { if (!open) { setScheduleCoach(null); setScheduleData([]); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{scheduleCoach?.name} 的跨校課表</DialogTitle>
+          </DialogHeader>
+          {scheduleLoading ? (
+            <div className="space-y-3 py-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-md" />)}</div>
+          ) : scheduleData.length === 0 ? (
+            <div className="text-center py-8">
+              <CalendarDays className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">目前沒有排課</p>
+            </div>
+          ) : (
+            <div className="space-y-3 py-4">
+              {Object.entries(
+                scheduleData.reduce((groups: Record<string, any[]>, slot) => {
+                  const key = slot.date;
+                  if (!groups[key]) groups[key] = [];
+                  groups[key].push(slot);
+                  return groups;
+                }, {})
+              ).map(([date, slots]) => (
+                <div key={date} className="border border-gray-100 rounded-md overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-2">
+                    <span className="text-sm font-medium" data-testid={`schedule-date-${date}`}>{date} ({DAY_LABELS[new Date(date).getDay().toString()] || ""})</span>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {(slots as any[]).map((slot: any) => (
+                      <div key={slot.slotId} className="px-3 py-2 flex items-center gap-3" data-testid={`schedule-slot-${slot.slotId}`}>
+                        <span className="text-sm text-tiffany font-medium">{slot.startTime}-{slot.endTime}</span>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{slot.franchiseName}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{slot.bookedSeats}/{slot.maxSeats} 人</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setScheduleCoach(null); setScheduleData([]); }}>關閉</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1087,7 +1164,16 @@ function TimeSlotsTab() {
   const addSlotMutation = useMutation({
     mutationFn: async (data: typeof slotForm) => {
       const payload = { ...data, coachId: data.coachId || null };
-      const res = await apiRequest("POST", "/api/franchise-admin/time-slots", payload);
+      const res = await fetch("/api/franchise-admin/time-slots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "新增時段失敗");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -1096,6 +1182,9 @@ function TimeSlotsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
       setShowAdd(false);
       setSlotForm({ date: "", startTime: "", endTime: "", coachId: 0, maxSeats: 5 });
+    },
+    onError: (error: Error) => {
+      toast({ title: "排課衝突", description: error.message, variant: "destructive" });
     },
   });
 

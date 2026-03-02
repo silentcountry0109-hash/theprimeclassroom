@@ -958,10 +958,47 @@ export async function registerRoutes(
 
   app.post("/api/franchise-admin/time-slots", isFranchiseAdmin, async (req: any, res) => {
     try {
-      const slot = await storage.createSlot({ ...req.body, franchiseId: req.franchiseId });
+      const { date, startTime, endTime, coachId } = req.body;
+      const franchiseId = req.franchiseId;
+
+      const roomConflicts = await storage.getOverlappingSlots(franchiseId, date, startTime, endTime);
+      if (roomConflicts.length > 0) {
+        const detail = roomConflicts.map((s) => `${s.startTime}-${s.endTime}`).join("、");
+        return res.status(409).json({
+          message: `教室時段衝突：${date} 已有時段 ${detail} 與此時段重疊`,
+          type: "room_conflict",
+          conflicts: roomConflicts,
+        });
+      }
+
+      if (coachId) {
+        const coachConflicts = await storage.getCoachOverlappingSlots(coachId, date, startTime, endTime);
+        if (coachConflicts.length > 0) {
+          const detail = coachConflicts.map((s) => `${s.franchiseName} ${s.startTime}-${s.endTime}`).join("、");
+          return res.status(409).json({
+            message: `老師排課衝突：${date} 老師已在 ${detail} 有排課`,
+            type: "coach_conflict",
+            conflicts: coachConflicts,
+          });
+        }
+      }
+
+      const slot = await storage.createSlot({ ...req.body, franchiseId });
       res.json(slot);
     } catch (error) {
       res.status(500).json({ message: "Failed to create time slot" });
+    }
+  });
+
+  app.get("/api/franchise-admin/coaches/:id/schedule", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coachId = parseInt(req.params.id);
+      const coach = await storage.getCoach(coachId);
+      if (!coach) return res.status(404).json({ message: "Coach not found" });
+      const schedule = await storage.getCoachScheduleAcrossFranchises(coachId);
+      res.json({ coach: { id: coach.id, name: coach.name }, schedule });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch coach schedule" });
     }
   });
 
