@@ -62,6 +62,8 @@ import {
   ShieldCheck,
   CalendarDays,
   AlertTriangle,
+  List,
+  ChevronLeft,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -1260,7 +1262,7 @@ function TimeSlotsTab() {
   });
 
   const getDayLabel = (dateStr: string) => {
-    const d = new Date(dateStr);
+    const d = new Date(dateStr + "T00:00:00");
     return DAY_LABELS[d.getDay().toString()] || "";
   };
 
@@ -1269,6 +1271,49 @@ function TimeSlotsTab() {
     return a.startTime.localeCompare(b.startTime);
   });
 
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [selectedCalDate, setSelectedCalDate] = useState<string | null>(null);
+
+  const calendarDays = (() => {
+    const { year, month } = calendarMonth;
+    const firstDay = new Date(year, month, 1);
+    let startDow = firstDay.getDay();
+    if (startDow === 0) startDow = 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: (string | null)[] = [];
+    for (let i = 1; i < startDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const mo = String(month + 1).padStart(2, "0");
+      const dd = String(d).padStart(2, "0");
+      cells.push(`${year}-${mo}-${dd}`);
+    }
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  })();
+
+  const slotsByDate: Record<string, typeof slots> = {};
+  slots.forEach((s) => {
+    if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
+    slotsByDate[s.date].push(s);
+  });
+  Object.values(slotsByDate).forEach((arr) => arr.sort((a, b) => a.startTime.localeCompare(b.startTime)));
+
+  const selectedDaySlots = selectedCalDate ? (slotsByDate[selectedCalDate] || []) : [];
+
+  const calMonthLabel = `${calendarMonth.year}年${calendarMonth.month + 1}月`;
+
+  const today = (() => {
+    const n = new Date();
+    const y = n.getFullYear();
+    const mo = String(n.getMonth() + 1).padStart(2, "0");
+    const dd = String(n.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${dd}`;
+  })();
+
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
@@ -1276,19 +1321,39 @@ function TimeSlotsTab() {
           <h1 className="text-xl font-semibold text-foreground">時段管理</h1>
           <p className="text-sm text-muted-foreground">管理本分校的可預約時段</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-franchise-slot">
-          <Plus className="w-4 h-4 mr-1.5" />新增時段
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-gray-100 rounded-lg p-0.5" data-testid="view-mode-toggle">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-tiffany" : "text-muted-foreground hover:text-foreground"}`}
+              data-testid="button-view-list"
+              title="列表檢視"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("calendar")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "calendar" ? "bg-white shadow-sm text-tiffany" : "text-muted-foreground hover:text-foreground"}`}
+              data-testid="button-view-calendar"
+              title="日曆檢視"
+            >
+              <CalendarDays className="w-4 h-4" />
+            </button>
+          </div>
+          <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-franchise-slot">
+            <Plus className="w-4 h-4 mr-1.5" />新增時段
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}</div>
-      ) : sortedSlots.length === 0 ? (
+      ) : slots.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-md border border-gray-100">
           <Clock className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">尚無時段資料</p>
         </div>
-      ) : (
+      ) : viewMode === "list" ? (
         <div className="space-y-2">
           {sortedSlots.map((slot) => {
             const coachName = coaches.find((c) => c.id === slot.coachId)?.name || "未指派";
@@ -1308,6 +1373,111 @@ function TimeSlotsTab() {
               </div>
             );
           })}
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => { setSelectedCalDate(null); setCalendarMonth((prev) => {
+                const d = new Date(prev.year, prev.month - 1, 1);
+                return { year: d.getFullYear(), month: d.getMonth() };
+              }); }}
+              className="p-1.5 rounded-md hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="button-cal-prev-month"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-semibold" data-testid="text-cal-month-label">{calMonthLabel}</span>
+            <button
+              onClick={() => { setSelectedCalDate(null); setCalendarMonth((prev) => {
+                const d = new Date(prev.year, prev.month + 1, 1);
+                return { year: d.getFullYear(), month: d.getMonth() };
+              }); }}
+              className="p-1.5 rounded-md hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="button-cal-next-month"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground mb-1">
+            {["一", "二", "三", "四", "五", "六", "日"].map((d) => (
+              <div key={d} className="py-1.5">{d}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden border border-gray-200">
+            {calendarDays.map((dateStr, i) => {
+              if (!dateStr) {
+                return <div key={`empty-${i}`} className="bg-gray-50 min-h-[72px]" />;
+              }
+              const daySlots = slotsByDate[dateStr] || [];
+              const dayNum = parseInt(dateStr.split("-")[2]);
+              const isToday = dateStr === today;
+              const isSelected = dateStr === selectedCalDate;
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => setSelectedCalDate(isSelected ? null : dateStr)}
+                  className={`bg-white min-h-[72px] p-1 text-left transition-colors relative hover:bg-tiffany/5 ${isSelected ? "ring-2 ring-tiffany ring-inset" : ""}`}
+                  data-testid={`cal-day-${dateStr}`}
+                >
+                  <span className={`text-xs inline-flex items-center justify-center w-5 h-5 rounded-full ${isToday ? "bg-tiffany text-white font-bold" : "text-gray-700"}`}>
+                    {dayNum}
+                  </span>
+                  {daySlots.length > 0 && (
+                    <div className="mt-0.5 space-y-0.5">
+                      {daySlots.length <= 2 ? daySlots.map((s) => (
+                        <div key={s.id} className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate">
+                          {s.startTime}
+                        </div>
+                      )) : (
+                        <>
+                          <div className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate">
+                            {daySlots[0].startTime}
+                          </div>
+                          <div className="text-[10px] leading-tight text-muted-foreground px-1">
+                            +{daySlots.length - 1} 堂
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedCalDate && (
+            <div className="mt-4" data-testid="cal-day-detail">
+              <h3 className="text-sm font-semibold mb-2">
+                {selectedCalDate} ({getDayLabel(selectedCalDate)}) — {selectedDaySlots.length} 個時段
+              </h3>
+              {selectedDaySlots.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">當日無時段</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedDaySlots.map((slot) => {
+                    const coachName = coaches.find((c) => c.id === slot.coachId)?.name || "未指派";
+                    return (
+                      <div key={slot.id} className="bg-white rounded-md border border-gray-100 p-3 flex items-center gap-4" data-testid={`cal-slot-${slot.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-sm text-tiffany font-medium">{slot.startTime} - {slot.endTime}</span>
+                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{coachName}</span>
+                            <span className="text-xs text-muted-foreground">已預約 {slot.bookedSeats}/{slot.maxSeats}</span>
+                          </div>
+                        </div>
+                        <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-cal-slot-${slot.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
