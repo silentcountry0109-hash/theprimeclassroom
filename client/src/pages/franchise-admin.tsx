@@ -1178,11 +1178,14 @@ function TimeSlotsTab() {
     if (!startDate || !endDate || weekdays.length === 0 || startTimes.length === 0) return;
     setBatchSubmitting(true);
     const dates: string[] = [];
-    const cur = new Date(startDate);
-    const end = new Date(endDate);
+    const cur = new Date(startDate + "T00:00:00");
+    const end = new Date(endDate + "T00:00:00");
     while (cur <= end) {
       if (weekdays.includes(cur.getDay())) {
-        dates.push(cur.toISOString().split("T")[0]);
+        const y = cur.getFullYear();
+        const mo = String(cur.getMonth() + 1).padStart(2, "0");
+        const d = String(cur.getDate()).padStart(2, "0");
+        dates.push(`${y}-${mo}-${d}`);
       }
       cur.setDate(cur.getDate() + 1);
     }
@@ -1461,15 +1464,16 @@ function TimeSlotsTab() {
                 {batchForm.startDate && batchForm.endDate && batchForm.weekdays.length > 0 && batchForm.startTimes.filter(Boolean).length > 0 && (
                   <div className="bg-gray-50 rounded-md px-3 py-2 text-xs text-muted-foreground" data-testid="batch-preview">
                     {(() => {
-                      const dates: string[] = [];
-                      const cur = new Date(batchForm.startDate);
-                      const end = new Date(batchForm.endDate);
+                      let count = 0;
+                      const cur = new Date(batchForm.startDate + "T00:00:00");
+                      const end = new Date(batchForm.endDate + "T00:00:00");
                       while (cur <= end) {
-                        if (batchForm.weekdays.includes(cur.getDay())) dates.push(cur.toISOString().split("T")[0]);
+                        if (batchForm.weekdays.includes(cur.getDay())) count++;
                         cur.setDate(cur.getDate() + 1);
                       }
-                      const total = dates.length * batchForm.startTimes.filter(Boolean).length;
-                      return `將建立 ${dates.length} 天 × ${batchForm.startTimes.filter(Boolean).length} 個時段 = 共 ${total} 個時段`;
+                      const timesCount = batchForm.startTimes.filter(Boolean).length;
+                      const total = count * timesCount;
+                      return `將建立 ${count} 天 × ${timesCount} 個時段 = 共 ${total} 個時段`;
                     })()}
                   </div>
                 )}
