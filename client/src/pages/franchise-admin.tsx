@@ -1156,10 +1156,69 @@ function CoachesTab() {
 function TimeSlotsTab() {
   const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
   const [slotForm, setSlotForm] = useState({ date: "", startTime: "", endTime: "", coachId: 0, maxSeats: 5 });
+  const [batchForm, setBatchForm] = useState({
+    startDate: "", endDate: "", weekdays: [1, 2, 3, 4, 5] as number[],
+    startTimes: ["09:00"] as string[], coachId: 0,
+  });
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
 
   const { data: slots = [], isLoading } = useQuery<TimeSlot[]>({ queryKey: ["/api/franchise-admin/time-slots"] });
   const { data: coaches = [] } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
+
+  const computeEndTime = (start: string) => {
+    const [h, m] = start.split(":").map(Number);
+    const totalMin = h * 60 + m + 90;
+    return `${String(Math.floor(totalMin / 60) % 24).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+  };
+
+  const handleBatchSubmit = async () => {
+    const { startDate, endDate, weekdays, startTimes, coachId } = batchForm;
+    if (!startDate || !endDate || weekdays.length === 0 || startTimes.length === 0) return;
+    setBatchSubmitting(true);
+    const dates: string[] = [];
+    const cur = new Date(startDate);
+    const end = new Date(endDate);
+    while (cur <= end) {
+      if (weekdays.includes(cur.getDay())) {
+        dates.push(cur.toISOString().split("T")[0]);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    let created = 0;
+    const conflicts: string[] = [];
+    for (const date of dates) {
+      for (const startTime of startTimes) {
+        const endTime = computeEndTime(startTime);
+        try {
+          const res = await fetch("/api/franchise-admin/time-slots", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date, startTime, endTime, coachId: coachId || null, maxSeats: 5 }),
+            credentials: "include",
+          });
+          if (res.ok) { created++; }
+          else {
+            const err = await res.json();
+            conflicts.push(`${date} ${startTime}: ${err.message}`);
+          }
+        } catch { conflicts.push(`${date} ${startTime}: 網路錯誤`); }
+      }
+    }
+    setBatchSubmitting(false);
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
+    if (created > 0) {
+      toast({ title: `成功新增 ${created} 個時段` });
+    }
+    if (conflicts.length > 0) {
+      toast({ title: `${conflicts.length} 個時段衝突`, description: conflicts.slice(0, 3).join("\n"), variant: "destructive" });
+    }
+    if (conflicts.length === 0) {
+      setShowAdd(false);
+    }
+  };
 
   const addSlotMutation = useMutation({
     mutationFn: async (data: typeof slotForm) => {
@@ -1249,56 +1308,184 @@ function TimeSlotsTab() {
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>新增時段</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>日期 *</Label>
-              <Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} data-testid="input-franchise-slot-date" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>開始時間 *</Label>
-                <Input type="time" value={slotForm.startTime} onChange={(e) => {
-                  const start = e.target.value;
-                  const [h, m] = start.split(":").map(Number);
-                  const totalMin = h * 60 + m + 90;
-                  const endH = String(Math.floor(totalMin / 60) % 24).padStart(2, "0");
-                  const endM = String(totalMin % 60).padStart(2, "0");
-                  setSlotForm({ ...slotForm, startTime: start, endTime: `${endH}:${endM}` });
-                }} data-testid="input-franchise-slot-start" />
-              </div>
-              <div>
-                <Label>結束時間</Label>
-                <Input type="time" value={slotForm.endTime} disabled className="bg-gray-50" data-testid="input-franchise-slot-end" />
-                <p className="text-xs text-muted-foreground mt-1">自動設定（開始＋90分鐘）</p>
-              </div>
-            </div>
-            <div>
-              <Label>指派老師</Label>
-              <Select value={slotForm.coachId ? slotForm.coachId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, coachId: parseInt(v) || 0 })}>
-                <SelectTrigger data-testid="select-franchise-slot-coach"><SelectValue placeholder="選擇老師（可不選）" /></SelectTrigger>
-                <SelectContent>
-                  {coaches.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>座位數</Label>
-              <p className="text-sm text-foreground mt-1.5 px-3 py-2 bg-gray-50 rounded-md border border-gray-100" data-testid="text-franchise-slot-seats">5 人</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
-            <Button
-              onClick={() => addSlotMutation.mutate(slotForm)}
-              disabled={!slotForm.date || !slotForm.startTime || addSlotMutation.isPending}
-              data-testid="button-submit-franchise-slot"
+      <Dialog open={showAdd} onOpenChange={(open) => { setShowAdd(open); if (!open) setBatchMode(false); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>新增時段</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-3 pb-2 border-b border-gray-100">
+            <button
+              onClick={() => setBatchMode(false)}
+              className={`text-sm px-3 py-1.5 rounded-full transition-colors ${!batchMode ? "bg-tiffany/10 text-tiffany font-medium" : "text-muted-foreground hover:bg-gray-50"}`}
+              data-testid="tab-single-slot"
             >
-              {addSlotMutation.isPending ? "新增中..." : "新增時段"}
-            </Button>
-          </DialogFooter>
+              單一時段
+            </button>
+            <button
+              onClick={() => setBatchMode(true)}
+              className={`text-sm px-3 py-1.5 rounded-full transition-colors ${batchMode ? "bg-tiffany/10 text-tiffany font-medium" : "text-muted-foreground hover:bg-gray-50"}`}
+              data-testid="tab-batch-slot"
+            >
+              批次排課
+            </button>
+          </div>
+
+          {!batchMode ? (
+            <>
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label>日期 *</Label>
+                  <Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} data-testid="input-franchise-slot-date" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>開始時間 *</Label>
+                    <Input type="time" value={slotForm.startTime} onChange={(e) => {
+                      const start = e.target.value;
+                      setSlotForm({ ...slotForm, startTime: start, endTime: computeEndTime(start) });
+                    }} data-testid="input-franchise-slot-start" />
+                  </div>
+                  <div>
+                    <Label>結束時間</Label>
+                    <Input type="time" value={slotForm.endTime} disabled className="bg-gray-50" data-testid="input-franchise-slot-end" />
+                  </div>
+                </div>
+                <div>
+                  <Label>指派老師</Label>
+                  <Select value={slotForm.coachId ? slotForm.coachId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, coachId: parseInt(v) || 0 })}>
+                    <SelectTrigger data-testid="select-franchise-slot-coach"><SelectValue placeholder="選擇老師（可不選）" /></SelectTrigger>
+                    <SelectContent>
+                      {coaches.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
+                <Button
+                  onClick={() => addSlotMutation.mutate(slotForm)}
+                  disabled={!slotForm.date || !slotForm.startTime || addSlotMutation.isPending}
+                  data-testid="button-submit-franchise-slot"
+                >
+                  {addSlotMutation.isPending ? "新增中..." : "新增時段"}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>起始日期 *</Label>
+                    <Input type="date" value={batchForm.startDate} onChange={(e) => setBatchForm({ ...batchForm, startDate: e.target.value })} data-testid="input-batch-start-date" />
+                  </div>
+                  <div>
+                    <Label>結束日期 *</Label>
+                    <Input type="date" value={batchForm.endDate} onChange={(e) => setBatchForm({ ...batchForm, endDate: e.target.value })} data-testid="input-batch-end-date" />
+                  </div>
+                </div>
+                <div>
+                  <Label>星期 *</Label>
+                  <div className="flex gap-2 mt-1.5 flex-wrap">
+                    {[
+                      { day: 1, label: "一" }, { day: 2, label: "二" }, { day: 3, label: "三" },
+                      { day: 4, label: "四" }, { day: 5, label: "五" }, { day: 6, label: "六" }, { day: 0, label: "日" },
+                    ].map(({ day, label }) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const wds = batchForm.weekdays.includes(day)
+                            ? batchForm.weekdays.filter((d) => d !== day)
+                            : [...batchForm.weekdays, day];
+                          setBatchForm({ ...batchForm, weekdays: wds });
+                        }}
+                        className={`w-9 h-9 rounded-full text-sm font-medium transition-colors ${
+                          batchForm.weekdays.includes(day) ? "bg-tiffany text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        }`}
+                        data-testid={`batch-weekday-${day}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label>時段 *</Label>
+                  <div className="space-y-2 mt-1.5">
+                    {batchForm.startTimes.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          value={t}
+                          onChange={(e) => {
+                            const updated = [...batchForm.startTimes];
+                            updated[i] = e.target.value;
+                            setBatchForm({ ...batchForm, startTimes: updated });
+                          }}
+                          className="flex-1"
+                          data-testid={`input-batch-time-${i}`}
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">~ {t ? computeEndTime(t) : "--:--"}</span>
+                        {batchForm.startTimes.length > 1 && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => setBatchForm({ ...batchForm, startTimes: batchForm.startTimes.filter((_, j) => j !== i) })}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBatchForm({ ...batchForm, startTimes: [...batchForm.startTimes, ""] })}
+                      data-testid="button-add-batch-time"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />新增時段
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label>指派老師</Label>
+                  <Select value={batchForm.coachId ? batchForm.coachId.toString() : ""} onValueChange={(v) => setBatchForm({ ...batchForm, coachId: parseInt(v) || 0 })}>
+                    <SelectTrigger data-testid="select-batch-coach"><SelectValue placeholder="選擇老師（可不選）" /></SelectTrigger>
+                    <SelectContent>
+                      {coaches.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {batchForm.startDate && batchForm.endDate && batchForm.weekdays.length > 0 && batchForm.startTimes.filter(Boolean).length > 0 && (
+                  <div className="bg-gray-50 rounded-md px-3 py-2 text-xs text-muted-foreground" data-testid="batch-preview">
+                    {(() => {
+                      const dates: string[] = [];
+                      const cur = new Date(batchForm.startDate);
+                      const end = new Date(batchForm.endDate);
+                      while (cur <= end) {
+                        if (batchForm.weekdays.includes(cur.getDay())) dates.push(cur.toISOString().split("T")[0]);
+                        cur.setDate(cur.getDate() + 1);
+                      }
+                      const total = dates.length * batchForm.startTimes.filter(Boolean).length;
+                      return `將建立 ${dates.length} 天 × ${batchForm.startTimes.filter(Boolean).length} 個時段 = 共 ${total} 個時段`;
+                    })()}
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
+                <Button
+                  onClick={handleBatchSubmit}
+                  disabled={!batchForm.startDate || !batchForm.endDate || batchForm.weekdays.length === 0 || batchForm.startTimes.filter(Boolean).length === 0 || batchSubmitting}
+                  data-testid="button-submit-batch-slot"
+                >
+                  {batchSubmitting ? "排課中..." : "批次建立"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
