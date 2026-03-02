@@ -49,6 +49,7 @@ export const children = pgTable("children", {
   grade: integer("grade").notNull(),
   school: text("school"),
   notes: text("notes"),
+  studentCode: text("student_code").unique(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -147,7 +148,7 @@ export const orderItems = pgTable("order_items", {
 
 export const insertFranchiseSchema = createInsertSchema(franchises).omit({ id: true, createdAt: true });
 export const insertCoachSchema = createInsertSchema(coaches).omit({ id: true, createdAt: true });
-export const insertChildSchema = createInsertSchema(children).omit({ id: true, createdAt: true });
+export const insertChildSchema = createInsertSchema(children).omit({ id: true, createdAt: true, studentCode: true });
 export const insertTimeSlotSchema = createInsertSchema(timeSlots).omit({ id: true, createdAt: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true });
 export const insertFaqSchema = createInsertSchema(faqs).omit({ id: true });

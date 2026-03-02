@@ -307,6 +307,9 @@ function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: (
               </div>
               <span className="text-foreground">{s.childName}</span>
               <span className="text-xs text-muted-foreground">{s.childGrade}年級</span>
+              {s.childStudentCode && (
+                <span className="text-[10px] text-muted-foreground/70 font-mono">{s.childStudentCode}</span>
+              )}
             </div>
           ))}
         </div>

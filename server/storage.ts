@@ -380,9 +380,35 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(children).where(eq(children.parentId, parentId));
   }
 
+  async generateStudentCode(): Promise<string> {
+    const taiwanDateStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }).replace(/-/g, "");
+    const prefix = taiwanDateStr;
+    const existing = await db.select({ studentCode: children.studentCode })
+      .from(children)
+      .where(sql`${children.studentCode} LIKE ${prefix + '-%'}`);
+    const maxSeq = existing.reduce((max, row) => {
+      if (!row.studentCode) return max;
+      const seq = parseInt(row.studentCode.split("-")[1] || "0", 10);
+      return seq > max ? seq : max;
+    }, 0);
+    const nextSeq = (maxSeq + 1).toString().padStart(4, "0");
+    return `${prefix}-${nextSeq}`;
+  }
+
   async createChild(child: InsertChild): Promise<Child> {
-    const [created] = await db.insert(children).values(child).returning();
-    return created;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const studentCode = await this.generateStudentCode();
+      try {
+        const [created] = await db.insert(children).values({ ...child, studentCode }).returning();
+        return created;
+      } catch (err: any) {
+        if (err?.code === "23505" && err?.constraint?.includes("student_code") && attempt < 4) {
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error("Failed to generate unique student code after 5 attempts");
   }
 
   async updateChild(id: number, data: Partial<InsertChild>): Promise<Child> {
@@ -975,6 +1001,7 @@ export class DatabaseStorage implements IStorage {
       childName: r.child.name,
       childGrade: r.child.grade,
       childGender: r.child.gender,
+      childStudentCode: r.child.studentCode,
       parentId: r.booking.parentId,
     }));
   }
@@ -1196,3 +1223,32 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+(async () => {
+  try {
+    const allChildren = await db.select().from(children);
+    const needCode = allChildren.filter((c) => !c.studentCode);
+    for (const child of needCode) {
+      const dateStr = child.createdAt
+        ? new Date(child.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }).replace(/-/g, "")
+        : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }).replace(/-/g, "");
+      const prefix = dateStr;
+      const existing = await db.select({ studentCode: children.studentCode })
+        .from(children)
+        .where(sql`${children.studentCode} LIKE ${prefix + '-%'}`);
+      const maxSeq = existing.reduce((max, row) => {
+        if (!row.studentCode) return max;
+        const seq = parseInt(row.studentCode.split("-")[1] || "0", 10);
+        return seq > max ? seq : max;
+      }, 0);
+      const nextSeq = (maxSeq + 1).toString().padStart(4, "0");
+      const code = `${prefix}-${nextSeq}`;
+      await db.update(children).set({ studentCode: code }).where(eq(children.id, child.id));
+    }
+    if (needCode.length > 0) {
+      console.log(`Backfilled student codes for ${needCode.length} children`);
+    }
+  } catch (e) {
+    console.error("Failed to backfill student codes:", e);
+  }
+})();

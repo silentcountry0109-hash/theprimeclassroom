@@ -80,6 +80,7 @@ import {
   UserCircle,
   Heart,
   Building2,
+  Hash,
 } from "lucide-react";
 import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -698,6 +699,8 @@ function BookingFlowTab() {
   const [selectedChild, setSelectedChild] = useState("");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedCoachFilter, setSelectedCoachFilter] = useState<string>("all");
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [autoAdvanced, setAutoAdvanced] = useState(false);
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [recurringSlots, setRecurringSlots] = useState<RecurringSlotInfo[]>([]);
   const [selectedRecurringSlots, setSelectedRecurringSlots] = useState<Set<number>>(new Set());
@@ -845,6 +848,9 @@ function BookingFlowTab() {
   const selectFranchise = (id: number) => {
     setSelectedFranchiseId(id);
     setSelectedDate(null);
+    setWeekOffset(0);
+    setAutoAdvanced(false);
+    setSelectedCoachFilter("all");
     setStep("detail");
   };
 
@@ -878,9 +884,61 @@ function BookingFlowTab() {
   };
 
   const slots = detail?.timeSlots || [];
-  const dates = [...new Set(slots.map((s) => s.date))].sort();
-  const activeDate = selectedDate || dates[0] || null;
-  const filteredSlots = (activeDate ? slots.filter((s) => s.date === activeDate) : slots)
+  const allDates = [...new Set(slots.map((s) => s.date))].sort();
+
+  useEffect(() => {
+    if (allDates.length > 0 && !autoAdvanced) {
+      const firstBookable = allDates.find((d) => !isSlotTooSoon(d));
+      if (firstBookable) {
+        const now = new Date();
+        const taiwanStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+        const today = new Date(taiwanStr + "T00:00:00+08:00");
+        const dayOfWeek = today.getDay();
+        const mondayOff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const thisMonday = new Date(today);
+        thisMonday.setDate(today.getDate() + mondayOff);
+        const bookableDate = new Date(firstBookable + "T00:00:00+08:00");
+        const diffMs = bookableDate.getTime() - thisMonday.getTime();
+        const diffWeeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+        if (diffWeeks > 0) {
+          setWeekOffset(diffWeeks);
+        }
+      }
+      setAutoAdvanced(true);
+    }
+  }, [allDates.join(","), selectedFranchiseId]);
+
+  const getWeekRange = (offset: number) => {
+    const now = new Date();
+    const taiwanStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    const today = new Date(taiwanStr + "T00:00:00+08:00");
+    const dayOfWeek = today.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() + mondayOffset + offset * 7);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    return { weekStart, weekEnd };
+  };
+
+  const { weekStart, weekEnd } = getWeekRange(weekOffset);
+  const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  const weekEndStr = weekEnd.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+
+  const datesInWeek = allDates.filter((d) => d >= weekStartStr && d <= weekEndStr);
+  const activeDate = selectedDate && datesInWeek.includes(selectedDate) ? selectedDate : datesInWeek[0] || null;
+
+  const hasNextWeek = allDates.some((d) => d > weekEndStr);
+  const hasPrevWeek = weekOffset > 0;
+
+  const formatWeekLabel = () => {
+    const DAY_SHORT = ["日", "一", "二", "三", "四", "五", "六"];
+    const s = weekStart;
+    const e = weekEnd;
+    return `${s.getMonth() + 1}/${s.getDate()}(${DAY_SHORT[s.getDay()]}) ~ ${e.getMonth() + 1}/${e.getDate()}(${DAY_SHORT[e.getDay()]})`;
+  };
+
+  const filteredSlots = (activeDate ? slots.filter((s) => s.date === activeDate) : [])
     .filter((s) => selectedCoachFilter === "all" || s.coachId?.toString() === selectedCoachFilter);
 
   const formatDate = (dateStr: string) => {
@@ -1278,9 +1336,31 @@ function BookingFlowTab() {
                 </div>
               )}
 
-              {dates.length > 0 && (
+              <div className="flex items-center justify-between mb-3 bg-white rounded-xl border border-gray-100 px-4 py-2.5">
+                <button
+                  onClick={() => { setWeekOffset((w) => w - 1); setSelectedDate(null); }}
+                  disabled={!hasPrevWeek}
+                  className={`p-1.5 rounded-lg transition-colors ${hasPrevWeek ? "hover:bg-tiffany/10 text-foreground" : "text-muted-foreground/30 cursor-not-allowed"}`}
+                  data-testid="button-prev-week"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-medium text-foreground" data-testid="text-week-range">
+                  {formatWeekLabel()}
+                </span>
+                <button
+                  onClick={() => { setWeekOffset((w) => w + 1); setSelectedDate(null); }}
+                  disabled={!hasNextWeek}
+                  className={`p-1.5 rounded-lg transition-colors ${hasNextWeek ? "hover:bg-tiffany/10 text-foreground" : "text-muted-foreground/30 cursor-not-allowed"}`}
+                  data-testid="button-next-week"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {datesInWeek.length > 0 && (
                 <div className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1">
-                  {dates.map((date) => {
+                  {datesInWeek.map((date) => {
                     const tooSoon = isSlotTooSoon(date);
                     return (
                     <button
@@ -1302,7 +1382,20 @@ function BookingFlowTab() {
                 </div>
               )}
 
-              {filteredSlots.length === 0 ? (
+              {datesInWeek.length === 0 ? (
+                <div className="text-center py-10 bg-white rounded-xl border border-gray-100">
+                  <CalendarDays className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">本週沒有可預約的時段</p>
+                  {hasNextWeek && (
+                    <button
+                      onClick={() => { setWeekOffset((w) => w + 1); setSelectedDate(null); }}
+                      className="text-xs text-tiffany hover:underline mt-2"
+                    >
+                      查看下一週 →
+                    </button>
+                  )}
+                </div>
+              ) : filteredSlots.length === 0 ? (
                 <div className="text-center py-10 bg-white rounded-xl border border-gray-100">
                   <CalendarDays className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">此日期沒有可預約的時段</p>
@@ -1759,6 +1852,12 @@ function ChildrenTab() {
                         {gradeLabel(child.grade)}
                       </span>
                     </div>
+                    {child.studentCode && (
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1" data-testid={`text-student-code-${child.id}`}>
+                        <Hash className="w-3 h-3" />
+                        學號：{child.studentCode}
+                      </p>
+                    )}
                     {child.school && (
                       <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
                         <BookOpen className="w-3 h-3" />
