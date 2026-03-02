@@ -372,6 +372,17 @@ export async function registerRoutes(
       if (!kids.find((k: any) => k.id === req.body.childId)) {
         return res.status(403).json({ message: "無權限為此孩子預約" });
       }
+      const slot = await storage.getSlot(req.body.slotId);
+      if (!slot) {
+        return res.status(404).json({ message: "時段不存在" });
+      }
+      const taiwanTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+      const taiwanToday = new Date(taiwanTodayStr + "T00:00:00+08:00");
+      const slotDate = new Date(slot.date + "T00:00:00+08:00");
+      const diffDays = Math.round((slotDate.getTime() - taiwanToday.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 3) {
+        return res.status(400).json({ message: "需於 3 天前預約課程（最早可預約 3 天後的時段）" });
+      }
       const booking = await storage.createBooking({
         slotId: req.body.slotId,
         childId: req.body.childId,
@@ -394,9 +405,22 @@ export async function registerRoutes(
       if (!kids.find((k: any) => k.id === childId)) {
         return res.status(403).json({ message: "無權限為此孩子預約" });
       }
+      const taiwanTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+      const taiwanToday = new Date(taiwanTodayStr + "T00:00:00+08:00");
       const results: { slotId: number; success: boolean; message?: string }[] = [];
       for (const slotId of slotIds) {
         try {
+          const slot = await storage.getSlot(slotId);
+          if (!slot) {
+            results.push({ slotId, success: false, message: "時段不存在" });
+            continue;
+          }
+          const slotDate = new Date(slot.date + "T00:00:00+08:00");
+          const diffDays = Math.round((slotDate.getTime() - taiwanToday.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays < 3) {
+            results.push({ slotId, success: false, message: "需於 3 天前預約課程" });
+            continue;
+          }
           await storage.createBooking({ slotId, childId, parentId: userId });
           results.push({ slotId, success: true });
         } catch (err: any) {

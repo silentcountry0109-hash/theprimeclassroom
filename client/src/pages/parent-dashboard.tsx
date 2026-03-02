@@ -697,6 +697,7 @@ function BookingFlowTab() {
   const [bookingSlot, setBookingSlot] = useState<SlotWithCoach | null>(null);
   const [selectedChild, setSelectedChild] = useState("");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedCoachFilter, setSelectedCoachFilter] = useState<string>("all");
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [recurringSlots, setRecurringSlots] = useState<RecurringSlotInfo[]>([]);
   const [selectedRecurringSlots, setSelectedRecurringSlots] = useState<Set<number>>(new Set());
@@ -864,10 +865,23 @@ function BookingFlowTab() {
     bookMutation.mutate({ slotId: bookingSlot.id, childId: parseInt(selectedChild) });
   };
 
+  const getTaiwanToday = () => {
+    const now = new Date();
+    const taiwanStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    return new Date(taiwanStr + "T00:00:00+08:00");
+  };
+  const isSlotTooSoon = (dateStr: string) => {
+    const taiwanToday = getTaiwanToday();
+    const slotDate = new Date(dateStr + "T00:00:00+08:00");
+    const diffDays = Math.floor((slotDate.getTime() - taiwanToday.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays < 3;
+  };
+
   const slots = detail?.timeSlots || [];
   const dates = [...new Set(slots.map((s) => s.date))].sort();
   const activeDate = selectedDate || dates[0] || null;
-  const filteredSlots = activeDate ? slots.filter((s) => s.date === activeDate) : slots;
+  const filteredSlots = (activeDate ? slots.filter((s) => s.date === activeDate) : slots)
+    .filter((s) => selectedCoachFilter === "all" || s.coachId?.toString() === selectedCoachFilter);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -1248,22 +1262,43 @@ function BookingFlowTab() {
             <div>
               <h3 className="text-base font-semibold text-foreground mb-3">可預約時段</h3>
 
+              {detail.coaches.length > 1 && (
+                <div className="mb-4">
+                  <Select value={selectedCoachFilter} onValueChange={setSelectedCoachFilter}>
+                    <SelectTrigger className="w-full sm:w-48 rounded-lg" data-testid="select-coach-filter">
+                      <SelectValue placeholder="篩選老師" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部老師</SelectItem>
+                      {detail.coaches.map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {dates.length > 0 && (
                 <div className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1">
-                  {dates.map((date) => (
+                  {dates.map((date) => {
+                    const tooSoon = isSlotTooSoon(date);
+                    return (
                     <button
                       key={date}
                       onClick={() => setSelectedDate(date)}
                       className={`px-4 py-2 text-sm rounded-full border whitespace-nowrap transition-all flex-shrink-0 ${
                         activeDate === date
                           ? "bg-tiffany text-white border-tiffany"
+                          : tooSoon
+                          ? "bg-gray-50 text-muted-foreground/50 border-gray-100 cursor-default"
                           : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany/50"
                       }`}
                       data-testid={`date-tab-${date}`}
                     >
-                      {formatDate(date)}
+                      {formatDate(date)}{tooSoon ? " (不可預約)" : ""}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -1277,11 +1312,13 @@ function BookingFlowTab() {
                   {filteredSlots.map((slot) => {
                     const available = slot.maxSeats - slot.bookedSeats;
                     const coach = detail.coaches.find((c) => c.id === slot.coachId);
+                    const tooSoon = isSlotTooSoon(slot.date);
+                    const canBook = available > 0 && !tooSoon;
                     return (
                       <div
                         key={slot.id}
                         className={`bg-white rounded-xl border p-4 transition-all ${
-                          available > 0 ? "border-gray-100 hover:border-tiffany/30 hover:shadow-sm" : "border-gray-100 opacity-60"
+                          canBook ? "border-gray-100 hover:border-tiffany/30 hover:shadow-sm" : "border-gray-100 opacity-60"
                         }`}
                         data-testid={`slot-card-${slot.id}`}
                       >
@@ -1338,12 +1375,12 @@ function BookingFlowTab() {
                           <Button
                             size="sm"
                             onClick={() => handleBook(slot)}
-                            disabled={available <= 0}
+                            disabled={!canBook}
                             className="rounded-full px-4 text-xs"
-                            style={available > 0 ? { backgroundColor: "#81D8D0", color: "white" } : {}}
+                            style={canBook ? { backgroundColor: "#81D8D0", color: "white" } : {}}
                             data-testid={`button-book-${slot.id}`}
                           >
-                            {available > 0 ? "預約" : "已滿"}
+                            {tooSoon ? "需提前 3 天" : available > 0 ? "預約" : "已滿"}
                           </Button>
                         </div>
                       </div>
