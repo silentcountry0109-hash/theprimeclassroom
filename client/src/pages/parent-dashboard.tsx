@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Sheet,
   SheetContent,
@@ -689,6 +690,15 @@ function StepIndicator({ current, steps }: { current: number; steps: { label: st
   );
 }
 
+function triggerCalendarDownload() {
+  const link = document.createElement("a");
+  link.href = "/api/bookings/calendar.ics";
+  link.download = "prime-math-bookings.ics";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function BookingFlowTab() {
   const { toast } = useToast();
   const [step, setStep] = useState<"search" | "detail" | "confirm">("search");
@@ -765,6 +775,13 @@ function BookingFlowTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/franchises", selectedFranchiseId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
 
+      if (localStorage.getItem("autoCalendarSync") === "true") {
+        setTimeout(() => {
+          triggerCalendarDownload();
+          toast({ title: "行事曆已自動更新", description: "請開啟下載的檔案加入手機行事曆" });
+        }, 1000);
+      }
+
       if (bookingSlot && selectedChild) {
         try {
           setRecurringLoading(true);
@@ -816,6 +833,14 @@ function BookingFlowTab() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/franchises", selectedFranchiseId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+
+      if (successCount > 0 && localStorage.getItem("autoCalendarSync") === "true") {
+        setTimeout(() => {
+          triggerCalendarDownload();
+          toast({ title: "行事曆已自動更新", description: "請開啟下載的檔案加入手機行事曆" });
+        }, 1000);
+      }
+
       setShowRecurringDialog(false);
       setRecurringSlots([]);
       setSelectedRecurringSlots(new Set());
@@ -2306,17 +2331,19 @@ function BookingsTab() {
     return `${month}/${day}（${weekday}）`;
   };
 
-  const handleCalendarSync = () => {
-    const link = document.createElement("a");
-    link.href = "/api/bookings/calendar.ics";
-    link.download = "prime-math-bookings.ics";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast({
-      title: "行事曆檔案已下載",
-      description: "請開啟 .ics 檔案加入手機行事曆，每堂課會在開始前 6 小時提醒。若取消課程，需手動刪除行事曆中的排程。",
-    });
+  const [autoCalendarSync, setAutoCalendarSync] = useState(() => {
+    return localStorage.getItem("autoCalendarSync") === "true";
+  });
+
+  const handleAutoCalendarToggle = (checked: boolean) => {
+    setAutoCalendarSync(checked);
+    localStorage.setItem("autoCalendarSync", checked ? "true" : "false");
+    if (checked) {
+      toast({
+        title: "已開啟自動加入行事曆",
+        description: "預約成功後會自動下載行事曆檔案，請開啟檔案加入手機行事曆。",
+      });
+    }
   };
 
   return (
@@ -2330,16 +2357,18 @@ function BookingsTab() {
               : "查看和管理所有預約"}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleCalendarSync}
-          className="flex items-center gap-1.5 text-tiffany border-tiffany/30 hover:bg-tiffany/5 shrink-0"
-          data-testid="button-calendar-sync"
-        >
-          <CalendarPlus className="w-4 h-4" />
-          <span className="hidden sm:inline">加入行事曆</span>
-        </Button>
+        <div className="flex items-center gap-2 shrink-0" data-testid="toggle-calendar-sync">
+          <CalendarPlus className="w-4 h-4 text-tiffany" />
+          <label htmlFor="auto-calendar" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+            自動加入行事曆
+          </label>
+          <Switch
+            id="auto-calendar"
+            checked={autoCalendarSync}
+            onCheckedChange={handleAutoCalendarToggle}
+            data-testid="switch-auto-calendar"
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2.5">
@@ -2583,7 +2612,7 @@ function BookingsTab() {
         <div className="bg-amber-50/50 rounded-xl border border-amber-200/50 p-3">
           <p className="text-xs text-amber-700 leading-relaxed">
             <AlertCircle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-            行事曆同步說明：點擊「加入行事曆」會下載 .ics 檔案，開啟後可匯入手機行事曆。每堂課會在開始前 6 小時發送提醒。若取消課程，手機行事曆中的排程需手動刪除。每次下載會包含所有已確認的課程。
+            行事曆同步說明：開啟「自動加入行事曆」後，每次預約成功會自動下載 .ics 檔案。手機開啟檔案後即可匯入行事曆，每堂課會在開始前 6 小時提醒。若取消課程，手機行事曆中的排程需手動刪除。
           </p>
         </div>
       </div>

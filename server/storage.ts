@@ -385,14 +385,14 @@ export class DatabaseStorage implements IStorage {
     const prefix = taiwanDateStr;
     const existing = await db.select({ studentCode: children.studentCode })
       .from(children)
-      .where(sql`${children.studentCode} LIKE ${prefix + '-%'}`);
+      .where(sql`${children.studentCode} LIKE ${prefix + '%'} AND length(${children.studentCode}) = 12`);
     const maxSeq = existing.reduce((max, row) => {
-      if (!row.studentCode) return max;
-      const seq = parseInt(row.studentCode.split("-")[1] || "0", 10);
+      if (!row.studentCode || row.studentCode.length !== 12) return max;
+      const seq = parseInt(row.studentCode.substring(8), 10);
       return seq > max ? seq : max;
     }, 0);
     const nextSeq = (maxSeq + 1).toString().padStart(4, "0");
-    return `${prefix}-${nextSeq}`;
+    return `${prefix}${nextSeq}`;
   }
 
   async createChild(child: InsertChild): Promise<Child> {
@@ -1227,6 +1227,16 @@ export const storage = new DatabaseStorage();
 (async () => {
   try {
     const allChildren = await db.select().from(children);
+
+    const withDash = allChildren.filter((c) => c.studentCode && c.studentCode.includes("-"));
+    for (const child of withDash) {
+      const newCode = child.studentCode!.replace(/-/g, "");
+      await db.update(children).set({ studentCode: newCode }).where(eq(children.id, child.id));
+    }
+    if (withDash.length > 0) {
+      console.log(`Migrated ${withDash.length} student codes to remove dashes`);
+    }
+
     const needCode = allChildren.filter((c) => !c.studentCode);
     for (const child of needCode) {
       const dateStr = child.createdAt
@@ -1235,14 +1245,14 @@ export const storage = new DatabaseStorage();
       const prefix = dateStr;
       const existing = await db.select({ studentCode: children.studentCode })
         .from(children)
-        .where(sql`${children.studentCode} LIKE ${prefix + '-%'}`);
+        .where(sql`${children.studentCode} LIKE ${prefix + '%'} AND length(${children.studentCode}) = 12`);
       const maxSeq = existing.reduce((max, row) => {
-        if (!row.studentCode) return max;
-        const seq = parseInt(row.studentCode.split("-")[1] || "0", 10);
+        if (!row.studentCode || row.studentCode.length !== 12) return max;
+        const seq = parseInt(row.studentCode.substring(8), 10);
         return seq > max ? seq : max;
       }, 0);
       const nextSeq = (maxSeq + 1).toString().padStart(4, "0");
-      const code = `${prefix}-${nextSeq}`;
+      const code = `${prefix}${nextSeq}`;
       await db.update(children).set({ studentCode: code }).where(eq(children.id, child.id));
     }
     if (needCode.length > 0) {
