@@ -1260,11 +1260,19 @@ function TimeSlotsTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>開始時間 *</Label>
-                <Input type="time" value={slotForm.startTime} onChange={(e) => setSlotForm({ ...slotForm, startTime: e.target.value })} data-testid="input-franchise-slot-start" />
+                <Input type="time" value={slotForm.startTime} onChange={(e) => {
+                  const start = e.target.value;
+                  const [h, m] = start.split(":").map(Number);
+                  const totalMin = h * 60 + m + 90;
+                  const endH = String(Math.floor(totalMin / 60) % 24).padStart(2, "0");
+                  const endM = String(totalMin % 60).padStart(2, "0");
+                  setSlotForm({ ...slotForm, startTime: start, endTime: `${endH}:${endM}` });
+                }} data-testid="input-franchise-slot-start" />
               </div>
               <div>
-                <Label>結束時間 *</Label>
-                <Input type="time" value={slotForm.endTime} onChange={(e) => setSlotForm({ ...slotForm, endTime: e.target.value })} data-testid="input-franchise-slot-end" />
+                <Label>結束時間</Label>
+                <Input type="time" value={slotForm.endTime} disabled className="bg-gray-50" data-testid="input-franchise-slot-end" />
+                <p className="text-xs text-muted-foreground mt-1">自動設定（開始＋90分鐘）</p>
               </div>
             </div>
             <div>
@@ -1278,14 +1286,14 @@ function TimeSlotsTab() {
             </div>
             <div>
               <Label>座位數</Label>
-              <Input type="number" min="1" value={slotForm.maxSeats} onChange={(e) => setSlotForm({ ...slotForm, maxSeats: parseInt(e.target.value) || 5 })} data-testid="input-franchise-slot-seats" />
+              <p className="text-sm text-foreground mt-1.5 px-3 py-2 bg-gray-50 rounded-md border border-gray-100" data-testid="text-franchise-slot-seats">5 人</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
             <Button
               onClick={() => addSlotMutation.mutate(slotForm)}
-              disabled={!slotForm.date || !slotForm.startTime || !slotForm.endTime || addSlotMutation.isPending}
+              disabled={!slotForm.date || !slotForm.startTime || addSlotMutation.isPending}
               data-testid="button-submit-franchise-slot"
             >
               {addSlotMutation.isPending ? "新增中..." : "新增時段"}
