@@ -84,6 +84,7 @@ import {
 import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
+import { TAIWAN_CITIES, getDistricts, getSchools } from "@shared/taiwan-schools";
 import avatarBoyPath from "../assets/avatar-boy.png";
 import avatarGirlPath from "../assets/avatar-girl.png";
 
@@ -1510,6 +1511,9 @@ function ChildrenTab() {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
   const [school, setSchool] = useState("");
+  const [schoolCity, setSchoolCity] = useState("");
+  const [schoolDistrict, setSchoolDistrict] = useState("");
+  const [schoolName, setSchoolName] = useState("");
   const [gender, setGender] = useState<"male" | "female">("male");
 
   const { data: children = [], isLoading } = useQuery<Child[]>({
@@ -1524,7 +1528,7 @@ function ChildrenTab() {
     bookings.filter((b) => b.childId === childId);
 
   const addMutation = useMutation({
-    mutationFn: async (data: { name: string; grade: number; school?: string; gender?: string }) => {
+    mutationFn: async (data: { name: string; grade: number; school: string; gender?: string }) => {
       const res = await apiRequest("POST", "/api/children", data);
       return res.json();
     },
@@ -1553,12 +1557,42 @@ function ChildrenTab() {
     },
   });
 
+  const composedSchool = useMemo(() => {
+    if (schoolCity && schoolDistrict && schoolName) {
+      return `${schoolCity}${schoolDistrict}${schoolName}`;
+    }
+    return "";
+  }, [schoolCity, schoolDistrict, schoolName]);
+
+  const parseSchoolString = (schoolStr: string) => {
+    if (!schoolStr) return { city: "", district: "", name: "" };
+    for (const city of TAIWAN_CITIES) {
+      if (schoolStr.startsWith(city)) {
+        const rest = schoolStr.slice(city.length);
+        const districts = getDistricts(city);
+        for (const dist of districts) {
+          if (rest.startsWith(dist)) {
+            const sName = rest.slice(dist.length);
+            return { city, district: dist, name: sName };
+          }
+        }
+      }
+    }
+    return { city: "", district: "", name: "" };
+  };
+
+  const availableDistricts = useMemo(() => schoolCity ? getDistricts(schoolCity) : [], [schoolCity]);
+  const availableSchools = useMemo(() => (schoolCity && schoolDistrict) ? getSchools(schoolCity, schoolDistrict) : [], [schoolCity, schoolDistrict]);
+
   const closeDialog = () => {
     setShowAddDialog(false);
     setEditingChild(null);
     setName("");
     setGrade("");
     setSchool("");
+    setSchoolCity("");
+    setSchoolDistrict("");
+    setSchoolName("");
     setGender("male");
   };
 
@@ -1566,6 +1600,9 @@ function ChildrenTab() {
     setName("");
     setGrade("");
     setSchool("");
+    setSchoolCity("");
+    setSchoolDistrict("");
+    setSchoolName("");
     setGender("male");
     setShowAddDialog(true);
   };
@@ -1574,22 +1611,34 @@ function ChildrenTab() {
     setEditingChild(child);
     setName(child.name);
     setGrade(child.grade.toString());
-    setSchool(child.school || "");
+    const schoolStr = child.school || "";
+    setSchool(schoolStr);
+    const parsed = parseSchoolString(schoolStr);
+    if (parsed.city && parsed.district && parsed.name) {
+      setSchoolCity(parsed.city);
+      setSchoolDistrict(parsed.district);
+      setSchoolName(parsed.name);
+    } else {
+      setSchoolCity("");
+      setSchoolDistrict("");
+      setSchoolName("");
+    }
     setGender((child.gender as "male" | "female") || "male");
   };
 
   const handleSubmit = () => {
-    if (!name || !grade) return;
+    const finalSchool = composedSchool;
+    if (!name || !grade || !finalSchool) return;
     if (editingChild) {
       editMutation.mutate({
         id: editingChild.id,
-        data: { name, grade: parseInt(grade), school: school || undefined, gender },
+        data: { name, grade: parseInt(grade), school: finalSchool, gender },
       });
     } else {
       addMutation.mutate({
         name,
         grade: parseInt(grade),
-        school: school || undefined,
+        school: finalSchool,
         gender,
       });
     }
@@ -1785,13 +1834,44 @@ function ChildrenTab() {
               </Select>
             </div>
             <div>
-              <Label className="mb-1.5 block">學校（選填）</Label>
-              <Input
-                value={school}
-                onChange={(e) => setSchool(e.target.value)}
-                placeholder="請輸入學校名稱"
-                data-testid="input-child-school"
-              />
+              <Label className="mb-1.5 block">就讀學校 <span className="text-red-400 text-xs">*必填</span></Label>
+              {editingChild && school && !composedSchool && (
+                <p className="text-xs text-amber-600 mb-1.5" data-testid="text-legacy-school-hint">
+                  目前學校：{school}，請重新選擇學校
+                </p>
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                <Select value={schoolCity} onValueChange={(val) => { setSchoolCity(val); setSchoolDistrict(""); setSchoolName(""); }}>
+                  <SelectTrigger data-testid="select-school-city">
+                    <SelectValue placeholder="縣市" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TAIWAN_CITIES.map((city) => (
+                      <SelectItem key={city} value={city}>{city}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={schoolDistrict} onValueChange={(val) => { setSchoolDistrict(val); setSchoolName(""); }} disabled={!schoolCity}>
+                  <SelectTrigger data-testid="select-school-district">
+                    <SelectValue placeholder="鄉鎮區" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDistricts.map((dist) => (
+                      <SelectItem key={dist} value={dist}>{dist}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={schoolName} onValueChange={setSchoolName} disabled={!schoolDistrict}>
+                  <SelectTrigger data-testid="select-school-name">
+                    <SelectValue placeholder="學校" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSchools.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -1800,7 +1880,7 @@ function ChildrenTab() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!name || !grade || isMutating}
+              disabled={!name || !grade || !composedSchool || isMutating}
               style={{ backgroundColor: "#81D8D0", color: "white" }}
               data-testid="button-submit-child"
             >

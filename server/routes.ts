@@ -325,6 +325,9 @@ export async function registerRoutes(
   app.post("/api/children", isCredentialOrAuth, async (req: any, res) => {
     try {
       const userId = req.currentUser.id;
+      if (!req.body.school || typeof req.body.school !== "string" || req.body.school.trim().length === 0) {
+        return res.status(400).json({ message: "請選擇就讀學校" });
+      }
       const child = await storage.createChild({
         ...req.body,
         parentId: userId,

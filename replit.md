@@ -33,6 +33,7 @@ The design aesthetic is Japanese minimalist, featuring a grid paper background p
 - **ICS Calendar Export**: Parents can export confirmed bookings to their calendars with reminder alarms.
 - **Favorite Franchises**: Parents can toggle a heart icon on franchise search cards to mark favorites. Favorited classrooms are pinned to the top of search results with a coral highlight. Data stored in `favoriteFranchises` table (userId + franchiseId). API: GET/POST/DELETE `/api/favorite-franchises/:franchiseId`.
 - **HQ Admin Analytics Dashboard**: The admin OverviewTab displays 6 summary stat cards (students, coaches, franchises, bookings, avg occupancy, this-month bookings) plus a per-franchise analytics breakdown with sortable/filterable cards showing coaches, students, bookings, occupancy rate, upcoming slots, and monthly metrics. API: GET `/api/admin/franchise-analytics`.
+- **School Cascading Dropdown**: When adding/editing a child, school is a required field using 3 cascading Select dropdowns: City → District → Elementary School. Data sourced from `shared/taiwan-schools.ts` covering all 22 Taiwan counties/cities. School value stored as concatenated string (e.g., "台北市大安區大安國小"). Legacy school data is handled with a migration hint during edit.
 
 ## External Dependencies
 - **Replit Auth**: Used for OpenID Connect based authentication for parent users.
