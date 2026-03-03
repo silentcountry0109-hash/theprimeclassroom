@@ -748,6 +748,298 @@ function PhotoManager({ franchiseId, photos, coverPhoto }: { franchiseId: number
   );
 }
 
+function CoachScheduleDialog({ coach, data, loading, onClose }: { coach: Coach | null; data: any[]; loading: boolean; onClose: () => void }) {
+  const [viewMode, setViewMode] = useState<"week" | "month" | "list">("week");
+  const [weekStart, setWeekStart] = useState(() => {
+    const now = new Date();
+    const dow = now.getDay();
+    const diff = dow === 0 ? -6 : 1 - dow;
+    const mon = new Date(now);
+    mon.setDate(mon.getDate() + diff);
+    return { year: mon.getFullYear(), month: mon.getMonth(), day: mon.getDate() };
+  });
+  const [calMonth, setCalMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [selectedCalDate, setSelectedCalDate] = useState<string | null>(null);
+
+  const prevCoachId = useState<number | null>(null);
+  if (coach && coach.id !== prevCoachId[0]) {
+    prevCoachId[1](coach.id);
+    setViewMode("week");
+    setSelectedCalDate(null);
+    const now = new Date();
+    const dow = now.getDay();
+    const diff = dow === 0 ? -6 : 1 - dow;
+    const mon = new Date(now);
+    mon.setDate(mon.getDate() + diff);
+    setWeekStart({ year: mon.getFullYear(), month: mon.getMonth(), day: mon.getDate() });
+    setCalMonth({ year: now.getFullYear(), month: now.getMonth() });
+  }
+
+  const fmtDate = (d: Date) => {
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${dd}`;
+  };
+
+  const todayStr = fmtDate(new Date());
+
+  const slotsByDate: Record<string, any[]> = {};
+  data.forEach((s) => {
+    if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
+    slotsByDate[s.date].push(s);
+  });
+  Object.values(slotsByDate).forEach((arr) => arr.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime)));
+
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart.year, weekStart.month, weekStart.day + i);
+    return fmtDate(d);
+  });
+  const weekLabel = (() => {
+    const s = new Date(weekStart.year, weekStart.month, weekStart.day);
+    const e = new Date(weekStart.year, weekStart.month, weekStart.day + 6);
+    const sYear = s.getFullYear();
+    const eYear = e.getFullYear();
+    if (sYear !== eYear) return `${sYear}/${s.getMonth() + 1}/${s.getDate()} - ${eYear}/${e.getMonth() + 1}/${e.getDate()}`;
+    return `${s.getMonth() + 1}/${s.getDate()} - ${e.getMonth() + 1}/${e.getDate()}`;
+  })();
+
+  const calendarDays = (() => {
+    const { year, month } = calMonth;
+    const firstDay = new Date(year, month, 1);
+    let startDow = firstDay.getDay();
+    if (startDow === 0) startDow = 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: (string | null)[] = [];
+    for (let i = 1; i < startDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const mo = String(month + 1).padStart(2, "0");
+      const dd = String(d).padStart(2, "0");
+      cells.push(`${year}-${mo}-${dd}`);
+    }
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  })();
+
+  const dayLabels = ["日", "一", "二", "三", "四", "五", "六"];
+  const weekHeaderLabels = ["一", "二", "三", "四", "五", "六", "日"];
+
+  const renderSlotItem = (slot: any) => (
+    <div key={slot.slotId} className="flex items-center gap-2 text-xs py-1" data-testid={`schedule-slot-${slot.slotId}`}>
+      <span className="text-tiffany font-medium whitespace-nowrap">{slot.startTime}-{slot.endTime}</span>
+      <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full truncate">{slot.franchiseName}</span>
+      <span className="text-muted-foreground ml-auto whitespace-nowrap">{slot.bookedSeats}/{slot.maxSeats}</span>
+    </div>
+  );
+
+  return (
+    <Dialog open={!!coach} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className={`max-h-[90vh] overflow-y-auto ${viewMode === "list" ? "max-w-lg" : "max-w-3xl"}`}>
+        <DialogHeader>
+          <DialogTitle>{coach?.name} 的跨校課表</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex bg-gray-100 rounded-lg p-0.5 w-fit" data-testid="schedule-view-toggle">
+          {([["week", "週曆"], ["month", "月曆"], ["list", "列表"]] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${viewMode === mode ? "bg-white shadow-sm text-tiffany font-medium" : "text-muted-foreground hover:text-foreground"}`}
+              data-testid={`button-schedule-view-${mode}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="space-y-3 py-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-md" />)}</div>
+        ) : data.length === 0 ? (
+          <div className="text-center py-8">
+            <CalendarDays className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">目前沒有排課</p>
+          </div>
+        ) : viewMode === "week" ? (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <button
+                onClick={() => setWeekStart((prev) => {
+                  const d = new Date(prev.year, prev.month, prev.day - 7);
+                  return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+                })}
+                className="p-1.5 rounded-md hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-schedule-prev-week"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-semibold" data-testid="text-schedule-week-label">{weekLabel}</span>
+              <button
+                onClick={() => setWeekStart((prev) => {
+                  const d = new Date(prev.year, prev.month, prev.day + 7);
+                  return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+                })}
+                className="p-1.5 rounded-md hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-schedule-next-week"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden border border-gray-200">
+              {weekDates.map((dateStr, i) => {
+                const daySlots = slotsByDate[dateStr] || [];
+                const dayNum = parseInt(dateStr.split("-")[2]);
+                const dow = new Date(dateStr + "T00:00:00").getDay();
+                const isToday = dateStr === todayStr;
+                return (
+                  <div key={dateStr} className="bg-white min-h-[120px] p-1.5" data-testid={`schedule-week-day-${dateStr}`}>
+                    <div className="text-center mb-1">
+                      <div className="text-[10px] text-muted-foreground">{dayLabels[dow]}</div>
+                      <span className={`text-xs inline-flex items-center justify-center w-5 h-5 rounded-full ${isToday ? "bg-tiffany text-white font-bold" : "text-gray-700"}`}>
+                        {dayNum}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {daySlots.map((slot: any) => (
+                        <div key={slot.slotId} className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate" title={`${slot.startTime}-${slot.endTime} ${slot.franchiseName}`} data-testid={`schedule-week-slot-${slot.slotId}`}>
+                          {slot.startTime}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {(() => {
+              const allWeekSlots = weekDates.flatMap((d) => (slotsByDate[d] || []).map((s: any) => ({ ...s, date: d })));
+              if (allWeekSlots.length === 0) return <p className="text-sm text-muted-foreground text-center py-4">本週無排課</p>;
+              const grouped = allWeekSlots.reduce((g: Record<string, any[]>, s) => {
+                if (!g[s.date]) g[s.date] = [];
+                g[s.date].push(s);
+                return g;
+              }, {});
+              return (
+                <div className="mt-3 space-y-2">
+                  {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([date, slots]) => (
+                    <div key={date} className="border border-gray-100 rounded-md overflow-hidden">
+                      <div className="bg-gray-50 px-3 py-1.5">
+                        <span className="text-xs font-medium" data-testid={`schedule-date-${date}`}>{date} ({dayLabels[new Date(date + "T00:00:00").getDay()]})</span>
+                      </div>
+                      <div className="px-3 py-1 divide-y divide-gray-50">
+                        {(slots as any[]).map((slot: any) => renderSlotItem(slot))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        ) : viewMode === "month" ? (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <button
+                onClick={() => { setSelectedCalDate(null); setCalMonth((prev) => { const d = new Date(prev.year, prev.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; }); }}
+                className="p-1.5 rounded-md hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-schedule-prev-month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-semibold" data-testid="text-schedule-month-label">{calMonth.year}年{calMonth.month + 1}月</span>
+              <button
+                onClick={() => { setSelectedCalDate(null); setCalMonth((prev) => { const d = new Date(prev.year, prev.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; }); }}
+                className="p-1.5 rounded-md hover:bg-gray-100 text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-schedule-next-month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-7 text-center text-[10px] font-medium text-muted-foreground mb-1">
+              {["一", "二", "三", "四", "五", "六", "日"].map((d) => <div key={d} className="py-1">{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden border border-gray-200">
+              {calendarDays.map((dateStr, i) => {
+                if (!dateStr) return <div key={`empty-${i}`} className="bg-gray-50 min-h-[60px]" />;
+                const daySlots = slotsByDate[dateStr] || [];
+                const dayNum = parseInt(dateStr.split("-")[2]);
+                const isToday = dateStr === todayStr;
+                const isSelected = dateStr === selectedCalDate;
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedCalDate(isSelected ? null : dateStr)}
+                    className={`bg-white min-h-[60px] p-1 text-left transition-colors hover:bg-tiffany/5 ${isSelected ? "ring-2 ring-tiffany ring-inset" : ""}`}
+                    data-testid={`schedule-cal-day-${dateStr}`}
+                  >
+                    <span className={`text-[10px] inline-flex items-center justify-center w-4 h-4 rounded-full ${isToday ? "bg-tiffany text-white font-bold" : "text-gray-700"}`}>
+                      {dayNum}
+                    </span>
+                    {daySlots.length > 0 && (
+                      <div className="mt-0.5">
+                        {daySlots.length <= 2 ? daySlots.map((s: any) => (
+                          <div key={s.slotId} className="text-[9px] leading-tight bg-tiffany/10 text-tiffany rounded px-0.5 py-0.5 truncate mb-0.5">{s.startTime}</div>
+                        )) : (
+                          <>
+                            <div className="text-[9px] leading-tight bg-tiffany/10 text-tiffany rounded px-0.5 py-0.5 truncate mb-0.5">{daySlots[0].startTime}</div>
+                            <div className="text-[9px] text-muted-foreground px-0.5">+{daySlots.length - 1} 堂</div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedCalDate && (
+              <div className="mt-3" data-testid="schedule-cal-day-detail">
+                <h4 className="text-xs font-semibold mb-2">
+                  {selectedCalDate} ({dayLabels[new Date(selectedCalDate + "T00:00:00").getDay()]}) — {(slotsByDate[selectedCalDate] || []).length} 堂
+                </h4>
+                {(slotsByDate[selectedCalDate] || []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-3">當日無排課</p>
+                ) : (
+                  <div className="border border-gray-100 rounded-md px-3 py-1 divide-y divide-gray-50">
+                    {(slotsByDate[selectedCalDate] || []).map((slot: any) => renderSlotItem(slot))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3 py-2">
+            {Object.entries(
+              data.reduce((groups: Record<string, any[]>, slot) => {
+                if (!groups[slot.date]) groups[slot.date] = [];
+                groups[slot.date].push(slot);
+                return groups;
+              }, {})
+            ).sort(([a], [b]) => a.localeCompare(b)).map(([date, slots]) => (
+              <div key={date} className="border border-gray-100 rounded-md overflow-hidden">
+                <div className="bg-gray-50 px-3 py-2">
+                  <span className="text-sm font-medium" data-testid={`schedule-date-${date}`}>{date} ({dayLabels[new Date(date + "T00:00:00").getDay()]})</span>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {(slots as any[]).map((slot: any) => (
+                    <div key={slot.slotId} className="px-3 py-2 flex items-center gap-3" data-testid={`schedule-slot-${slot.slotId}`}>
+                      <span className="text-sm text-tiffany font-medium">{slot.startTime}-{slot.endTime}</span>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{slot.franchiseName}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">{slot.bookedSeats}/{slot.maxSeats} 人</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>關閉</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CoachesTab() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
@@ -1107,50 +1399,12 @@ function CoachesTab() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!scheduleCoach} onOpenChange={(open) => { if (!open) { setScheduleCoach(null); setScheduleData([]); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{scheduleCoach?.name} 的跨校課表</DialogTitle>
-          </DialogHeader>
-          {scheduleLoading ? (
-            <div className="space-y-3 py-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-md" />)}</div>
-          ) : scheduleData.length === 0 ? (
-            <div className="text-center py-8">
-              <CalendarDays className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">目前沒有排課</p>
-            </div>
-          ) : (
-            <div className="space-y-3 py-4">
-              {Object.entries(
-                scheduleData.reduce((groups: Record<string, any[]>, slot) => {
-                  const key = slot.date;
-                  if (!groups[key]) groups[key] = [];
-                  groups[key].push(slot);
-                  return groups;
-                }, {})
-              ).map(([date, slots]) => (
-                <div key={date} className="border border-gray-100 rounded-md overflow-hidden">
-                  <div className="bg-gray-50 px-3 py-2">
-                    <span className="text-sm font-medium" data-testid={`schedule-date-${date}`}>{date} ({DAY_LABELS[new Date(date).getDay().toString()] || ""})</span>
-                  </div>
-                  <div className="divide-y divide-gray-50">
-                    {(slots as any[]).map((slot: any) => (
-                      <div key={slot.slotId} className="px-3 py-2 flex items-center gap-3" data-testid={`schedule-slot-${slot.slotId}`}>
-                        <span className="text-sm text-tiffany font-medium">{slot.startTime}-{slot.endTime}</span>
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{slot.franchiseName}</span>
-                        <span className="text-xs text-muted-foreground ml-auto">{slot.bookedSeats}/{slot.maxSeats} 人</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setScheduleCoach(null); setScheduleData([]); }}>關閉</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CoachScheduleDialog
+        coach={scheduleCoach}
+        data={scheduleData}
+        loading={scheduleLoading}
+        onClose={() => { setScheduleCoach(null); setScheduleData([]); }}
+      />
     </div>
   );
 }
