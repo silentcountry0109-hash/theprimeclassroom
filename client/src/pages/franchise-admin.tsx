@@ -974,14 +974,9 @@ function CoachScheduleDialog({ coach, data, loading, onClose }: { coach: Coach |
                     </span>
                     {daySlots.length > 0 && (
                       <div className="mt-0.5">
-                        {daySlots.length <= 2 ? daySlots.map((s: any) => (
-                          <div key={s.slotId} className="text-[9px] leading-tight bg-tiffany/10 text-tiffany rounded px-0.5 py-0.5 truncate mb-0.5">{s.startTime}</div>
-                        )) : (
-                          <>
-                            <div className="text-[9px] leading-tight bg-tiffany/10 text-tiffany rounded px-0.5 py-0.5 truncate mb-0.5">{daySlots[0].startTime}</div>
-                            <div className="text-[9px] text-muted-foreground px-0.5">+{daySlots.length - 1} 堂</div>
-                          </>
-                        )}
+                        {daySlots.map((s: any) => (
+                          <div key={s.slotId} className="text-[9px] leading-tight bg-tiffany/10 text-tiffany rounded px-0.5 py-0.5 truncate mb-0.5 text-center">{s.startTime}-{s.endTime}</div>
+                        ))}
                       </div>
                     )}
                   </button>
@@ -991,7 +986,12 @@ function CoachScheduleDialog({ coach, data, loading, onClose }: { coach: Coach |
             {selectedCalDate && (
               <div className="mt-3" data-testid="schedule-cal-day-detail">
                 <h4 className="text-xs font-semibold mb-2">
-                  {selectedCalDate} ({dayLabels[new Date(selectedCalDate + "T00:00:00").getDay()]}) — {(slotsByDate[selectedCalDate] || []).length} 堂
+                  {selectedCalDate} ({dayLabels[new Date(selectedCalDate + "T00:00:00").getDay()]})
+                  {(() => {
+                    const ds = slotsByDate[selectedCalDate] || [];
+                    const franchises = [...new Set(ds.map((s: any) => s.franchiseName))];
+                    return <> · {franchises.join("、")} — {ds.length} 堂</>;
+                  })()}
                 </h4>
                 {(slotsByDate[selectedCalDate] || []).length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-3">當日無排課</p>
