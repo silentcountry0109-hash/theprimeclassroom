@@ -1,8 +1,10 @@
 import { Star, Award } from "lucide-react";
+import { getCoachPhoto } from "@/lib/default-images";
 
 interface CoachCardProps {
   name: string;
   photoUrl?: string | null;
+  coachId?: number;
   specialties?: string[] | null;
   rating?: number | null;
   reviewCount?: number | null;
@@ -14,6 +16,7 @@ interface CoachCardProps {
 export default function CoachCard({
   name,
   photoUrl,
+  coachId,
   specialties,
   rating,
   reviewCount,
@@ -21,6 +24,7 @@ export default function CoachCard({
   maxSeats = 5,
   isCertified,
 }: CoachCardProps) {
+  const resolvedPhoto = getCoachPhoto(name, coachId, photoUrl);
   const availableSeats = maxSeats - bookedSeats;
 
   return (
@@ -29,19 +33,11 @@ export default function CoachCard({
       data-testid={`card-coach-${name}`}
     >
       <div className="relative aspect-[3/4] rounded-2xl bg-gradient-to-br from-tiffany/20 to-tiffany/5">
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt={name}
-            className="w-full h-full object-cover rounded-2xl"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center rounded-2xl">
-            <span className="text-7xl font-serif text-tiffany/30 select-none">
-              {name[0]}
-            </span>
-          </div>
-        )}
+        <img
+          src={resolvedPhoto}
+          alt={name}
+          className="w-full h-full object-cover rounded-2xl"
+        />
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent rounded-2xl" />
 

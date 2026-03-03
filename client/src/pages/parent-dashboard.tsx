@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getDefaultClassroomImage } from "@/lib/default-images";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1313,11 +1314,22 @@ function BookingFlowTab() {
               )}
             </div>
 
-            {detail.franchise.photos && detail.franchise.photos.length > 0 && (
+            {detail.franchise.photos && detail.franchise.photos.length > 0 ? (
               <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                 <PhotoCarousel photos={detail.franchise.photos} alt={detail.franchise.name} height="h-52" showControls />
                 <div className="px-4 py-2 text-xs text-muted-foreground/60 text-center">
                   教室環境 · {detail.franchise.photos.length} 張照片
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <img
+                  src={getDefaultClassroomImage(detail.franchise.id)}
+                  alt={detail.franchise.name}
+                  className="w-full h-52 object-cover"
+                />
+                <div className="px-4 py-2 text-xs text-muted-foreground/60 text-center">
+                  教室環境
                 </div>
               </div>
             )}
@@ -1605,7 +1617,7 @@ function BookingFlowTab() {
             .map((result) => {
             const f = result.franchise;
             const isFav = favoriteIds.includes(f.id);
-            const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null);
+            const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null) || getDefaultClassroomImage(f.id);
             return (
               <div
                 key={f.id}
@@ -1613,13 +1625,7 @@ function BookingFlowTab() {
                 data-testid={`franchise-card-${f.id}`}
               >
                 <div className="relative flex-shrink-0 w-28 sm:w-36 cursor-pointer" onClick={() => selectFranchise(f.id)}>
-                  {coverImg ? (
-                    <img src={coverImg} alt={f.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-tiffany/5 to-tiffany/10 flex items-center justify-center">
-                      <Building2 className="w-8 h-8 text-tiffany/30" />
-                    </div>
-                  )}
+                  <img src={coverImg} alt={f.name} className="w-full h-full object-cover" />
                   <button
                     onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate({ franchiseId: f.id, isFavorite: isFav }); }}
                     className={`absolute top-1.5 left-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all ${isFav ? "bg-coral/90 text-white" : "bg-black/30 text-white/80 hover:bg-coral/70 hover:text-white"}`}

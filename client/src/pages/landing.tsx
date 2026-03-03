@@ -1330,6 +1330,7 @@ function CoachesSection() {
                   <div key={coach.id} className="flex-shrink-0" style={{ width: cardWidth }}>
                     <CoachCard
                       name={coach.name}
+                      coachId={coach.id}
                       photoUrl={TEACHER_PHOTOS[coach.name] || coach.photoUrl}
                       specialties={coach.specialties}
                       rating={coach.rating}

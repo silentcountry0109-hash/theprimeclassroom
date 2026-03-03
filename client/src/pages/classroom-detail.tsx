@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
+import { getCoachPhoto, getDefaultClassroomImage } from "@/lib/default-images";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -41,21 +42,6 @@ import { useToast } from "@/hooks/use-toast";
 import type { Franchise, Coach, Child } from "@shared/schema";
 import { DAY_LABELS } from "@shared/constants";
 
-import teacher1Img from "@assets/teacher_1.png";
-import teacher2Img from "@assets/teacher_2.png";
-import teacher3Img from "@assets/teacher_3.png";
-import teacher4Img from "@assets/teacher_4.png";
-import teacher5Img from "@assets/teacher_5.png";
-import teacher6Img from "@assets/teacher_6.png";
-
-const TEACHER_PHOTOS: Record<string, string> = {
-  "林佳慧": teacher1Img,
-  "陳志明": teacher2Img,
-  "王雅琪": teacher3Img,
-  "張育銘": teacher4Img,
-  "李美玲": teacher5Img,
-  "黃建宏": teacher6Img,
-};
 
 interface SlotWithCoach {
   id: number;
@@ -271,8 +257,16 @@ export default function ClassroomDetail() {
           </div>
         </div>
 
-        {f.photos && f.photos.length > 0 && (
+        {f.photos && f.photos.length > 0 ? (
           <PhotoCarousel photos={f.photos} />
+        ) : (
+          <div className="rounded-xl overflow-hidden border border-gray-100">
+            <img
+              src={getDefaultClassroomImage(f.id)}
+              alt={f.name}
+              className="w-full h-52 object-cover"
+            />
+          </div>
         )}
 
         {coachList.length > 0 && (
@@ -283,17 +277,11 @@ export default function ClassroomDetail() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {coachList.map((coach) => (
                 <div key={coach.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-start gap-3" data-testid={`coach-card-${coach.id}`}>
-                  {TEACHER_PHOTOS[coach.name] ? (
-                    <img
-                      src={TEACHER_PHOTOS[coach.name]}
-                      alt={coach.name}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-tiffany/20 flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
-                      <GraduationCap className="w-5 h-5 text-tiffany" />
-                    </div>
-                  )}
+                  <img
+                    src={getCoachPhoto(coach.name, coach.id, coach.photoUrl)}
+                    alt={coach.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-tiffany/20 flex-shrink-0"
+                  />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium text-sm text-foreground">{coach.name}</span>
@@ -390,17 +378,11 @@ export default function ClassroomDetail() {
 
                     {slot.coachName && (
                       <div className="flex items-center gap-2 mb-3">
-                        {TEACHER_PHOTOS[slot.coachName] ? (
-                          <img
-                            src={TEACHER_PHOTOS[slot.coachName]}
-                            alt={slot.coachName}
-                            className="w-7 h-7 rounded-full object-cover border border-tiffany/20"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-tiffany/10 flex items-center justify-center">
-                            <GraduationCap className="w-3.5 h-3.5 text-tiffany" />
-                          </div>
-                        )}
+                        <img
+                          src={getCoachPhoto(slot.coachName, slot.coachId)}
+                          alt={slot.coachName}
+                          className="w-7 h-7 rounded-full object-cover border border-tiffany/20"
+                        />
                         <span className="text-sm text-muted-foreground">{slot.coachName}</span>
                       </div>
                     )}
