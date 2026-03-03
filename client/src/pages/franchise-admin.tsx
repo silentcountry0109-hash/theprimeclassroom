@@ -801,10 +801,7 @@ function CoachScheduleDialog({ coach, data, loading, onClose }: { coach: Coach |
   const weekLabel = (() => {
     const s = new Date(weekStart.year, weekStart.month, weekStart.day);
     const e = new Date(weekStart.year, weekStart.month, weekStart.day + 6);
-    const sYear = s.getFullYear();
-    const eYear = e.getFullYear();
-    if (sYear !== eYear) return `${sYear}/${s.getMonth() + 1}/${s.getDate()} - ${eYear}/${e.getMonth() + 1}/${e.getDate()}`;
-    return `${s.getMonth() + 1}/${s.getDate()} - ${e.getMonth() + 1}/${e.getDate()}`;
+    return `${s.getFullYear()}/${s.getMonth() + 1}/${s.getDate()} - ${e.getFullYear()}/${e.getMonth() + 1}/${e.getDate()}`;
   })();
 
   const calendarDays = (() => {
