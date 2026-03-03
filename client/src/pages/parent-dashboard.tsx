@@ -365,7 +365,21 @@ function OverviewTab({
     });
 
   const completedCount = bookings.filter((b) => b.status === "completed").length;
-  const nextClass = upcomingBookings[0];
+
+  const nextClassPerChild = useMemo(() => {
+    const seen = new Set<number>();
+    const result: typeof upcomingBookings = [];
+    for (const b of upcomingBookings) {
+      if (!seen.has(b.childId)) {
+        seen.add(b.childId);
+        result.push(b);
+      }
+    }
+    return result;
+  }, [upcomingBookings]);
+
+  const nextClassIds = new Set(nextClassPerChild.map(b => b.id));
+  const remainingUpcoming = upcomingBookings.filter(b => !nextClassIds.has(b.id));
 
   const gradeLabel = (g: number) => {
     const labels = ["一", "二", "三", "四", "五", "六"];
@@ -402,66 +416,71 @@ function OverviewTab({
         )}
       </div>
 
-      {nextClass && (
-        <button
-          onClick={() => onNavigate("bookings")}
-          className="w-full bg-gradient-to-r from-tiffany/8 via-white to-coral/5 rounded-2xl border border-tiffany/20 p-4 sm:p-5 text-left hover:shadow-md transition-all group"
-          data-testid="card-next-class"
-        >
-          <div className="flex items-center gap-1.5 mb-3">
+      {nextClassPerChild.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-tiffany" />
             <span className="text-xs font-medium text-tiffany tracking-wider">下一堂課</span>
             <span className="text-[10px] text-muted-foreground ml-auto" data-testid="text-next-class-countdown">
-              {nextClass.slotDate && nextClass.slotStartTime && getCountdownText(nextClass.slotDate, nextClass.slotStartTime)}
+              {nextClassPerChild[0].slotDate && nextClassPerChild[0].slotStartTime && getCountdownText(nextClassPerChild[0].slotDate, nextClassPerChild[0].slotStartTime)}
             </span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex-shrink-0 bg-white rounded-xl p-3 shadow-sm border border-gray-50">
-              <div className="text-xs text-muted-foreground text-center">
-                {(() => {
-                  if (!nextClass.slotDate) return "";
-                  const d = new Date(nextClass.slotDate + "T00:00:00");
-                  const today = new Date();
-                  today.setHours(0,0,0,0);
-                  const tmrw = new Date(today); tmrw.setDate(tmrw.getDate()+1);
-                  if (d.getTime() === today.getTime()) return "今天";
-                  if (d.getTime() === tmrw.getTime()) return "明天";
-                  return `${d.getMonth()+1}/${d.getDate()}`;
-                })()}
-              </div>
-              <div className="text-xl font-bold text-tiffany text-center">
-                {nextClass.slotStartTime?.slice(0, 5)}
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground truncate group-hover:text-tiffany transition-colors">
-                {nextClass.franchiseName || "教室"}
-              </p>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
-                {nextClass.coachName && (
-                  <span className="flex items-center gap-1">
-                    <GraduationCap className="w-3 h-3 text-tiffany" />
-                    {nextClass.coachName} 老師
-                  </span>
-                )}
-                <span className="text-muted-foreground/60">
-                  {nextClass.slotStartTime?.slice(0,5)} - {nextClass.slotEndTime?.slice(0,5)}
-                </span>
-              </div>
-              {nextClass.childName && (
-                <div className="flex items-center gap-1.5 mt-1.5" data-testid="text-next-class-child">
-                  <img
-                    src={nextClass.childGender === "female" ? avatarGirlPath : avatarBoyPath}
-                    alt={nextClass.childName}
-                    className="w-5 h-5 rounded-full object-cover"
-                  />
-                  <span className="text-xs font-medium text-foreground">{nextClass.childName}</span>
+          {nextClassPerChild.map((nc) => (
+            <button
+              key={nc.id}
+              onClick={() => onNavigate("bookings")}
+              className="w-full bg-gradient-to-r from-tiffany/8 via-white to-coral/5 rounded-2xl border border-tiffany/20 p-4 sm:p-5 text-left hover:shadow-md transition-all group"
+              data-testid={`card-next-class-${nc.childId}`}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0 bg-white rounded-xl p-3 shadow-sm border border-gray-50">
+                  <div className="text-xs text-muted-foreground text-center">
+                    {(() => {
+                      if (!nc.slotDate) return "";
+                      const d = new Date(nc.slotDate + "T00:00:00");
+                      const today = new Date();
+                      today.setHours(0,0,0,0);
+                      const tmrw = new Date(today); tmrw.setDate(tmrw.getDate()+1);
+                      if (d.getTime() === today.getTime()) return "今天";
+                      if (d.getTime() === tmrw.getTime()) return "明天";
+                      return `${d.getMonth()+1}/${d.getDate()}`;
+                    })()}
+                  </div>
+                  <div className="text-xl font-bold text-tiffany text-center">
+                    {nc.slotStartTime?.slice(0, 5)}
+                  </div>
                 </div>
-              )}
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-tiffany transition-colors flex-shrink-0" />
-          </div>
-        </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-semibold text-foreground truncate group-hover:text-tiffany transition-colors">
+                    {nc.franchiseName || "教室"}
+                  </p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                    {nc.coachName && (
+                      <span className="flex items-center gap-1">
+                        <GraduationCap className="w-3 h-3 text-tiffany" />
+                        {nc.coachName} 老師
+                      </span>
+                    )}
+                    <span className="text-muted-foreground/60">
+                      {nc.slotStartTime?.slice(0,5)} - {nc.slotEndTime?.slice(0,5)}
+                    </span>
+                  </div>
+                  {nc.childName && (
+                    <div className="flex items-center gap-1.5 mt-1.5" data-testid={`text-next-class-child-${nc.childId}`}>
+                      <img
+                        src={nc.childGender === "female" ? avatarGirlPath : avatarBoyPath}
+                        alt={nc.childName}
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                      <span className="text-xs font-medium text-foreground">{nc.childName}</span>
+                    </div>
+                  )}
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-tiffany transition-colors flex-shrink-0" />
+              </div>
+            </button>
+          ))}
+        </div>
       )}
 
       {children.length === 0 ? (
@@ -574,7 +593,7 @@ function OverviewTab({
         </button>
       </div>
 
-      {upcomingBookings.length > 1 && (
+      {remainingUpcoming.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -591,7 +610,7 @@ function OverviewTab({
             </button>
           </div>
           <div className="space-y-2">
-            {upcomingBookings.slice(1, 4).map((booking) => {
+            {remainingUpcoming.slice(0, 4).map((booking) => {
               const avatarSrc = booking.childGender === "female" ? avatarGirlPath : avatarBoyPath;
               return (
                 <div
