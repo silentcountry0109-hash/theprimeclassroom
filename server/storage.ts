@@ -68,6 +68,7 @@ export interface IStorage {
   createBooking(booking: InsertBooking): Promise<Booking>;
   hasExistingBooking(slotId: number, childId: number): Promise<boolean>;
   cancelBooking(id: number): Promise<void>;
+  completeExpiredBookings(): Promise<number>;
 
   getFaqs(): Promise<Faq[]>;
   getAllFaqs(): Promise<Faq[]>;
@@ -642,6 +643,30 @@ export class DatabaseStorage implements IStorage {
       .update(timeSlots)
       .set({ bookedSeats: sql`GREATEST(${timeSlots.bookedSeats} - 1, 0)` })
       .where(eq(timeSlots.id, booking.slotId));
+  }
+
+  async completeExpiredBookings(): Promise<number> {
+    const now = new Date();
+    const tzOffset = 8 * 60;
+    const taiwanNow = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
+    const todayStr = taiwanNow.toISOString().split("T")[0];
+
+    const expiredSlots = await db.select({ id: timeSlots.id })
+      .from(timeSlots)
+      .where(sql`${timeSlots.date} < ${todayStr}`);
+
+    if (expiredSlots.length === 0) return 0;
+
+    const expiredSlotIds = expiredSlots.map(s => s.id);
+    const result = await db.update(bookings)
+      .set({ status: "completed" })
+      .where(and(
+        inArray(bookings.slotId, expiredSlotIds),
+        eq(bookings.status, "confirmed")
+      ))
+      .returning();
+
+    return result.length;
   }
 
   async getFaqs(): Promise<Faq[]> {

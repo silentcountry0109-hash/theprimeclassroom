@@ -351,7 +351,13 @@ function OverviewTab({
   }, []);
 
   const upcomingBookings = bookings
-    .filter((b) => b.status === "confirmed")
+    .filter((b) => {
+      if (b.status !== "confirmed") return false;
+      if (!b.slotDate) return false;
+      const now = new Date();
+      const slotEnd = new Date(b.slotDate + "T" + (b.slotEndTime || "23:59") + ":00+08:00");
+      return slotEnd > now;
+    })
     .sort((a, b) => {
       const dateA = `${a.slotDate} ${a.slotStartTime}`;
       const dateB = `${b.slotDate} ${b.slotStartTime}`;

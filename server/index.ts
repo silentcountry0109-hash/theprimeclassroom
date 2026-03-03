@@ -62,6 +62,12 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
+  const { storage } = await import("./storage");
+  const completedCount = await storage.completeExpiredBookings();
+  if (completedCount > 0) {
+    log(`auto-completed ${completedCount} expired bookings`);
+  }
+
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

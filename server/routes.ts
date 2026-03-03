@@ -375,6 +375,7 @@ export async function registerRoutes(
 
   app.get("/api/bookings", isCredentialOrAuth, async (req: any, res) => {
     try {
+      await storage.completeExpiredBookings();
       const userId = req.currentUser.id;
       const userBookings = await storage.getBookingsByParent(userId);
       res.json(userBookings);
