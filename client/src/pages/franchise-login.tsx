@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Lock, User, ArrowLeft, Building2, ShieldCheck, GraduationCap, BookOpen, Eye, EyeOff } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Lock, User, ArrowLeft, Building2, ShieldCheck, GraduationCap, BookOpen, Eye, EyeOff, KeyRound } from "lucide-react";
 
 type LoginMode = "franchise" | "coach";
 
@@ -20,6 +21,12 @@ export default function FranchiseLogin() {
   const [rememberMe, setRememberMe] = useState(!!savedUsername);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changePasswordError, setChangePasswordError] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const switchMode = (newMode: LoginMode) => {
     setMode(newMode);
@@ -63,7 +70,11 @@ export default function FranchiseLogin() {
         }
       } else {
         if (data.role === "coach") {
-          navigate("/coach-dashboard");
+          if (data.mustChangePassword) {
+            setShowChangePassword(true);
+          } else {
+            navigate("/coach-dashboard");
+          }
         } else {
           setError("此帳號不是老師帳號");
         }
@@ -229,6 +240,78 @@ export default function FranchiseLogin() {
           </p>
         </div>
       </div>
+
+      <Dialog open={showChangePassword} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-tiffany" />
+              首次登入 — 請修改密碼
+            </DialogTitle>
+            <DialogDescription>
+              為了帳號安全，請設定您的新密碼
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>新密碼 *</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="請輸入新密碼（至少 6 個字元）"
+                data-testid="input-new-password"
+              />
+            </div>
+            <div>
+              <Label>確認新密碼 *</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="請再次輸入新密碼"
+                data-testid="input-confirm-password"
+              />
+            </div>
+            {changePasswordError && (
+              <p className="text-sm text-red-500" data-testid="text-change-password-error">{changePasswordError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={async () => {
+                setChangePasswordError("");
+                if (newPassword.length < 6) { setChangePasswordError("密碼至少需要 6 個字元"); return; }
+                if (newPassword !== confirmPassword) { setChangePasswordError("兩次密碼不一致"); return; }
+                setChangingPassword(true);
+                try {
+                  const res = await fetch("/api/auth/change-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ newPassword }),
+                  });
+                  if (!res.ok) {
+                    const err = await res.json();
+                    setChangePasswordError(err.message || "修改密碼失敗");
+                  } else {
+                    setShowChangePassword(false);
+                    navigate("/coach-dashboard?firstLogin=1");
+                  }
+                } catch {
+                  setChangePasswordError("網路錯誤，請稍後再試");
+                }
+                setChangingPassword(false);
+              }}
+              disabled={changingPassword || newPassword.length < 6 || !confirmPassword}
+              className="bg-tiffany hover:bg-tiffany/90 text-[#1a2332]"
+              data-testid="button-submit-change-password"
+            >
+              {changingPassword ? "修改中..." : "確認修改密碼"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

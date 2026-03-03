@@ -109,10 +109,28 @@ export async function registerRoutes(
       req.session.credentialUserId = user.id;
       req.session.save(() => {
         const { passwordHash: _, ...safeUser } = user;
-        res.json(safeUser);
+        res.json({ ...safeUser, mustChangePassword: user.mustChangePassword || false });
       });
     } catch (error) {
       res.status(500).json({ message: "登入失敗" });
+    }
+  });
+
+  app.post("/api/auth/change-password", async (req: any, res) => {
+    const credId = req.session?.credentialUserId;
+    if (!credId) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, credId));
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (user.role !== "coach") return res.status(403).json({ message: "此功能僅供老師使用" });
+      if (!user.mustChangePassword) return res.status(400).json({ message: "不需要更改密碼" });
+      const { newPassword } = req.body;
+      if (!newPassword || newPassword.length < 6) return res.status(400).json({ message: "新密碼至少需要 6 個字元" });
+      const hash = await bcrypt.hash(newPassword, 10);
+      await db.update(users).set({ passwordHash: hash, mustChangePassword: false, updatedAt: new Date() }).where(eq(users.id, credId));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "修改密碼失敗" });
     }
   });
 
@@ -1034,19 +1052,24 @@ export async function registerRoutes(
   app.post("/api/franchise-admin/coaches/:id/account", isFranchiseAdmin, async (req: any, res) => {
     try {
       const coachId = parseInt(req.params.id);
-      const { username, password } = req.body;
-      if (!username || !password) return res.status(400).json({ message: "請輸入帳號和密碼" });
-      if (password.length < 6) return res.status(400).json({ message: "密碼至少需要 6 個字元" });
 
       const coach = await storage.getCoach(coachId);
       if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
       if (coach.userId) return res.status(400).json({ message: "此老師已有帳號" });
+      if (!coach.phone || coach.phone.length < 6) return res.status(400).json({ message: "請先填寫老師手機號碼（至少 6 位）" });
 
-      const [existing] = await db.select().from(users).where(eq(users.username, username));
-      if (existing) return res.status(400).json({ message: "此帳號已被使用" });
+      let username = `${coach.name}@prime`;
+      let suffix = 1;
+      while (true) {
+        const [existing] = await db.select().from(users).where(eq(users.username, username));
+        if (!existing) break;
+        suffix++;
+        username = `${coach.name}${suffix}@prime`;
+      }
 
-      const hash = await bcrypt.hash(password, 10);
-      const userId = `coach-${username}-${Date.now()}`;
+      const phoneLast6 = coach.phone.slice(-6);
+      const hash = await bcrypt.hash(phoneLast6, 10);
+      const userId = `coach-${coach.name}-${Date.now()}`;
       await db.insert(users).values({
         id: userId,
         username,
@@ -1054,10 +1077,11 @@ export async function registerRoutes(
         firstName: coach.name,
         role: "coach",
         franchiseId: req.franchiseId,
+        mustChangePassword: true,
       });
 
       const updated = await storage.createCoachAccount(coachId, userId);
-      res.json(updated);
+      res.json({ ...updated, accountUsername: username });
     } catch (error) {
       res.status(500).json({ message: "建立帳號失敗" });
     }
@@ -1075,7 +1099,7 @@ export async function registerRoutes(
       if (!coach.userId) return res.status(400).json({ message: "此老師尚未建立帳號" });
 
       const hash = await bcrypt.hash(password, 10);
-      await db.update(users).set({ passwordHash: hash }).where(eq(users.id, coach.userId));
+      await db.update(users).set({ passwordHash: hash, mustChangePassword: true }).where(eq(users.id, coach.userId));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "重設密碼失敗" });

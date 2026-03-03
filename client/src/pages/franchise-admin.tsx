@@ -1050,8 +1050,6 @@ function CoachesTab() {
   const [scheduleLoading, setScheduleLoading] = useState(false);
 
   const [accountDialogCoach, setAccountDialogCoach] = useState<Coach | null>(null);
-  const [accountMode, setAccountMode] = useState<"create" | "reset">("create");
-  const [accountUsername, setAccountUsername] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
 
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
@@ -1064,7 +1062,6 @@ function CoachesTab() {
 
   const resetAccountForm = () => {
     setAccountDialogCoach(null);
-    setAccountUsername("");
     setAccountPassword("");
   };
 
@@ -1079,16 +1076,17 @@ function CoachesTab() {
   };
 
   const openCreateAccount = (c: Coach) => {
-    setAccountMode("create");
-    setAccountDialogCoach(c);
-    setAccountUsername("");
-    setAccountPassword("");
+    if (!c.phone || c.phone.length < 6) {
+      toast({ title: "無法建立帳號", description: "請先填寫老師手機號碼（至少 6 位）", variant: "destructive" });
+      return;
+    }
+    const phoneLast6 = c.phone.slice(-6);
+    if (!confirm(`將以「${c.name}@prime」建立帳號\n預設密碼為手機末六碼（${phoneLast6}）\n老師首次登入須修改密碼\n\n確定建立？`)) return;
+    createAccountMutation.mutate({ coachId: c.id });
   };
 
   const openResetPassword = (c: Coach) => {
-    setAccountMode("reset");
     setAccountDialogCoach(c);
-    setAccountUsername("");
     setAccountPassword("");
   };
 
@@ -1149,18 +1147,17 @@ function CoachesTab() {
   });
 
   const createAccountMutation = useMutation({
-    mutationFn: async ({ coachId, username, password }: { coachId: number; username: string; password: string }) => {
-      const res = await apiRequest("POST", `/api/franchise-admin/coaches/${coachId}/account`, { username, password });
+    mutationFn: async ({ coachId }: { coachId: number }) => {
+      const res = await apiRequest("POST", `/api/franchise-admin/coaches/${coachId}/account`, {});
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "建立帳號失敗");
       }
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "帳號建立成功", description: "老師現在可以使用帳號密碼登入系統" });
+    onSuccess: (data) => {
+      toast({ title: "帳號建立成功", description: `帳號：${data.accountUsername}，密碼為手機末六碼` });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
-      resetAccountForm();
     },
     onError: (error: Error) => {
       toast({ title: "建立帳號失敗", description: error.message, variant: "destructive" });
@@ -1328,9 +1325,7 @@ function CoachesTab() {
       <Dialog open={!!accountDialogCoach} onOpenChange={(open) => { if (!open) resetAccountForm(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {accountMode === "create" ? "建立老師帳號" : "重設老師密碼"}
-            </DialogTitle>
+            <DialogTitle>重設老師密碼</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-md">
@@ -1342,56 +1337,30 @@ function CoachesTab() {
                 <p className="text-xs text-muted-foreground">{accountDialogCoach?.specialties?.join(" · ") || "一般數學教學"}</p>
               </div>
             </div>
-            {accountMode === "create" && (
-              <div>
-                <Label>帳號 *</Label>
-                <Input
-                  value={accountUsername}
-                  onChange={(e) => setAccountUsername(e.target.value)}
-                  placeholder="設定登入帳號"
-                  data-testid="input-coach-account-username"
-                />
-                <p className="text-xs text-muted-foreground mt-1">帳號建立後無法變更</p>
-              </div>
-            )}
             <div>
-              <Label>{accountMode === "create" ? "密碼 *" : "新密碼 *"}</Label>
+              <Label>新密碼 *</Label>
               <Input
                 type="password"
                 value={accountPassword}
                 onChange={(e) => setAccountPassword(e.target.value)}
-                placeholder={accountMode === "create" ? "設定登入密碼（至少 6 個字元）" : "輸入新密碼（至少 6 個字元）"}
+                placeholder="輸入新密碼（至少 6 個字元）"
                 data-testid="input-coach-account-password"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetAccountForm} data-testid="button-cancel-coach-account">取消</Button>
-            {accountMode === "create" ? (
-              <Button
-                onClick={() => {
-                  if (accountDialogCoach) {
-                    createAccountMutation.mutate({ coachId: accountDialogCoach.id, username: accountUsername, password: accountPassword });
-                  }
-                }}
-                disabled={!accountUsername || accountPassword.length < 6 || createAccountMutation.isPending}
-                data-testid="button-submit-coach-account"
-              >
-                {createAccountMutation.isPending ? "建立中..." : "建立帳號"}
-              </Button>
-            ) : (
-              <Button
-                onClick={() => {
-                  if (accountDialogCoach) {
-                    resetPasswordMutation.mutate({ coachId: accountDialogCoach.id, password: accountPassword });
-                  }
-                }}
-                disabled={accountPassword.length < 6 || resetPasswordMutation.isPending}
-                data-testid="button-submit-reset-password"
-              >
-                {resetPasswordMutation.isPending ? "重設中..." : "重設密碼"}
-              </Button>
-            )}
+            <Button
+              onClick={() => {
+                if (accountDialogCoach) {
+                  resetPasswordMutation.mutate({ coachId: accountDialogCoach.id, password: accountPassword });
+                }
+              }}
+              disabled={accountPassword.length < 6 || resetPasswordMutation.isPending}
+              data-testid="button-submit-reset-password"
+            >
+              {resetPasswordMutation.isPending ? "重設中..." : "重設密碼"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
