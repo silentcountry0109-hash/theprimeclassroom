@@ -370,10 +370,10 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     queryKey: ["/api/coach/contact-books/slot", slot.id],
   });
 
-  const [sharedUnit, setSharedUnit] = useState("");
-  const [sharedProgress, setSharedProgress] = useState("");
   const [activeStudentIdx, setActiveStudentIdx] = useState(0);
   const [studentData, setStudentData] = useState<Record<number, {
+    lessonUnit: string;
+    lessonProgress: string;
     performance: string;
     classNotes: string;
     quizScore: string;
@@ -387,6 +387,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     const existing = existingBooks.find((b: any) => b.childId === childId);
     if (existing) {
       return {
+        lessonUnit: existing.lessonUnit || "",
+        lessonProgress: existing.lessonProgress || "",
         performance: existing.performance || "good",
         classNotes: existing.classNotes || "",
         quizScore: existing.quizScore?.toString() || "",
@@ -396,6 +398,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
       };
     }
     return {
+      lessonUnit: "",
+      lessonProgress: "",
       performance: "good",
       classNotes: "",
       quizScore: "",
@@ -420,13 +424,6 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     }));
   };
 
-  useMemo(() => {
-    if (existingBooks.length > 0 && !sharedUnit) {
-      setSharedUnit(existingBooks[0].lessonUnit || "");
-      setSharedProgress(existingBooks[0].lessonProgress || "");
-    }
-  }, [existingBooks]);
-
   const saveMutation = useMutation({
     mutationFn: async () => {
       const entries = students.map((s: any) => {
@@ -435,8 +432,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
           bookingId: s.bookingId,
           childId: s.childId,
           lessonDate: slot.date,
-          lessonUnit: sharedUnit,
-          lessonProgress: sharedProgress,
+          lessonUnit: data.lessonUnit,
+          lessonProgress: data.lessonProgress,
           performance: data.performance,
           classNotes: data.classNotes,
           quizScore: data.quizScore ? parseInt(data.quizScore) : null,
@@ -477,30 +474,6 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
         </div>
 
         <div className="space-y-4">
-          <div className="bg-tiffany/5 rounded-lg p-3 space-y-3">
-            <p className="text-xs font-semibold text-tiffany uppercase tracking-wider">共用資訊</p>
-            <div>
-              <Label className="text-xs">今日上課單元 *</Label>
-              <Input
-                value={sharedUnit}
-                onChange={e => setSharedUnit(e.target.value)}
-                placeholder="例：三位數加減法"
-                className="mt-1"
-                data-testid="input-lesson-unit"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">教學進度</Label>
-              <Input
-                value={sharedProgress}
-                onChange={e => setSharedProgress(e.target.value)}
-                placeholder="例：課本第3章 p.45-52"
-                className="mt-1"
-                data-testid="input-lesson-progress"
-              />
-            </div>
-          </div>
-
           {students.length > 1 && (
             <div className="flex gap-1 overflow-x-auto pb-1">
               {students.map((s: any, idx: number) => (
@@ -528,6 +501,28 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
                 </div>
                 <span className="font-semibold text-sm">{currentStudent.childName}</span>
                 <span className="text-xs text-muted-foreground">{currentStudent.childGrade}年級</span>
+              </div>
+
+              <div>
+                <Label className="text-xs">今日上課單元 *</Label>
+                <Input
+                  value={currentData.lessonUnit}
+                  onChange={e => updateStudentField(currentStudent.childId, "lessonUnit", e.target.value)}
+                  placeholder="例：三位數加減法"
+                  className="mt-1"
+                  data-testid="input-lesson-unit"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs">教學進度</Label>
+                <Input
+                  value={currentData.lessonProgress}
+                  onChange={e => updateStudentField(currentStudent.childId, "lessonProgress", e.target.value)}
+                  placeholder="例：課本第3章 p.45-52"
+                  className="mt-1"
+                  data-testid="input-lesson-progress"
+                />
               </div>
 
               <div>
@@ -609,7 +604,7 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
 
           <Button
             className="w-full bg-tiffany hover:bg-tiffany/90 text-white"
-            disabled={!sharedUnit || saveMutation.isPending}
+            disabled={students.some((s: any) => !getStudentFormData(s.childId).lessonUnit) || saveMutation.isPending}
             onClick={() => saveMutation.mutate()}
             data-testid="button-save-contact-book"
           >
