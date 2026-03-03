@@ -1122,10 +1122,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(contactBooks.childId, childId))
       .orderBy(desc(contactBooks.createdAt));
 
-    return results.map(r => ({
-      ...r.contactBook,
-      coachName: r.coach.name,
-    }));
+    return results.map(r => {
+      const { internalNotes, ...safeBook } = r.contactBook;
+      return {
+        ...safeBook,
+        coachName: r.coach.name,
+      };
+    });
   }
 
   async getContactBooksByParent(parentId: string): Promise<any[]> {
@@ -1144,13 +1147,16 @@ export class DatabaseStorage implements IStorage {
       .where(inArray(contactBooks.childId, childIds))
       .orderBy(desc(contactBooks.createdAt));
 
-    return results.map(r => ({
-      ...r.contactBook,
-      coachName: r.coach.name,
-      childName: r.child.name,
-      childGrade: r.child.grade,
-      childGender: r.child.gender,
-    }));
+    return results.map(r => {
+      const { internalNotes, ...safeBook } = r.contactBook;
+      return {
+        ...safeBook,
+        coachName: r.coach.name,
+        childName: r.child.name,
+        childGrade: r.child.grade,
+        childGender: r.child.gender,
+      };
+    });
   }
 
   async getCoachStudents(coachId: number): Promise<any[]> {

@@ -2638,11 +2638,12 @@ interface ContactBookWithDetails {
   lessonDate: string;
   lessonUnit: string;
   lessonProgress: string | null;
-  performance: string;
+  performance: string | null;
   classNotes: string | null;
   quizScore: number | null;
   quizTotal: number | null;
   homework: string | null;
+  nextExam: string | null;
   teacherRemarks: string | null;
   createdAt: string | null;
   coachName: string;
@@ -2650,13 +2651,6 @@ interface ContactBookWithDetails {
   childGrade?: number;
   childGender?: string;
 }
-
-const PERFORMANCE_MAP: Record<string, { label: string; color: string; bgColor: string }> = {
-  excellent: { label: "優秀", color: "text-green-700 dark:text-green-300", bgColor: "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700" },
-  good: { label: "良好", color: "text-tiffany dark:text-tiffany", bgColor: "bg-tiffany/10 border-tiffany/20" },
-  fair: { label: "尚可", color: "text-amber-700 dark:text-amber-300", bgColor: "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700" },
-  needs_improvement: { label: "需加強", color: "text-red-700 dark:text-red-300", bgColor: "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700" },
-};
 
 function ContactBookTab() {
   const [selectedChildId, setSelectedChildId] = useState<string>("all");
@@ -2726,7 +2720,6 @@ function ContactBookTab() {
       ) : (
         <div className="space-y-3">
           {contactBooks.map((cb) => {
-            const perf = PERFORMANCE_MAP[cb.performance] || { label: cb.performance, color: "text-muted-foreground", bgColor: "bg-gray-50 border-gray-200" };
             const isExpanded = expandedId === cb.id;
             const avatarSrc = cb.childGender === "female" ? avatarGirlPath : avatarBoyPath;
             const dateObj = new Date(cb.lessonDate + "T00:00:00");
@@ -2756,9 +2749,6 @@ function ContactBookTab() {
                               {cb.childName}
                             </span>
                           )}
-                          <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border ${perf.bgColor} ${perf.color}`} data-testid={`badge-performance-${cb.id}`}>
-                            {perf.label}
-                          </span>
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0">
                           <CalendarDays className="w-3 h-3" />
@@ -2795,17 +2785,6 @@ function ContactBookTab() {
 
                   {isExpanded && (
                     <div className="mt-4 pt-3 border-t border-gray-50 space-y-3" data-testid={`contact-book-detail-${cb.id}`}>
-                      {cb.classNotes && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                            <Pencil className="w-3 h-3" />
-                            課堂筆記
-                          </p>
-                          <p className="text-sm text-foreground leading-relaxed bg-gray-50/80 rounded-lg p-3" data-testid={`text-cb-notes-${cb.id}`}>
-                            {cb.classNotes}
-                          </p>
-                        </div>
-                      )}
                       {cb.homework && (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
@@ -2817,14 +2796,14 @@ function ContactBookTab() {
                           </p>
                         </div>
                       )}
-                      {cb.teacherRemarks && (
+                      {cb.nextExam && (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                            <Bell className="w-3 h-3" />
-                            老師備註
+                            <Pencil className="w-3 h-3" />
+                            下次考試
                           </p>
-                          <p className="text-sm text-foreground leading-relaxed bg-tiffany/5 rounded-lg p-3 border border-tiffany/10" data-testid={`text-cb-remarks-${cb.id}`}>
-                            {cb.teacherRemarks}
+                          <p className="text-sm text-foreground leading-relaxed bg-gray-50/80 rounded-lg p-3" data-testid={`text-cb-next-exam-${cb.id}`}>
+                            {cb.nextExam}
                           </p>
                         </div>
                       )}
@@ -2839,6 +2818,17 @@ function ContactBookTab() {
                               {cb.quizScore} <span className="text-sm font-normal text-muted-foreground">/ {cb.quizTotal || 100}</span>
                             </p>
                           </div>
+                        </div>
+                      )}
+                      {cb.teacherRemarks && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                            <Bell className="w-3 h-3" />
+                            老師備註
+                          </p>
+                          <p className="text-sm text-foreground leading-relaxed bg-tiffany/5 rounded-lg p-3 border border-tiffany/10" data-testid={`text-cb-remarks-${cb.id}`}>
+                            {cb.teacherRemarks}
+                          </p>
                         </div>
                       )}
                     </div>

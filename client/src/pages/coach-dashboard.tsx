@@ -14,13 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Calendar,
@@ -39,24 +32,7 @@ import {
   Star,
 } from "lucide-react";
 
-const PERFORMANCE_OPTIONS = [
-  { value: "excellent", label: "優秀", color: "bg-green-100 text-green-700 border-green-200" },
-  { value: "good", label: "良好", color: "bg-blue-100 text-blue-700 border-blue-200" },
-  { value: "fair", label: "尚可", color: "bg-amber-100 text-amber-700 border-amber-200" },
-  { value: "needs_improvement", label: "需加強", color: "bg-red-100 text-red-700 border-red-200" },
-];
-
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
-
-function getPerformanceLabel(value: string) {
-  return PERFORMANCE_OPTIONS.find(o => o.value === value)?.label || value;
-}
-
-function getPerformanceBadge(value: string) {
-  const option = PERFORMANCE_OPTIONS.find(o => o.value === value);
-  if (!option) return null;
-  return <Badge variant="outline" className={option.color}>{option.label}</Badge>;
-}
 
 export default function CoachDashboard() {
   const [, navigate] = useLocation();
@@ -374,12 +350,12 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
   const [studentData, setStudentData] = useState<Record<number, {
     lessonUnit: string;
     lessonProgress: string;
-    performance: string;
-    classNotes: string;
+    homework: string;
+    nextExam: string;
     quizScore: string;
     quizTotal: string;
-    homework: string;
     teacherRemarks: string;
+    internalNotes: string;
   }>>({});
 
   const initStudentData = (childId: number) => {
@@ -389,23 +365,23 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
       return {
         lessonUnit: existing.lessonUnit || "",
         lessonProgress: existing.lessonProgress || "",
-        performance: existing.performance || "good",
-        classNotes: existing.classNotes || "",
+        homework: existing.homework || "",
+        nextExam: existing.nextExam || "",
         quizScore: existing.quizScore?.toString() || "",
         quizTotal: existing.quizTotal?.toString() || "100",
-        homework: existing.homework || "",
         teacherRemarks: existing.teacherRemarks || "",
+        internalNotes: existing.internalNotes || "",
       };
     }
     return {
       lessonUnit: "",
       lessonProgress: "",
-      performance: "good",
-      classNotes: "",
+      homework: "",
+      nextExam: "",
       quizScore: "",
       quizTotal: "100",
-      homework: "",
       teacherRemarks: "",
+      internalNotes: "",
     };
   };
 
@@ -434,12 +410,12 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
           lessonDate: slot.date,
           lessonUnit: data.lessonUnit,
           lessonProgress: data.lessonProgress,
-          performance: data.performance,
-          classNotes: data.classNotes,
+          homework: data.homework || null,
+          nextExam: data.nextExam || null,
           quizScore: data.quizScore ? parseInt(data.quizScore) : null,
           quizTotal: data.quizTotal ? parseInt(data.quizTotal) : 100,
-          homework: data.homework || null,
           teacherRemarks: data.teacherRemarks || null,
+          internalNotes: data.internalNotes || null,
         };
       });
       await apiRequest("POST", "/api/coach/contact-books", { entries });
@@ -526,30 +502,24 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
               </div>
 
               <div>
-                <Label className="text-xs">學習表現 *</Label>
-                <Select
-                  value={currentData.performance}
-                  onValueChange={v => updateStudentField(currentStudent.childId, "performance", v)}
-                >
-                  <SelectTrigger className="mt-1" data-testid="select-performance">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PERFORMANCE_OPTIONS.map(o => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">回家作業</Label>
+                <Input
+                  value={currentData.homework}
+                  onChange={e => updateStudentField(currentStudent.childId, "homework", e.target.value)}
+                  placeholder="選填，例：練習題 p.30 第1-5題"
+                  className="mt-1"
+                  data-testid="input-homework"
+                />
               </div>
 
               <div>
-                <Label className="text-xs">課堂筆記</Label>
-                <Textarea
-                  value={currentData.classNotes}
-                  onChange={e => updateStudentField(currentStudent.childId, "classNotes", e.target.value)}
-                  placeholder="描述學生今日學習狀況、理解程度..."
-                  className="mt-1 min-h-[80px]"
-                  data-testid="textarea-class-notes"
+                <Label className="text-xs">下次考試</Label>
+                <Input
+                  value={currentData.nextExam}
+                  onChange={e => updateStudentField(currentStudent.childId, "nextExam", e.target.value)}
+                  placeholder="選填，例：第三單元小考（3/10）"
+                  className="mt-1"
+                  data-testid="input-next-exam"
                 />
               </div>
 
@@ -579,24 +549,24 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
               </div>
 
               <div>
-                <Label className="text-xs">回家作業</Label>
-                <Input
-                  value={currentData.homework}
-                  onChange={e => updateStudentField(currentStudent.childId, "homework", e.target.value)}
-                  placeholder="選填，例：練習題 p.30 第1-5題"
-                  className="mt-1"
-                  data-testid="input-homework"
+                <Label className="text-xs">老師備註（給家長端）</Label>
+                <Textarea
+                  value={currentData.teacherRemarks}
+                  onChange={e => updateStudentField(currentStudent.childId, "teacherRemarks", e.target.value)}
+                  placeholder="選填，家長可見的備註"
+                  className="mt-1 min-h-[60px]"
+                  data-testid="textarea-teacher-remarks"
                 />
               </div>
 
               <div>
-                <Label className="text-xs">老師備註（給家長）</Label>
+                <Label className="text-xs">老師備註（內部觀看）</Label>
                 <Textarea
-                  value={currentData.teacherRemarks}
-                  onChange={e => updateStudentField(currentStudent.childId, "teacherRemarks", e.target.value)}
-                  placeholder="選填，私人訊息給家長"
+                  value={currentData.internalNotes}
+                  onChange={e => updateStudentField(currentStudent.childId, "internalNotes", e.target.value)}
+                  placeholder="選填，僅內部人員可見"
                   className="mt-1 min-h-[60px]"
-                  data-testid="textarea-teacher-remarks"
+                  data-testid="textarea-internal-notes"
                 />
               </div>
             </div>
@@ -713,7 +683,6 @@ function ContactBookCard({ entry, showChild = true }: { entry: any; showChild?: 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-foreground">{entry.lessonUnit}</span>
-            {getPerformanceBadge(entry.performance)}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
             <span>{entry.lessonDate}</span>

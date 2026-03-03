@@ -192,12 +192,14 @@ export const contactBooks = pgTable("contact_books", {
   lessonDate: text("lesson_date").notNull(),
   lessonUnit: text("lesson_unit").notNull(),
   lessonProgress: text("lesson_progress"),
-  performance: text("performance").notNull(),
+  performance: text("performance"),
   classNotes: text("class_notes"),
   quizScore: integer("quiz_score"),
   quizTotal: integer("quiz_total").default(100),
   homework: text("homework"),
+  nextExam: text("next_exam"),
   teacherRemarks: text("teacher_remarks"),
+  internalNotes: text("internal_notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
