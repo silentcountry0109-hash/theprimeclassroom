@@ -151,6 +151,25 @@ export default function CoachDashboard() {
         {activeTab === "students" && <StudentsTab coachId={userData.coach?.id} />}
         {activeTab === "profile" && <ProfileTab />}
       </div>
+
+      <Dialog open={showBindingSuccess} onOpenChange={setShowBindingSuccess}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle className="flex flex-col items-center gap-3 pt-2">
+              <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              </div>
+              綁定成功
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground" data-testid="text-binding-success">
+            歡迎加入質數教室！您的帳號已成功綁定，密碼已更新完成。
+          </p>
+          <Button onClick={() => setShowBindingSuccess(false)} className="w-full mt-2" data-testid="button-close-binding-success">
+            開始使用
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -871,25 +890,6 @@ function ProfileTab() {
           </div>
         )}
       </div>
-
-      <Dialog open={showBindingSuccess} onOpenChange={setShowBindingSuccess}>
-        <DialogContent className="max-w-sm text-center">
-          <DialogHeader>
-            <DialogTitle className="flex flex-col items-center gap-3 pt-2">
-              <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-green-500" />
-              </div>
-              綁定成功
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground" data-testid="text-binding-success">
-            歡迎加入質數教室！您的帳號已成功綁定，密碼已更新完成。
-          </p>
-          <Button onClick={() => setShowBindingSuccess(false)} className="w-full mt-2" data-testid="button-close-binding-success">
-            開始使用
-          </Button>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
