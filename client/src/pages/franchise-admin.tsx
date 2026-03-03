@@ -1220,7 +1220,7 @@ function CoachesTab() {
                   )}
                   {coach.userId ? (
                     <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-account-status-${coach.id}`}>
-                      <ShieldCheck className="w-3 h-3" />帳號已建立
+                      <ShieldCheck className="w-3 h-3" />{(coach as any).accountUsername || "帳號已建立"}
                     </span>
                   ) : (
                     <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" data-testid={`coach-account-status-${coach.id}`}>

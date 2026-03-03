@@ -910,7 +910,14 @@ export async function registerRoutes(
   app.get("/api/franchise-admin/coaches", isFranchiseAdmin, async (req: any, res) => {
     try {
       const coachList = await storage.getCoachesByFranchise(req.franchiseId);
-      res.json(coachList);
+      const enriched = await Promise.all(coachList.map(async (coach) => {
+        if (coach.userId) {
+          const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, coach.userId));
+          return { ...coach, accountUsername: user?.username || null };
+        }
+        return { ...coach, accountUsername: null };
+      }));
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch coaches" });
     }
