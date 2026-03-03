@@ -1517,7 +1517,11 @@ function TimeSlotsTab() {
     return DAY_LABELS[d.getDay().toString()] || "";
   };
 
-  const sortedSlots = [...slots].sort((a, b) => {
+  const [filterCoachId, setFilterCoachId] = useState<number | null>(null);
+
+  const filteredSlots = filterCoachId ? slots.filter((s) => s.coachId === filterCoachId) : slots;
+
+  const sortedSlots = [...filteredSlots].sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return a.startTime.localeCompare(b.startTime);
   });
@@ -1547,7 +1551,7 @@ function TimeSlotsTab() {
   })();
 
   const slotsByDate: Record<string, typeof slots> = {};
-  slots.forEach((s) => {
+  filteredSlots.forEach((s) => {
     if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
     slotsByDate[s.date].push(s);
   });
@@ -1573,6 +1577,17 @@ function TimeSlotsTab() {
           <p className="text-sm text-muted-foreground">管理本分校的可預約時段</p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={filterCoachId ? String(filterCoachId) : "all"} onValueChange={(v) => setFilterCoachId(v === "all" ? null : Number(v))}>
+            <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-filter-coach">
+              <SelectValue placeholder="全部老師" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部老師</SelectItem>
+              {coaches.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex bg-gray-100 rounded-lg p-0.5" data-testid="view-mode-toggle">
             <button
               onClick={() => setViewMode("list")}
@@ -1678,20 +1693,11 @@ function TimeSlotsTab() {
                   </span>
                   {daySlots.length > 0 && (
                     <div className="mt-0.5 space-y-0.5">
-                      {daySlots.length <= 2 ? daySlots.map((s) => (
-                        <div key={s.id} className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate">
-                          {s.startTime}
+                      {daySlots.map((s) => (
+                        <div key={s.id} className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate text-center">
+                          {s.startTime}-{s.endTime}
                         </div>
-                      )) : (
-                        <>
-                          <div className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate">
-                            {daySlots[0].startTime}
-                          </div>
-                          <div className="text-[10px] leading-tight text-muted-foreground px-1">
-                            +{daySlots.length - 1} 堂
-                          </div>
-                        </>
-                      )}
+                      ))}
                     </div>
                   )}
                 </button>
