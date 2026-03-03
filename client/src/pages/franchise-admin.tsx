@@ -997,7 +997,7 @@ function CoachesTab() {
             </div>
             <div>
               <Label>手機號碼</Label>
-              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="例：0912-345-678" data-testid="input-franchise-coach-phone" />
+              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="例：0912345678" data-testid="input-franchise-coach-phone" />
             </div>
             <div>
               <Label>簡介</Label>
