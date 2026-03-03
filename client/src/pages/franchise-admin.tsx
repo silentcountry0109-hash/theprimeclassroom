@@ -900,8 +900,8 @@ function CoachScheduleDialog({ coach, data, loading, onClose }: { coach: Coach |
                     </div>
                     <div className="space-y-0.5">
                       {daySlots.map((slot: any) => (
-                        <div key={slot.slotId} className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate" title={`${slot.startTime}-${slot.endTime} ${slot.franchiseName}`} data-testid={`schedule-week-slot-${slot.slotId}`}>
-                          {slot.startTime}
+                        <div key={slot.slotId} className="text-[10px] leading-tight bg-tiffany/10 text-tiffany rounded px-1 py-0.5 truncate text-center" title={`${slot.startTime}-${slot.endTime} ${slot.franchiseName}`} data-testid={`schedule-week-slot-${slot.slotId}`}>
+                          {slot.startTime}-{slot.endTime}
                         </div>
                       ))}
                     </div>
