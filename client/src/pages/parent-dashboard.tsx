@@ -380,7 +380,7 @@ function OverviewTab({
   }, [upcomingBookings]);
 
   const nextClassIds = new Set(nextClassPerChild.map(b => b.id));
-  const remainingUpcoming = upcomingBookings.filter(b => !nextClassIds.has(b.id));
+  const remainingUpcoming = upcomingBookings;
 
   const gradeLabel = (g: number) => {
     const labels = ["一", "二", "三", "四", "五", "六"];
