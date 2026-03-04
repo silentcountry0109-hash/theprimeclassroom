@@ -452,13 +452,13 @@ function OverviewTab({
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-base font-semibold text-foreground truncate group-hover:text-tiffany transition-colors">
+                  <p className="text-lg font-semibold text-foreground truncate group-hover:text-tiffany transition-colors">
                     {nc.franchiseName || "教室"}
                   </p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
                     {nc.coachName && (
                       <span className="flex items-center gap-1">
-                        <GraduationCap className="w-3 h-3 text-tiffany" />
+                        <GraduationCap className="w-3.5 h-3.5 text-tiffany" />
                         {nc.coachName} 老師
                       </span>
                     )}
@@ -467,13 +467,13 @@ function OverviewTab({
                     </span>
                   </div>
                   {nc.childName && (
-                    <div className="flex items-center gap-1.5 mt-1.5" data-testid={`text-next-class-child-${nc.childId}`}>
+                    <div className="flex items-center gap-1.5 mt-2" data-testid={`text-next-class-child-${nc.childId}`}>
                       <img
                         src={nc.childGender === "female" ? avatarGirlPath : avatarBoyPath}
                         alt={nc.childName}
                         className="w-5 h-5 rounded-full object-cover"
                       />
-                      <span className="text-xs font-medium text-foreground">{nc.childName}</span>
+                      <span className="text-sm font-medium text-foreground">{nc.childName}</span>
                     </div>
                   )}
                 </div>
