@@ -212,6 +212,18 @@ html, body, #root {
  */
 @layer utilities {
 
+  /* Brand color for native form controls (time picker, date picker, checkboxes, etc.) */
+  input[type="time"],
+  input[type="date"] {
+    accent-color: #81D8D0;
+    color-scheme: light;
+  }
+
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: hue-rotate(150deg) saturate(0.6);
+  }
+
   /* Hide ugly search cancel button in Chrome until we can style it properly */
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
