@@ -74,6 +74,7 @@ interface FranchiseStats {
   totalSlots: number;
   totalBookings: number;
   confirmedBookings: number;
+  attendedBookings: number;
 }
 
 interface FranchiseBooking {
@@ -226,7 +227,7 @@ function OverviewTab() {
     { label: "老師人數", value: stats?.totalCoaches ?? 0, icon: GraduationCap, color: "bg-tiffany/10 text-tiffany" },
     { label: "可用時段", value: stats?.totalSlots ?? 0, icon: Clock, color: "bg-coral/10 text-coral" },
     { label: "總預約數", value: stats?.totalBookings ?? 0, icon: CalendarCheck, color: "bg-amber-warm text-amber-700" },
-    { label: "已確認", value: stats?.confirmedBookings ?? 0, icon: Users, color: "bg-tiffany/10 text-tiffany" },
+    { label: "已上課", value: stats?.attendedBookings ?? 0, icon: Users, color: "bg-green-50 text-green-600" },
   ];
 
   const presets = [
@@ -308,7 +309,7 @@ function OverviewTab() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { label: "開課時段", value: rangeStats.totalSlots, icon: Clock, color: "bg-tiffany/10 text-tiffany", sub: `${rangeStats.totalSeats} 個座位` },
-              { label: "預約數", value: rangeStats.totalBookings, icon: CalendarCheck, color: "bg-coral/10 text-coral", sub: `已確認 ${rangeStats.confirmedBookings}` },
+              { label: "預約數", value: rangeStats.totalBookings, icon: CalendarCheck, color: "bg-coral/10 text-coral", sub: `已上課 ${rangeStats.completedBookings + (rangeStats.checkedInBookings || 0)}` },
               { label: "取消數", value: rangeStats.cancelledBookings, icon: Users, color: "bg-amber-warm text-amber-700", sub: rangeStats.totalBookings > 0 ? `取消率 ${Math.round((rangeStats.cancelledBookings / rangeStats.totalBookings) * 100)}%` : "無預約" },
               { label: "座位使用率", value: `${rangeStats.occupancyRate}%`, icon: Percent, color: "bg-tiffany/10 text-tiffany", sub: `${rangeStats.bookedSeats} / ${rangeStats.totalSeats} 座位` },
             ].map((card) => (
@@ -443,6 +444,8 @@ interface DateRangeStats {
   totalSlots: number;
   totalBookings: number;
   confirmedBookings: number;
+  completedBookings: number;
+  checkedInBookings: number;
   cancelledBookings: number;
   totalSeats: number;
   bookedSeats: number;
@@ -1904,6 +1907,7 @@ function BookingsTab() {
 
   const statusMap: Record<string, { label: string; color: string }> = {
     confirmed: { label: "已確認", color: "bg-tiffany/10 text-tiffany" },
+    checked_in: { label: "上課中", color: "bg-orange-50 text-orange-600" },
     cancelled: { label: "已取消", color: "bg-gray-100 text-gray-500" },
     completed: { label: "已完成", color: "bg-amber-warm text-amber-700" },
   };

@@ -1148,6 +1148,16 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/coach/bookings/:id/check-in", isCoach, async (req: any, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      await storage.checkInBooking(bookingId, req.coach.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "點名失敗" });
+    }
+  });
+
   app.get("/api/coach/students", isCoach, async (req: any, res) => {
     try {
       const students = await storage.getCoachStudents(req.coach.id);

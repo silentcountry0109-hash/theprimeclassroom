@@ -353,7 +353,7 @@ function OverviewTab({
 
   const upcomingBookings = bookings
     .filter((b) => {
-      if (b.status !== "confirmed") return false;
+      if (b.status !== "confirmed" && b.status !== "checked_in") return false;
       if (!b.slotDate) return false;
       const now = new Date();
       const slotEnd = new Date(b.slotDate + "T" + (b.slotEndTime || "23:59") + ":00+08:00");
@@ -452,9 +452,16 @@ function OverviewTab({
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-lg font-semibold text-foreground truncate group-hover:text-tiffany transition-colors">
-                    {nc.franchiseName || "教室"}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-lg font-semibold text-foreground truncate group-hover:text-tiffany transition-colors">
+                      {nc.franchiseName || "教室"}
+                    </p>
+                    {nc.status === "checked_in" && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full flex-shrink-0" data-testid={`badge-in-class-${nc.id}`}>
+                        上課中
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
                     {nc.coachName && (
                       <span className="flex items-center gap-1">
@@ -638,9 +645,16 @@ function OverviewTab({
                   <div className="w-px h-8 bg-gray-100 flex-shrink-0" />
                   <img src={avatarSrc} alt={booking.childName || ""} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {booking.franchiseName || "教室"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {booking.franchiseName || "教室"}
+                      </p>
+                      {booking.status === "checked_in" && (
+                        <span className="inline-flex items-center text-[10px] font-medium bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                          上課中
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       {booking.coachName && (
                         <span>{booking.coachName} 老師</span>
@@ -1886,12 +1900,12 @@ function ChildrenTab() {
         <div className="space-y-3">
           {children.map((child) => {
             const childBookings = getChildBookings(child.id);
-            const upcomingCount = childBookings.filter((b) => b.status === "confirmed").length;
+            const upcomingCount = childBookings.filter((b) => b.status === "confirmed" || b.status === "checked_in").length;
             const completedCount = childBookings.filter((b) => b.status === "completed").length;
             const totalCount = upcomingCount + completedCount;
             const avatarSrc = child.gender === "female" ? avatarGirlPath : avatarBoyPath;
             const nextBooking = childBookings
-              .filter((b) => b.status === "confirmed")
+              .filter((b) => b.status === "confirmed" || b.status === "checked_in")
               .sort((a, b) => `${a.slotDate} ${a.slotStartTime}`.localeCompare(`${b.slotDate} ${b.slotStartTime}`))[0];
 
             return (
@@ -2294,11 +2308,15 @@ function BookingsTab() {
     ? dateFiltered.filter((b) => b.childId === selectedChildId)
     : dateFiltered;
 
-  const filtered = statusFilter === "all" ? childFiltered : childFiltered.filter((b) => b.status === statusFilter);
+  const filtered = statusFilter === "all"
+    ? childFiltered
+    : statusFilter === "confirmed"
+      ? childFiltered.filter((b) => b.status === "confirmed" || b.status === "checked_in")
+      : childFiltered.filter((b) => b.status === statusFilter);
 
   const statusCounts = useMemo(() => ({
     all: childFiltered.length,
-    confirmed: childFiltered.filter((b) => b.status === "confirmed").length,
+    confirmed: childFiltered.filter((b) => b.status === "confirmed" || b.status === "checked_in").length,
     completed: childFiltered.filter((b) => b.status === "completed").length,
     cancelled: childFiltered.filter((b) => b.status === "cancelled").length,
   }), [childFiltered]);
@@ -2309,7 +2327,7 @@ function BookingsTab() {
     if (!isMultiChild) return [];
     return children.map((child) => {
       const cb = dateFiltered.filter((b) => b.childId === child.id);
-      const upcoming = cb.filter((b) => b.status === "confirmed");
+      const upcoming = cb.filter((b) => b.status === "confirmed" || b.status === "checked_in");
       const completed = cb.filter((b) => b.status === "completed");
       const nextClass = upcoming
         .sort((a, b) => `${a.slotDate} ${a.slotStartTime}`.localeCompare(`${b.slotDate} ${b.slotStartTime}`))[0];
@@ -2339,6 +2357,7 @@ function BookingsTab() {
 
   const statusConfig = {
     confirmed: { label: "已確認", icon: CheckCircle2, bgClass: "bg-tiffany/10", textClass: "text-tiffany", dotClass: "bg-tiffany" },
+    checked_in: { label: "上課中", icon: CheckCircle2, bgClass: "bg-orange-50", textClass: "text-orange-600", dotClass: "bg-orange-500" },
     cancelled: { label: "已取消", icon: XCircle, bgClass: "bg-gray-100", textClass: "text-gray-500", dotClass: "bg-gray-400" },
     completed: { label: "已完成", icon: CheckCircle2, bgClass: "bg-green-50", textClass: "text-green-600", dotClass: "bg-green-500" },
   };

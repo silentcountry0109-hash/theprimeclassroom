@@ -102,6 +102,7 @@ export interface IStorage {
     totalSlots: number;
     totalBookings: number;
     confirmedBookings: number;
+    attendedBookings: number;
   }>;
   getAllProducts(): Promise<Product[]>;
   getActiveProducts(): Promise<Product[]>;
@@ -127,6 +128,7 @@ export interface IStorage {
   getCoachSlots(coachId: number, year: number, month: number): Promise<any[]>;
   getTimeSlot(id: number): Promise<any | undefined>;
   getSlotStudents(slotId: number): Promise<any[]>;
+  checkInBooking(id: number, coachId: number): Promise<void>;
   createContactBook(data: InsertContactBook): Promise<ContactBook>;
   getContactBook(id: number): Promise<ContactBook | undefined>;
   updateContactBook(id: number, data: Partial<InsertContactBook>): Promise<ContactBook>;
@@ -155,6 +157,8 @@ export interface IStorage {
     totalSlots: number;
     totalBookings: number;
     confirmedBookings: number;
+    completedBookings: number;
+    checkedInBookings: number;
     cancelledBookings: number;
     totalSeats: number;
     bookedSeats: number;
@@ -623,7 +627,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(bookings.slotId, slotId),
           eq(bookings.childId, childId),
-          eq(bookings.status, "confirmed")
+          inArray(bookings.status, ["confirmed", "checked_in"])
         )
       );
     return existing.length > 0;
@@ -662,7 +666,7 @@ export class DatabaseStorage implements IStorage {
       .set({ status: "completed" })
       .where(and(
         inArray(bookings.slotId, expiredSlotIds),
-        eq(bookings.status, "confirmed")
+        inArray(bookings.status, ["confirmed", "checked_in"])
       ))
       .returning();
 
@@ -787,12 +791,15 @@ export class DatabaseStorage implements IStorage {
     const franchiseSlots = await db.select({ id: timeSlots.id }).from(timeSlots).where(eq(timeSlots.franchiseId, franchiseId));
     let totalBookings = 0;
     let confirmedBookings = 0;
+    let attendedBookings = 0;
     if (franchiseSlots.length > 0) {
       const slotIds = franchiseSlots.map((s) => s.id);
       const [allBookings] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(inArray(bookings.slotId, slotIds));
       const [confirmed] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(and(inArray(bookings.slotId, slotIds), eq(bookings.status, "confirmed")));
+      const [attended] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(and(inArray(bookings.slotId, slotIds), inArray(bookings.status, ["completed", "checked_in"])));
       totalBookings = Number(allBookings.count);
       confirmedBookings = Number(confirmed.count);
+      attendedBookings = Number(attended.count);
     }
 
     return {
@@ -800,6 +807,7 @@ export class DatabaseStorage implements IStorage {
       totalSlots: Number(slotCount.count),
       totalBookings,
       confirmedBookings,
+      attendedBookings,
     };
   }
 
@@ -833,6 +841,8 @@ export class DatabaseStorage implements IStorage {
     const totalSlots = slotsInRange.length;
     const totalBookings = bookingRows.length;
     const confirmedBookings = bookingRows.filter((b) => b.status === "confirmed").length;
+    const completedBookings = bookingRows.filter((b) => b.status === "completed").length;
+    const checkedInBookings = bookingRows.filter((b) => b.status === "checked_in").length;
     const cancelledBookings = bookingRows.filter((b) => b.status === "cancelled").length;
     const totalSeats = slotsInRange.reduce((sum, s) => sum + s.maxSeats, 0);
     const bookedSeats = slotsInRange.reduce((sum, s) => sum + s.bookedSeats, 0);
@@ -881,7 +891,7 @@ export class DatabaseStorage implements IStorage {
     }
     const coachStats = Array.from(coachMap.values());
 
-    return { totalSlots, totalBookings, confirmedBookings, cancelledBookings, totalSeats, bookedSeats, occupancyRate, dailyStats, coachStats };
+    return { totalSlots, totalBookings, confirmedBookings, completedBookings, checkedInBookings, cancelledBookings, totalSeats, bookedSeats, occupancyRate, dailyStats, coachStats };
   }
 
   async getAllProducts(): Promise<Product[]> {
@@ -1079,7 +1089,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(bookings.slotId, slotId),
-          eq(bookings.status, "confirmed")
+          inArray(bookings.status, ["confirmed", "checked_in"])
         )
       );
 
@@ -1091,7 +1101,17 @@ export class DatabaseStorage implements IStorage {
       childGender: r.child.gender,
       childStudentCode: r.child.studentCode,
       parentId: r.booking.parentId,
+      status: r.booking.status,
     }));
+  }
+
+  async checkInBooking(id: number, coachId: number): Promise<void> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+    if (!booking) throw new Error("預約不存在");
+    if (booking.status !== "confirmed") throw new Error("只有已確認的預約可以點名");
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
+    if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
+    await db.update(bookings).set({ status: "checked_in" }).where(eq(bookings.id, id));
   }
 
   async createContactBook(data: InsertContactBook): Promise<ContactBook> {

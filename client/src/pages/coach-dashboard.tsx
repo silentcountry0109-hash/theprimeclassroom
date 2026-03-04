@@ -278,8 +278,23 @@ function CalendarTab({ coachId }: { coachId: number }) {
 }
 
 function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: () => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: students = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/coach/slots", slot.id, "students"],
+  });
+
+  const checkInMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/check-in`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
+      toast({ title: "點名成功", description: "學生已標記為出席" });
+    },
+    onError: (error: any) => {
+      toast({ title: "點名失敗", description: error.message, variant: "destructive" });
+    },
   });
 
   return (
@@ -314,6 +329,26 @@ function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: (
               {s.childStudentCode && (
                 <span className="text-[10px] text-muted-foreground/70 font-mono">{s.childStudentCode}</span>
               )}
+              <span className="ml-auto">
+                {s.status === "checked_in" ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-checked-in-${s.bookingId}`}>
+                    <CheckCircle className="w-3 h-3" />
+                    已到
+                  </span>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs border-tiffany/30 text-tiffany hover:bg-tiffany/5"
+                    onClick={() => checkInMutation.mutate(s.bookingId)}
+                    disabled={checkInMutation.isPending}
+                    data-testid={`button-check-in-${s.bookingId}`}
+                  >
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    點名
+                  </Button>
+                )}
+              </span>
             </div>
           ))}
         </div>
