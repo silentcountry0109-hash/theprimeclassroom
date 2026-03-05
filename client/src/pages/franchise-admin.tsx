@@ -2281,6 +2281,8 @@ function BookingsTab() {
   const { data: bookings = [], isLoading } = useQuery<FranchiseBooking[]>({
     queryKey: ["/api/franchise-admin/bookings"],
   });
+  const [searchName, setSearchName] = useState("");
+  const [searchDate, setSearchDate] = useState("");
 
   const getDayLabel = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -2294,11 +2296,51 @@ function BookingsTab() {
     completed: { label: "已完成", color: "bg-amber-warm text-amber-700" },
   };
 
+  const filteredBookings = bookings.filter((b) => {
+    if (searchName && !b.childName.includes(searchName)) return false;
+    if (searchDate && b.date !== searchDate) return false;
+    return true;
+  });
+
+  const hasFilter = searchName || searchDate;
+
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-foreground">預約管理</h1>
         <p className="text-sm text-muted-foreground">查看家長的預約資訊</p>
+      </div>
+
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="relative flex-1 min-w-[160px]">
+          <Input
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            placeholder="搜尋學生姓名"
+            className="pl-9"
+            data-testid="input-booking-search-name"
+          />
+          <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        </div>
+        <div className="relative">
+          <Input
+            type="date"
+            value={searchDate}
+            onChange={(e) => setSearchDate(e.target.value)}
+            className="w-[180px]"
+            data-testid="input-booking-search-date"
+          />
+        </div>
+        {hasFilter && (
+          <Button variant="outline" size="sm" onClick={() => { setSearchName(""); setSearchDate(""); }} data-testid="button-clear-booking-filter">
+            清除篩選
+          </Button>
+        )}
+        {hasFilter && (
+          <span className="text-xs text-muted-foreground" data-testid="text-booking-filter-count">
+            共 {filteredBookings.length} 筆結果
+          </span>
+        )}
       </div>
 
       {isLoading ? (
@@ -2308,9 +2350,13 @@ function BookingsTab() {
           <CalendarCheck className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">尚無預約資料</p>
         </div>
+      ) : filteredBookings.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-md border border-gray-100">
+          <p className="text-sm text-muted-foreground">無符合條件的預約</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {bookings.map((booking) => {
+          {filteredBookings.map((booking) => {
             const status = statusMap[booking.status] || statusMap.confirmed;
             return (
               <div key={booking.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`franchise-booking-${booking.id}`}>
