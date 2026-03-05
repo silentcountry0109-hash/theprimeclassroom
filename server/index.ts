@@ -68,6 +68,16 @@ app.use((req, res, next) => {
     log(`auto-completed ${completedCount} expired bookings`);
   }
 
+  setInterval(async () => {
+    try {
+      const count = await storage.completeExpiredBookings();
+      if (count > 0) {
+        log(`auto-completed ${count} expired bookings`);
+      }
+    } catch (e) {
+    }
+  }, 60 * 1000);
+
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

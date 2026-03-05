@@ -785,10 +785,13 @@ export class DatabaseStorage implements IStorage {
     const tzOffset = 8 * 60;
     const taiwanNow = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
     const todayStr = taiwanNow.toISOString().split("T")[0];
+    const nowTimeStr = taiwanNow.toTimeString().slice(0, 5);
 
     const expiredSlots = await db.select({ id: timeSlots.id })
       .from(timeSlots)
-      .where(sql`${timeSlots.date} < ${todayStr}`);
+      .where(
+        sql`${timeSlots.date} < ${todayStr} OR (${timeSlots.date} = ${todayStr} AND ${timeSlots.endTime} <= ${nowTimeStr})`
+      );
 
     if (expiredSlots.length === 0) return 0;
 
