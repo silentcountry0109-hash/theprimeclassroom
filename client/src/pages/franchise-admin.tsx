@@ -2912,11 +2912,9 @@ function StudentsTab() {
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                         {student.studentCode && <span>編碼：{student.studentCode}</span>}
                         <span>家長：{student.parentName}</span>
-                        {student.parentPhone && (
-                          <span className="flex items-center gap-0.5">
-                            <Phone className="w-3 h-3" />{student.parentPhone}
-                          </span>
-                        )}
+                        <span className="flex items-center gap-0.5">
+                          <Phone className="w-3 h-3" />{student.parentPhone || "未填寫"}
+                        </span>
                       </div>
                     </div>
                   </div>
