@@ -67,6 +67,7 @@ import {
   DoorOpen,
   Check,
   X,
+  ChevronDown,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -78,6 +79,18 @@ interface FranchiseStats {
   totalBookings: number;
   confirmedBookings: number;
   attendedBookings: number;
+}
+
+interface TodayStats {
+  date: string;
+  todayCoaches: number;
+  coachList: string[];
+  todaySlots: number;
+  slotList: { id: number; startTime: string; endTime: string; coachName: string; classroomName: string | null; bookedSeats: number; maxSeats: number }[];
+  todayBookings: number;
+  bookingList: { id: number; childName: string; childGrade: number; status: string; startTime: string; endTime: string }[];
+  todayAttended: number;
+  attendedList: { id: number; childName: string; childGrade: number; status: string; startTime: string; endTime: string }[];
 }
 
 interface FranchiseBooking {
@@ -192,6 +205,12 @@ function OverviewTab() {
     queryKey: ["/api/franchise-admin/stats"],
   });
 
+  const { data: todayStats, isLoading: todayLoading } = useQuery<TodayStats>({
+    queryKey: ["/api/franchise-admin/stats/today"],
+  });
+
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
   const { data: franchise } = useQuery<Franchise>({
     queryKey: ["/api/franchise-admin/my-franchise"],
   });
@@ -228,11 +247,15 @@ function OverviewTab() {
 
   const maxDailySeats = rangeStats?.dailyStats ? Math.max(...rangeStats.dailyStats.map((d) => d.totalSeats), 1) : 1;
 
-  const statCards = [
-    { label: "老師人數", value: stats?.totalCoaches ?? 0, icon: GraduationCap, color: "bg-tiffany/10 text-tiffany" },
-    { label: "可用時段", value: stats?.totalSlots ?? 0, icon: Clock, color: "bg-coral/10 text-coral" },
-    { label: "總預約數", value: stats?.totalBookings ?? 0, icon: CalendarCheck, color: "bg-amber-warm text-amber-700" },
-    { label: "已上課", value: stats?.attendedBookings ?? 0, icon: Users, color: "bg-green-50 text-green-600" },
+  const todayDateLabel = todayStats?.date
+    ? (() => { const d = new Date(todayStats.date + "T00:00:00"); return `${d.getMonth() + 1}/${d.getDate()}`; })()
+    : "";
+
+  const todayStatCards = [
+    { key: "coaches", label: "上課老師數", value: todayStats?.todayCoaches ?? 0, icon: GraduationCap, color: "bg-tiffany/10 text-tiffany" },
+    { key: "slots", label: "上課時段", value: todayStats?.todaySlots ?? 0, icon: Clock, color: "bg-coral/10 text-coral" },
+    { key: "bookings", label: "預約人數", value: todayStats?.todayBookings ?? 0, icon: CalendarCheck, color: "bg-amber-warm text-amber-700" },
+    { key: "attended", label: "已上課人數", value: todayStats?.todayAttended ?? 0, icon: Users, color: "bg-green-50 text-green-600" },
   ];
 
   const presets = [
@@ -253,20 +276,88 @@ function OverviewTab() {
         </p>
       </div>
 
+      <div className="flex items-center gap-2 mb-1">
+        <Calendar className="w-4 h-4 text-tiffany" />
+        <span className="text-sm font-medium text-muted-foreground">今日 {todayDateLabel || todayStats?.date || ""}</span>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card) => (
-          <div key={card.label} className="bg-white rounded-md border border-gray-100 p-5" data-testid={`franchise-stat-${card.label}`}>
-            {isLoading ? (
-              <Skeleton className="h-16" />
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${card.color}`}>
-                  <card.icon className="w-6 h-6" />
+        {todayStatCards.map((card) => (
+          <div key={card.key} data-testid={`franchise-stat-${card.key}`}>
+            <button
+              onClick={() => setExpandedCard(expandedCard === card.key ? null : card.key)}
+              className="w-full bg-white rounded-md border border-gray-100 p-5 text-left hover:border-tiffany/40 hover:shadow-sm transition-all cursor-pointer"
+            >
+              {todayLoading ? (
+                <Skeleton className="h-16" />
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${card.color}`}>
+                    <card.icon className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-2xl font-bold text-foreground">{card.value}</p>
+                    <p className="text-xs text-muted-foreground">{card.label}</p>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedCard === card.key ? "rotate-180" : ""}`} />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{card.value}</p>
-                  <p className="text-xs text-muted-foreground">{card.label}</p>
-                </div>
+              )}
+            </button>
+            {expandedCard === card.key && todayStats && (
+              <div className="bg-white border border-gray-100 border-t-0 rounded-b-md px-4 py-3 space-y-1.5 text-sm animate-in slide-in-from-top-1">
+                {card.key === "coaches" && (
+                  todayStats.coachList.length === 0
+                    ? <p className="text-xs text-muted-foreground py-2 text-center">今日無排課老師</p>
+                    : todayStats.coachList.map((name, i) => (
+                      <div key={i} className="flex items-center gap-2 py-1">
+                        <GraduationCap className="w-3.5 h-3.5 text-tiffany" />
+                        <span className="text-sm">{name}</span>
+                      </div>
+                    ))
+                )}
+                {card.key === "slots" && (
+                  todayStats.slotList.length === 0
+                    ? <p className="text-xs text-muted-foreground py-2 text-center">今日無時段</p>
+                    : todayStats.slotList.map((slot) => (
+                      <div key={slot.id} className="flex items-center gap-2 py-1 flex-wrap">
+                        <span className="text-tiffany font-medium text-xs">{slot.startTime}-{slot.endTime}</span>
+                        {slot.classroomName && (
+                          <span className="text-xs bg-tiffany/10 text-tiffany px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                            <DoorOpen className="w-3 h-3" />{slot.classroomName}
+                          </span>
+                        )}
+                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{slot.coachName}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{slot.bookedSeats}/{slot.maxSeats}</span>
+                      </div>
+                    ))
+                )}
+                {card.key === "bookings" && (
+                  todayStats.bookingList.length === 0
+                    ? <p className="text-xs text-muted-foreground py-2 text-center">今日無預約</p>
+                    : todayStats.bookingList.map((b) => (
+                      <div key={b.id} className="flex items-center gap-2 py-1 flex-wrap">
+                        <span className="text-sm font-medium">{b.childName}</span>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{b.childGrade}年級</span>
+                        <span className="text-xs text-tiffany">{b.startTime}-{b.endTime}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ml-auto ${b.status === "checked_in" || b.status === "completed" ? "bg-green-50 text-green-600" : "bg-tiffany/10 text-tiffany"}`}>
+                          {b.status === "checked_in" ? "上課中" : b.status === "completed" ? "已完成" : "已確認"}
+                        </span>
+                      </div>
+                    ))
+                )}
+                {card.key === "attended" && (
+                  todayStats.attendedList.length === 0
+                    ? <p className="text-xs text-muted-foreground py-2 text-center">今日尚無學生上課</p>
+                    : todayStats.attendedList.map((b) => (
+                      <div key={b.id} className="flex items-center gap-2 py-1 flex-wrap">
+                        <span className="text-sm font-medium">{b.childName}</span>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{b.childGrade}年級</span>
+                        <span className="text-xs text-tiffany">{b.startTime}-{b.endTime}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ml-auto ${b.status === "checked_in" ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600"}`}>
+                          {b.status === "checked_in" ? "上課中" : "已完成"}
+                        </span>
+                      </div>
+                    ))
+                )}
               </div>
             )}
           </div>

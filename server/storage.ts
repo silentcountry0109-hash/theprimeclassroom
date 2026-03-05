@@ -107,6 +107,7 @@ export interface IStorage {
     confirmedBookings: number;
     attendedBookings: number;
   }>;
+  getFranchiseTodayStats(franchiseId: number): Promise<any>;
   getAllProducts(): Promise<Product[]>;
   getActiveProducts(): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
@@ -930,6 +931,94 @@ export class DatabaseStorage implements IStorage {
       totalBookings,
       confirmedBookings,
       attendedBookings,
+    };
+  }
+
+  async getFranchiseTodayStats(franchiseId: number) {
+    const now = new Date();
+    const taiwanDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const today = taiwanDate.toISOString().split("T")[0];
+
+    const todaySlotRows = await db
+      .select({
+        id: timeSlots.id,
+        startTime: timeSlots.startTime,
+        endTime: timeSlots.endTime,
+        coachId: timeSlots.coachId,
+        classroomId: timeSlots.classroomId,
+        bookedSeats: timeSlots.bookedSeats,
+        maxSeats: timeSlots.maxSeats,
+      })
+      .from(timeSlots)
+      .where(and(eq(timeSlots.franchiseId, franchiseId), eq(timeSlots.date, today), eq(timeSlots.isActive, true)));
+
+    const coachIds = [...new Set(todaySlotRows.filter((s) => s.coachId).map((s) => s.coachId!))];
+    const coachRows = coachIds.length > 0
+      ? await db.select({ id: coaches.id, name: coaches.name }).from(coaches).where(inArray(coaches.id, coachIds))
+      : [];
+
+    const classroomIds = [...new Set(todaySlotRows.filter((s) => s.classroomId).map((s) => s.classroomId!))];
+    const classroomRows = classroomIds.length > 0
+      ? await db.select({ id: classrooms.id, name: classrooms.name }).from(classrooms).where(inArray(classrooms.id, classroomIds))
+      : [];
+
+    const slotIds = todaySlotRows.map((s) => s.id);
+    const todayBookingRows = slotIds.length > 0
+      ? await db
+          .select({
+            id: bookings.id,
+            slotId: bookings.slotId,
+            childId: bookings.childId,
+            status: bookings.status,
+          })
+          .from(bookings)
+          .where(inArray(bookings.slotId, slotIds))
+      : [];
+
+    const childIds = [...new Set(todayBookingRows.map((b) => b.childId))];
+    const childRows = childIds.length > 0
+      ? await db.select({ id: children.id, name: children.name, grade: children.grade }).from(children).where(inArray(children.id, childIds))
+      : [];
+    const childMap = Object.fromEntries(childRows.map((c) => [c.id, c]));
+
+    const coachMap = Object.fromEntries(coachRows.map((c) => [c.id, c.name]));
+    const classroomMap = Object.fromEntries(classroomRows.map((c) => [c.id, c.name]));
+
+    const slotDetails = todaySlotRows.map((s) => ({
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      coachName: s.coachId ? (coachMap[s.coachId] || "未指派") : "未指派",
+      classroomName: s.classroomId ? (classroomMap[s.classroomId] || null) : null,
+      bookedSeats: s.bookedSeats,
+      maxSeats: s.maxSeats,
+    }));
+
+    const bookingDetails = todayBookingRows.map((b) => {
+      const child = childMap[b.childId];
+      const slot = todaySlotRows.find((s) => s.id === b.slotId);
+      return {
+        id: b.id,
+        childName: child?.name || "未知",
+        childGrade: child?.grade || 0,
+        status: b.status,
+        startTime: slot?.startTime || "",
+        endTime: slot?.endTime || "",
+      };
+    });
+
+    const attendedBookings = bookingDetails.filter((b) => b.status === "checked_in" || b.status === "completed");
+
+    return {
+      date: today,
+      todayCoaches: coachRows.length,
+      coachList: coachRows.map((c) => c.name),
+      todaySlots: todaySlotRows.length,
+      slotList: slotDetails,
+      todayBookings: todayBookingRows.length,
+      bookingList: bookingDetails,
+      todayAttended: attendedBookings.length,
+      attendedList: attendedBookings,
     };
   }
 

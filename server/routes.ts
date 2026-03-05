@@ -915,6 +915,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/franchise-admin/stats/today", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const stats = await storage.getFranchiseTodayStats(req.franchiseId);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch today stats" });
+    }
+  });
+
   app.get("/api/franchise-admin/stats/date-range", isFranchiseAdmin, async (req: any, res) => {
     try {
       const { startDate, endDate } = req.query;
