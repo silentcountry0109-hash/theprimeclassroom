@@ -6,6 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
+import { coaches } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -105,6 +106,12 @@ export async function registerRoutes(
       }
       if (user.role !== "admin" && user.role !== "franchise_admin" && user.role !== "parent" && user.role !== "coach") {
         return res.status(403).json({ message: "帳號或密碼錯誤" });
+      }
+      if (user.role === "coach") {
+        const [coach] = await db.select().from(coaches).where(eq(coaches.userId, user.id));
+        if (coach && !coach.isActive) {
+          return res.status(403).json({ message: "此帳號已被停用，請聯繫管理員" });
+        }
       }
       req.session.credentialUserId = user.id;
       req.session.save(() => {
