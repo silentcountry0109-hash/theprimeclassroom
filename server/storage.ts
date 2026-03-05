@@ -134,6 +134,7 @@ export interface IStorage {
   getTimeSlot(id: number): Promise<any | undefined>;
   getSlotStudents(slotId: number): Promise<any[]>;
   checkInBooking(id: number, coachId: number): Promise<void>;
+  markAbsentBooking(id: number, coachId: number): Promise<void>;
   uncheckInBooking(id: number, coachId: number): Promise<void>;
   getCoachDailyRecord(coachId: number, date: string): Promise<any>;
   updateCoachDailyRecord(coachId: number, date: string): Promise<CoachDailyRecord>;
@@ -1388,7 +1389,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(bookings.slotId, slotId),
-          inArray(bookings.status, ["confirmed", "checked_in"])
+          inArray(bookings.status, ["confirmed", "checked_in", "absent"])
         )
       );
 
@@ -1427,10 +1428,33 @@ export class DatabaseStorage implements IStorage {
     await db.update(bookings).set({ status: "checked_in" }).where(eq(bookings.id, id));
   }
 
+  async markAbsentBooking(id: number, coachId: number): Promise<void> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+    if (!booking) throw new Error("預約不存在");
+    if (booking.status !== "confirmed") throw new Error("只有已確認的預約可以標記未到");
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
+    if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
+
+    const now = new Date();
+    const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    const earliestCheckIn = new Date(slotStart.getTime() - 15 * 60 * 1000);
+
+    if (now < earliestCheckIn) {
+      const startTimeStr = slot.startTime;
+      throw new Error(`尚未到點名時間，請於 ${startTimeStr} 前 15 分鐘再進行點名`);
+    }
+    if (now > slotEnd) {
+      throw new Error("課程已結束，無法標記未到");
+    }
+
+    await db.update(bookings).set({ status: "absent" }).where(eq(bookings.id, id));
+  }
+
   async uncheckInBooking(id: number, coachId: number): Promise<void> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) throw new Error("預約不存在");
-    if (booking.status !== "checked_in") throw new Error("只有已點名的預約可以取消點名");
+    if (booking.status !== "checked_in" && booking.status !== "absent") throw new Error("只有已點名或已標記未到的預約可以取消");
     const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
     if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
 
@@ -1472,13 +1496,14 @@ export class DatabaseStorage implements IStorage {
         continue;
       }
 
-      const allCheckedIn = slotBks.every(b => b.status === "checked_in" || b.status === "completed");
+      const allCheckedIn = slotBks.every(b => b.status === "checked_in" || b.status === "completed" || b.status === "absent");
       if (allCheckedIn) checkedInSlots++;
 
-      const slotBookingIds = slotBks.map(b => b.id);
+      const presentBks = slotBks.filter(b => b.status !== "absent");
+      const slotBookingIds = presentBks.map(b => b.id);
       const slotCBs = contactBookRecords.filter(cb => slotBookingIds.includes(cb.bookingId!));
-      const studentIds = slotBks.map(b => b.childId);
-      const allHaveContactBook = studentIds.every(childId =>
+      const presentChildIds = presentBks.map(b => b.childId);
+      const allHaveContactBook = presentChildIds.length === 0 || presentChildIds.every(childId =>
         slotCBs.some(cb => cb.childId === childId)
       );
       if (allHaveContactBook) contactBookSlots++;

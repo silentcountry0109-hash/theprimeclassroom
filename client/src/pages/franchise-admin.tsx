@@ -475,8 +475,8 @@ function OverviewTab() {
                         <span className="text-sm font-medium">{b.childName}</span>
                         <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{b.childGrade}年級</span>
                         <span className="text-xs text-tiffany">{b.startTime}-{b.endTime}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ml-auto ${b.status === "checked_in" || b.status === "completed" ? "bg-green-50 text-green-600" : "bg-tiffany/10 text-tiffany"}`}>
-                          {b.status === "checked_in" ? "上課中" : b.status === "completed" ? "已完成" : "已確認"}
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ml-auto ${b.status === "checked_in" || b.status === "completed" ? "bg-green-50 text-green-600" : b.status === "absent" ? "bg-red-50 text-red-600" : "bg-tiffany/10 text-tiffany"}`}>
+                          {b.status === "checked_in" ? "上課中" : b.status === "completed" ? "已完成" : b.status === "absent" ? "未到" : "已確認"}
                         </span>
                       </div>
                     ))
@@ -2072,7 +2072,7 @@ function TimeSlotsTab() {
 
   const getSlotBookedChildIds = (slotId: number) => {
     return slotBookings
-      .filter((b: any) => b.slotId === slotId && (b.status === "confirmed" || b.status === "checked_in"))
+      .filter((b: any) => b.slotId === slotId && (b.status === "confirmed" || b.status === "checked_in" || b.status === "absent"))
       .map((b: any) => b.childId);
   };
 

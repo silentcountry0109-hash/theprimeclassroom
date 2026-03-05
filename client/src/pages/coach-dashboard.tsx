@@ -47,6 +47,7 @@ import {
   Bell,
   CalendarPlus,
   CalendarMinus,
+  UserX,
 } from "lucide-react";
 import type { Notification } from "@shared/schema";
 
@@ -466,10 +467,24 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
-      toast({ title: "已取消點名", description: "學生狀態已恢復為待點名" });
+      toast({ title: "已取消", description: "學生狀態已恢復為待點名" });
     },
     onError: (error: any) => {
-      toast({ title: "取消點名失敗", description: error.message, variant: "destructive" });
+      toast({ title: "操作失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const absentMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/absent`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      toast({ title: "已標記未到", description: "學生已標記為缺席" });
+    },
+    onError: (error: any) => {
+      toast({ title: "標記未到失敗", description: error.message, variant: "destructive" });
     },
   });
 
@@ -555,18 +570,68 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
                       </AlertDialog>
                     )}
                   </>
+                ) : s.status === "absent" ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full" data-testid={`badge-absent-${s.bookingId}`}>
+                      <UserX className="w-3 h-3" />
+                      未到
+                    </span>
+                    {!isSlotEnded && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
+                            data-testid={`button-unmark-absent-${s.bookingId}`}
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>確定要取消未到標記嗎？</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {s.childName} 的狀態將恢復為「待點名」，請確認是否為誤標。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>返回</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => uncheckInMutation.mutate(s.bookingId)}
+                              className="bg-red-500 hover:bg-red-600"
+                              data-testid={`button-confirm-unmark-absent-${s.bookingId}`}
+                            >
+                              確認取消
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs border-tiffany/30 text-tiffany hover:bg-tiffany/5"
-                    onClick={() => checkInMutation.mutate(s.bookingId)}
-                    disabled={checkInMutation.isPending || !canCheckIn}
-                    data-testid={`button-check-in-${s.bookingId}`}
-                  >
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    點名
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs border-tiffany/30 text-tiffany hover:bg-tiffany/5"
+                      onClick={() => checkInMutation.mutate(s.bookingId)}
+                      disabled={checkInMutation.isPending || absentMutation.isPending || !canCheckIn}
+                      data-testid={`button-check-in-${s.bookingId}`}
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      已到
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs border-red-300 text-red-500 hover:bg-red-50"
+                      onClick={() => absentMutation.mutate(s.bookingId)}
+                      disabled={checkInMutation.isPending || absentMutation.isPending || !canCheckIn}
+                      data-testid={`button-absent-${s.bookingId}`}
+                    >
+                      <UserX className="w-3 h-3 mr-1" />
+                      未到
+                    </Button>
+                  </div>
                 )}
               </span>
             </div>

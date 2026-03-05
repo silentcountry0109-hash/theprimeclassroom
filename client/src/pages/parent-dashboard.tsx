@@ -2373,6 +2373,7 @@ function BookingsTab() {
     checked_in: { label: "上課中", icon: CheckCircle2, bgClass: "bg-orange-50", textClass: "text-orange-600", dotClass: "bg-orange-500" },
     cancelled: { label: "已取消", icon: XCircle, bgClass: "bg-gray-100", textClass: "text-gray-500", dotClass: "bg-gray-400" },
     completed: { label: "已完成", icon: CheckCircle2, bgClass: "bg-green-50", textClass: "text-green-600", dotClass: "bg-green-500" },
+    absent: { label: "未到", icon: XCircle, bgClass: "bg-red-50", textClass: "text-red-600", dotClass: "bg-red-500" },
   };
 
   const filterTabs = [

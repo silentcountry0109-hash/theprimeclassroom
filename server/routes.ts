@@ -1500,6 +1500,23 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/coach/bookings/:id/absent", isCoach, async (req: any, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      await storage.markAbsentBooking(bookingId, req.coach.id);
+      const booking = await storage.getBooking(bookingId);
+      if (booking) {
+        const slot = await storage.getTimeSlot(booking.slotId);
+        if (slot) {
+          await storage.updateCoachDailyRecord(req.coach.id, slot.date);
+        }
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "標記未到失敗" });
+    }
+  });
+
   app.patch("/api/coach/bookings/:id/uncheck-in", isCoach, async (req: any, res) => {
     try {
       const bookingId = parseInt(req.params.id);
