@@ -987,6 +987,10 @@ export async function registerRoutes(
       const { date, startTime, endTime, coachId, classroomId } = req.body;
       const franchiseId = req.franchiseId;
 
+      if (!coachId) {
+        return res.status(400).json({ message: "請指派老師" });
+      }
+
       const allClassrooms = await storage.getClassroomsByFranchise(franchiseId);
       if (allClassrooms.length > 0 && !classroomId) {
         return res.status(400).json({ message: "此分校已建立教室，排課時必須指定教室" });

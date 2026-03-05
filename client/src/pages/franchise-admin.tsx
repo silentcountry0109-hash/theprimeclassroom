@@ -1966,9 +1966,9 @@ function TimeSlotsTab() {
                   </Select>
                 </div>
                 <div>
-                  <Label>指派老師</Label>
+                  <Label>指派老師 *</Label>
                   <Select value={slotForm.coachId ? slotForm.coachId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, coachId: parseInt(v) || 0 })}>
-                    <SelectTrigger data-testid="select-franchise-slot-coach"><SelectValue placeholder="選擇老師（可不選）" /></SelectTrigger>
+                    <SelectTrigger data-testid="select-franchise-slot-coach"><SelectValue placeholder="選擇老師" /></SelectTrigger>
                     <SelectContent>
                       {coaches.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                     </SelectContent>
@@ -1979,7 +1979,7 @@ function TimeSlotsTab() {
                 <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
                 <Button
                   onClick={() => addSlotMutation.mutate(slotForm)}
-                  disabled={!slotForm.date || !slotForm.startTime || (classroomsList.length > 0 && !slotForm.classroomId) || addSlotMutation.isPending}
+                  disabled={!slotForm.date || !slotForm.startTime || !slotForm.coachId || (classroomsList.length > 0 && !slotForm.classroomId) || addSlotMutation.isPending}
                   data-testid="button-submit-franchise-slot"
                 >
                   {addSlotMutation.isPending ? "新增中..." : "新增時段"}
@@ -2074,9 +2074,9 @@ function TimeSlotsTab() {
                   </Select>
                 </div>
                 <div>
-                  <Label>指派老師</Label>
+                  <Label>指派老師 *</Label>
                   <Select value={batchForm.coachId ? batchForm.coachId.toString() : ""} onValueChange={(v) => setBatchForm({ ...batchForm, coachId: parseInt(v) || 0 })}>
-                    <SelectTrigger data-testid="select-batch-coach"><SelectValue placeholder="選擇老師（可不選）" /></SelectTrigger>
+                    <SelectTrigger data-testid="select-batch-coach"><SelectValue placeholder="選擇老師" /></SelectTrigger>
                     <SelectContent>
                       {coaches.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                     </SelectContent>
@@ -2103,7 +2103,7 @@ function TimeSlotsTab() {
                 <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
                 <Button
                   onClick={handleBatchSubmit}
-                  disabled={!batchForm.startDate || !batchForm.endDate || batchForm.weekdays.length === 0 || batchForm.startTimes.filter(Boolean).length === 0 || (classroomsList.length > 0 && !batchForm.classroomId) || batchSubmitting}
+                  disabled={!batchForm.startDate || !batchForm.endDate || batchForm.weekdays.length === 0 || batchForm.startTimes.filter(Boolean).length === 0 || !batchForm.coachId || (classroomsList.length > 0 && !batchForm.classroomId) || batchSubmitting}
                   data-testid="button-submit-batch-slot"
                 >
                   {batchSubmitting ? "排課中..." : "批次建立"}
