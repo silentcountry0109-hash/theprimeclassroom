@@ -1940,7 +1940,7 @@ function TimeSlotsTab() {
             <>
               <div className="space-y-4 py-4">
                 <div>
-                  <Label>日期 *</Label>
+                  <Label>上課日期 *</Label>
                   <Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} data-testid="input-franchise-slot-date" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1957,7 +1957,7 @@ function TimeSlotsTab() {
                   </div>
                 </div>
                 <div>
-                  <Label>教室 {classroomsList.length > 0 && "*"}</Label>
+                  <Label>上課教室 {classroomsList.length > 0 && "*"}</Label>
                   <Select value={slotForm.classroomId ? slotForm.classroomId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, classroomId: parseInt(v) || 0 })}>
                     <SelectTrigger data-testid="select-franchise-slot-classroom"><SelectValue placeholder={classroomsList.length > 0 ? "選擇教室" : "尚未建立教室"} /></SelectTrigger>
                     <SelectContent>
@@ -2065,7 +2065,7 @@ function TimeSlotsTab() {
                   </div>
                 </div>
                 <div>
-                  <Label>教室 {classroomsList.length > 0 && "*"}</Label>
+                  <Label>上課教室 {classroomsList.length > 0 && "*"}</Label>
                   <Select value={batchForm.classroomId ? batchForm.classroomId.toString() : ""} onValueChange={(v) => setBatchForm({ ...batchForm, classroomId: parseInt(v) || 0 })}>
                     <SelectTrigger data-testid="select-batch-classroom"><SelectValue placeholder={classroomsList.length > 0 ? "選擇教室" : "尚未建立教室"} /></SelectTrigger>
                     <SelectContent>
