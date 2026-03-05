@@ -1614,6 +1614,37 @@ function TimeSlotsTab() {
     },
   });
 
+  const [batchDeleteMode, setBatchDeleteMode] = useState(false);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<Set<number>>(new Set());
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
+  const toggleSlotSelection = (id: number) => {
+    setSelectedSlotIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedSlotIds.size === 0) return;
+    if (!confirm(`確定刪除選取的 ${selectedSlotIds.size} 個時段？`)) return;
+    setBatchDeleting(true);
+    let deleted = 0;
+    for (const id of selectedSlotIds) {
+      try {
+        await apiRequest("DELETE", `/api/franchise-admin/time-slots/${id}`);
+        deleted++;
+      } catch {}
+    }
+    setBatchDeleting(false);
+    setSelectedSlotIds(new Set());
+    setBatchDeleteMode(false);
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
+    toast({ title: `已刪除 ${deleted} 個時段` });
+  };
+
   const [manualBookSlot, setManualBookSlot] = useState<TimeSlot | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
 
@@ -1750,9 +1781,43 @@ function TimeSlotsTab() {
               <CalendarDays className="w-4 h-4" />
             </button>
           </div>
-          <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-franchise-slot">
-            <Plus className="w-4 h-4 mr-1.5" />新增時段
-          </Button>
+          {batchDeleteMode ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const allIds = sortedSlots.map((s) => s.id);
+                  if (selectedSlotIds.size === allIds.length) setSelectedSlotIds(new Set());
+                  else setSelectedSlotIds(new Set(allIds));
+                }}
+                data-testid="button-select-all-slots"
+              >
+                {selectedSlotIds.size === sortedSlots.length ? "取消全選" : "全選"}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBatchDelete}
+                disabled={selectedSlotIds.size === 0 || batchDeleting}
+                data-testid="button-batch-delete"
+              >
+                <Trash2 className="w-4 h-4 mr-1" />{batchDeleting ? "刪除中..." : `刪除 (${selectedSlotIds.size})`}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setBatchDeleteMode(false); setSelectedSlotIds(new Set()); }} data-testid="button-cancel-batch-delete">
+                取消
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setBatchDeleteMode(true)} data-testid="button-enter-batch-delete">
+                <Trash2 className="w-4 h-4 mr-1" />批量刪除
+              </Button>
+              <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-franchise-slot">
+                <Plus className="w-4 h-4 mr-1.5" />新增時段
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1769,7 +1834,16 @@ function TimeSlotsTab() {
             const coachName = coaches.find((c) => c.id === slot.coachId)?.name || "未指派";
             const classroomName = classroomsList.find((c) => c.id === slot.classroomId)?.name;
             return (
-              <div key={slot.id} className="bg-white rounded-md border border-gray-100 p-3 flex items-center gap-4" data-testid={`franchise-slot-${slot.id}`}>
+              <div key={slot.id} className={`bg-white rounded-md border p-3 flex items-center gap-4 ${batchDeleteMode && selectedSlotIds.has(slot.id) ? "border-red-300 bg-red-50/30" : "border-gray-100"}`} data-testid={`franchise-slot-${slot.id}`}>
+                {batchDeleteMode && (
+                  <input
+                    type="checkbox"
+                    checked={selectedSlotIds.has(slot.id)}
+                    onChange={() => toggleSlotSelection(slot.id)}
+                    className="w-4 h-4 rounded border-gray-300 text-tiffany accent-tiffany shrink-0 cursor-pointer"
+                    data-testid={`checkbox-slot-${slot.id}`}
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-sm font-medium">{slot.date} ({getDayLabel(slot.date)})</span>
@@ -1786,16 +1860,18 @@ function TimeSlotsTab() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
-                    <Button variant="outline" size="icon" onClick={() => { setManualBookSlot(slot); setStudentSearch(""); }} data-testid={`button-manual-book-${slot.id}`} title="加排學生">
-                      <UserPlus className="w-4 h-4 text-tiffany" />
+                {!batchDeleteMode && (
+                  <div className="flex items-center gap-1">
+                    {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
+                      <Button variant="outline" size="icon" onClick={() => { setManualBookSlot(slot); setStudentSearch(""); }} data-testid={`button-manual-book-${slot.id}`} title="加排學生">
+                        <UserPlus className="w-4 h-4 text-tiffany" />
+                      </Button>
+                    )}
+                    <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-franchise-slot-${slot.id}`}>
+                      <Trash2 className="w-4 h-4" />
                     </Button>
-                  )}
-                  <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-franchise-slot-${slot.id}`}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                  </div>
+                )}
               </div>
             );
           })}
