@@ -695,12 +695,27 @@ function FranchiseInfoTab() {
   const [nearbySchools, setNearbySchools] = useState<string[]>([]);
   const [schoolInput, setSchoolInput] = useState("");
 
+  type DayHours = { isOpen: boolean; openTime: string; closeTime: string };
+  type BusinessHours = Record<string, DayHours>;
+  const defaultBusinessHours: BusinessHours = {
+    "0": { isOpen: false, openTime: "09:00", closeTime: "21:00" },
+    "1": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+    "2": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+    "3": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+    "4": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+    "5": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+    "6": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+  };
+  const [businessHours, setBusinessHours] = useState<BusinessHours>(defaultBusinessHours);
+  const dayOrder = ["1", "2", "3", "4", "5", "6", "0"];
+
   const startEdit = () => {
     if (franchise) {
       setDescription(franchise.description || "");
       setPhone(franchise.phone || "");
       setTags(franchise.tags || []);
       setNearbySchools(franchise.nearbySchools || []);
+      setBusinessHours((franchise.businessHours as BusinessHours) || defaultBusinessHours);
     }
     setEditing(true);
   };
@@ -708,7 +723,7 @@ function FranchiseInfoTab() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("PATCH", "/api/franchise-admin/my-franchise", {
-        description, phone, tags, nearbySchools,
+        description, phone, tags, nearbySchools, businessHours,
       });
       return res.json();
     },
@@ -780,6 +795,24 @@ function FranchiseInfoTab() {
               </div>
             </div>
           )}
+          <div>
+            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><Clock className="w-3.5 h-3.5" />營業時間</p>
+            <div className="space-y-1">
+              {dayOrder.map((d) => {
+                const bh = (franchise.businessHours as BusinessHours)?.[d] || defaultBusinessHours[d];
+                return (
+                  <div key={d} className="flex items-center gap-3 text-sm" data-testid={`display-business-hours-${d}`}>
+                    <span className="w-8 font-medium text-foreground">{DAY_LABELS[d]}</span>
+                    {bh.isOpen ? (
+                      <span className="text-muted-foreground">{bh.openTime} - {bh.closeTime}</span>
+                    ) : (
+                      <span className="text-coral text-xs">休息</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-md border border-gray-100 p-6 space-y-4">
@@ -824,6 +857,45 @@ function FranchiseInfoTab() {
                 data-testid="input-franchise-info-school"
               />
               <Button type="button" variant="outline" size="sm" onClick={() => { if (schoolInput.trim() && !nearbySchools.includes(schoolInput.trim())) { setNearbySchools([...nearbySchools, schoolInput.trim()]); setSchoolInput(""); } }}>加入</Button>
+            </div>
+          </div>
+          <div>
+            <Label className="flex items-center gap-1 mb-2"><Clock className="w-3.5 h-3.5" />營業時間</Label>
+            <div className="space-y-2">
+              {dayOrder.map((d) => {
+                const dh = businessHours[d];
+                return (
+                  <div key={d} className="flex items-center gap-3" data-testid={`edit-business-hours-${d}`}>
+                    <span className="w-8 text-sm font-medium">{DAY_LABELS[d]}</span>
+                    <Switch
+                      checked={dh.isOpen}
+                      onCheckedChange={(checked) => setBusinessHours({ ...businessHours, [d]: { ...dh, isOpen: checked } })}
+                      data-testid={`switch-business-hours-${d}`}
+                    />
+                    {dh.isOpen ? (
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="time"
+                          value={dh.openTime}
+                          onChange={(e) => setBusinessHours({ ...businessHours, [d]: { ...dh, openTime: e.target.value } })}
+                          className="w-28 h-8 text-sm"
+                          data-testid={`input-open-time-${d}`}
+                        />
+                        <span className="text-muted-foreground text-sm">~</span>
+                        <Input
+                          type="time"
+                          value={dh.closeTime}
+                          onChange={(e) => setBusinessHours({ ...businessHours, [d]: { ...dh, closeTime: e.target.value } })}
+                          className="w-28 h-8 text-sm"
+                          data-testid={`input-close-time-${d}`}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-coral text-xs">休息</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div className="flex gap-3 pt-2">
@@ -1744,6 +1816,24 @@ function TimeSlotsTab() {
   const { data: slots = [], isLoading } = useQuery<TimeSlot[]>({ queryKey: ["/api/franchise-admin/time-slots"] });
   const { data: coaches = [] } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
   const { data: classroomsList = [] } = useQuery<Classroom[]>({ queryKey: ["/api/franchise-admin/classrooms"] });
+  const { data: franchise } = useQuery<Franchise>({ queryKey: ["/api/franchise-admin/my-franchise"] });
+
+  type DayHoursConfig = { isOpen: boolean; openTime?: string; closeTime?: string };
+  const businessHours = franchise?.businessHours as Record<string, DayHoursConfig> | undefined;
+
+  const isDayClosed = (dateStr: string) => {
+    if (!businessHours || !dateStr) return false;
+    const dow = new Date(dateStr + "T00:00:00").getDay().toString();
+    return businessHours[dow] && !businessHours[dow].isOpen;
+  };
+
+  const getDayBusinessHours = (dateStr: string) => {
+    if (!businessHours || !dateStr) return null;
+    const dow = new Date(dateStr + "T00:00:00").getDay().toString();
+    const dh = businessHours[dow];
+    if (!dh || !dh.isOpen) return null;
+    return { openTime: dh.openTime || "00:00", closeTime: dh.closeTime || "23:59" };
+  };
 
   const computeEndTime = (start: string) => {
     const [h, m] = start.split(":").map(Number);
@@ -2312,6 +2402,16 @@ function TimeSlotsTab() {
                 <div>
                   <Label>上課日期 *</Label>
                   <Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} data-testid="input-franchise-slot-date" />
+                  {slotForm.date && isDayClosed(slotForm.date) && (
+                    <p className="text-xs text-coral mt-1" data-testid="text-day-closed-warning">
+                      {DAY_LABELS[new Date(slotForm.date + "T00:00:00").getDay().toString()]}未營業，無法排課
+                    </p>
+                  )}
+                  {slotForm.date && !isDayClosed(slotForm.date) && getDayBusinessHours(slotForm.date) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      營業時間：{getDayBusinessHours(slotForm.date)!.openTime} - {getDayBusinessHours(slotForm.date)!.closeTime}
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -2326,6 +2426,15 @@ function TimeSlotsTab() {
                     <Input type="time" value={slotForm.endTime} disabled className="bg-gray-50" data-testid="input-franchise-slot-end" />
                   </div>
                 </div>
+                {slotForm.date && slotForm.startTime && !isDayClosed(slotForm.date) && (() => {
+                  const dh = getDayBusinessHours(slotForm.date);
+                  if (!dh) return null;
+                  const end = computeEndTime(slotForm.startTime);
+                  if (slotForm.startTime < dh.openTime || end > dh.closeTime) {
+                    return <p className="text-xs text-coral" data-testid="text-time-out-of-range">排課時間超出營業時間（{dh.openTime} - {dh.closeTime}）</p>;
+                  }
+                  return null;
+                })()}
                 <div>
                   <Label>上課教室 {classroomsList.length > 0 && "*"}</Label>
                   <Select value={slotForm.classroomId ? slotForm.classroomId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, classroomId: parseInt(v) || 0 })}>
@@ -2349,7 +2458,11 @@ function TimeSlotsTab() {
                 <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
                 <Button
                   onClick={() => addSlotMutation.mutate(slotForm)}
-                  disabled={!slotForm.date || !slotForm.startTime || !slotForm.coachId || (classroomsList.length > 0 && !slotForm.classroomId) || addSlotMutation.isPending}
+                  disabled={!slotForm.date || !slotForm.startTime || !slotForm.coachId || (classroomsList.length > 0 && !slotForm.classroomId) || addSlotMutation.isPending || isDayClosed(slotForm.date) || (() => {
+                    const dh = getDayBusinessHours(slotForm.date);
+                    if (!dh || !slotForm.startTime) return false;
+                    return slotForm.startTime < dh.openTime || computeEndTime(slotForm.startTime) > dh.closeTime;
+                  })()}
                   data-testid="button-submit-franchise-slot"
                 >
                   {addSlotMutation.isPending ? "新增中..." : "新增時段"}
@@ -2375,24 +2488,30 @@ function TimeSlotsTab() {
                     {[
                       { day: 1, label: "一" }, { day: 2, label: "二" }, { day: 3, label: "三" },
                       { day: 4, label: "四" }, { day: 5, label: "五" }, { day: 6, label: "六" }, { day: 0, label: "日" },
-                    ].map(({ day, label }) => (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => {
-                          const wds = batchForm.weekdays.includes(day)
-                            ? batchForm.weekdays.filter((d) => d !== day)
-                            : [...batchForm.weekdays, day];
-                          setBatchForm({ ...batchForm, weekdays: wds });
-                        }}
-                        className={`w-9 h-9 rounded-full text-sm font-medium transition-colors ${
-                          batchForm.weekdays.includes(day) ? "bg-tiffany text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                        }`}
-                        data-testid={`batch-weekday-${day}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                    ].map(({ day, label }) => {
+                      const closed = businessHours?.[day.toString()] && !businessHours[day.toString()].isOpen;
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          disabled={!!closed}
+                          title={closed ? "未營業" : undefined}
+                          onClick={() => {
+                            const wds = batchForm.weekdays.includes(day)
+                              ? batchForm.weekdays.filter((d) => d !== day)
+                              : [...batchForm.weekdays, day];
+                            setBatchForm({ ...batchForm, weekdays: wds });
+                          }}
+                          className={`w-9 h-9 rounded-full text-sm font-medium transition-colors ${
+                            closed ? "bg-gray-50 text-gray-300 line-through cursor-not-allowed" :
+                            batchForm.weekdays.includes(day) ? "bg-tiffany text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          }`}
+                          data-testid={`batch-weekday-${day}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>

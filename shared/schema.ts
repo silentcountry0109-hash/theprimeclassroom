@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, serial, boolean, timestamp, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, serial, boolean, timestamp, real, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -23,6 +23,7 @@ export const franchises = pgTable("franchises", {
   rating: real("franchise_rating").default(0),
   reviewCount: integer("franchise_review_count").default(0),
   nearbySchools: text("nearby_schools").array(),
+  businessHours: jsonb("business_hours"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

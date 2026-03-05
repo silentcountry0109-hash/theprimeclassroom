@@ -814,6 +814,29 @@ export async function registerRoutes(
 
   app.post("/api/admin/time-slots", isAdmin, async (req, res) => {
     try {
+      const { date, startTime, endTime, franchiseId } = req.body;
+      if (franchiseId && date) {
+        const franchiseData = await storage.getFranchise(franchiseId);
+        if (franchiseData?.businessHours) {
+          const bh = franchiseData.businessHours as Record<string, { isOpen: boolean; openTime?: string; closeTime?: string }>;
+          const [y, mo, d] = date.split("-").map(Number);
+          const dayOfWeek = new Date(y, mo - 1, d).getDay().toString();
+          const dayConfig = bh[dayOfWeek];
+          if (dayConfig && !dayConfig.isOpen) {
+            const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
+            return res.status(400).json({ message: `星期${dayNames[parseInt(dayOfWeek)]}未營業，無法排課` });
+          }
+          if (dayConfig && dayConfig.isOpen && dayConfig.openTime && dayConfig.closeTime) {
+            const st = startTime.padStart(5, "0");
+            const et = endTime.padStart(5, "0");
+            const ot = dayConfig.openTime.padStart(5, "0");
+            const ct = dayConfig.closeTime.padStart(5, "0");
+            if (st < ot || et > ct) {
+              return res.status(400).json({ message: `排課時間超出營業時間（${dayConfig.openTime} - ${dayConfig.closeTime}）` });
+            }
+          }
+        }
+      }
       const slot = await storage.createSlot(req.body);
       if (slot.coachId) {
         const coach = await storage.getCoach(slot.coachId);
@@ -960,10 +983,11 @@ export async function registerRoutes(
 
   app.patch("/api/franchise-admin/my-franchise", isFranchiseAdmin, async (req: any, res) => {
     try {
-      const { description, phone, tags, nearbySchools, photos, coverPhoto } = req.body;
+      const { description, phone, tags, nearbySchools, photos, coverPhoto, businessHours } = req.body;
       const updates: any = { description, phone, tags, nearbySchools };
       if (photos !== undefined) updates.photos = photos;
       if (coverPhoto !== undefined) updates.coverPhoto = coverPhoto;
+      if (businessHours !== undefined) updates.businessHours = businessHours;
       const franchise = await storage.updateFranchise(req.franchiseId, updates);
       res.json(franchise);
     } catch (error) {
@@ -1100,6 +1124,27 @@ export async function registerRoutes(
 
       if (!coachId) {
         return res.status(400).json({ message: "請指派老師" });
+      }
+
+      const franchiseData = await storage.getFranchise(franchiseId);
+      if (franchiseData?.businessHours && date) {
+        const bh = franchiseData.businessHours as Record<string, { isOpen: boolean; openTime?: string; closeTime?: string }>;
+        const [y, mo, d] = date.split("-").map(Number);
+        const dayOfWeek = new Date(y, mo - 1, d).getDay().toString();
+        const dayConfig = bh[dayOfWeek];
+        if (dayConfig && !dayConfig.isOpen) {
+          const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
+          return res.status(400).json({ message: `星期${dayNames[parseInt(dayOfWeek)]}未營業，無法排課` });
+        }
+        if (dayConfig && dayConfig.isOpen && dayConfig.openTime && dayConfig.closeTime) {
+          const st = startTime.padStart(5, "0");
+          const et = endTime.padStart(5, "0");
+          const ot = dayConfig.openTime.padStart(5, "0");
+          const ct = dayConfig.closeTime.padStart(5, "0");
+          if (st < ot || et > ct) {
+            return res.status(400).json({ message: `排課時間超出營業時間（${dayConfig.openTime} - ${dayConfig.closeTime}）` });
+          }
+        }
       }
 
       const allClassrooms = await storage.getClassroomsByFranchise(franchiseId);
