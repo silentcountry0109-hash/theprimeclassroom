@@ -1455,8 +1455,11 @@ export class DatabaseStorage implements IStorage {
     const slotBookings = await db.select().from(bookings)
       .where(and(inArray(bookings.slotId, slotIds), sql`${bookings.status} != 'cancelled'`));
 
-    const contactBookRecords = await db.select().from(contactBooks)
-      .where(and(eq(contactBooks.coachId, coachId), inArray(contactBooks.slotId, slotIds)));
+    const bookingIds = slotBookings.map(b => b.id);
+    const contactBookRecords = bookingIds.length > 0
+      ? await db.select().from(contactBooks)
+          .where(and(eq(contactBooks.coachId, coachId), inArray(contactBooks.bookingId, bookingIds)))
+      : [];
 
     let checkedInSlots = 0;
     let contactBookSlots = 0;
@@ -1472,8 +1475,9 @@ export class DatabaseStorage implements IStorage {
       const allCheckedIn = slotBks.every(b => b.status === "checked_in" || b.status === "completed");
       if (allCheckedIn) checkedInSlots++;
 
+      const slotBookingIds = slotBks.map(b => b.id);
+      const slotCBs = contactBookRecords.filter(cb => slotBookingIds.includes(cb.bookingId!));
       const studentIds = slotBks.map(b => b.childId);
-      const slotCBs = contactBookRecords.filter(cb => cb.slotId === slot.id);
       const allHaveContactBook = studentIds.every(childId =>
         slotCBs.some(cb => cb.childId === childId)
       );
@@ -1557,7 +1561,7 @@ export class DatabaseStorage implements IStorage {
 
   async getContactBooksBySlot(slotId: number, coachId: number): Promise<any[]> {
     const slotBookings = await db.select().from(bookings).where(
-      and(eq(bookings.slotId, slotId), eq(bookings.status, "confirmed"))
+      and(eq(bookings.slotId, slotId), sql`${bookings.status} != 'cancelled'`)
     );
     const bookingIds = slotBookings.map(b => b.id);
     if (bookingIds.length === 0) return [];
