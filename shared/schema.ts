@@ -218,6 +218,22 @@ export const insertFavoriteFranchiseSchema = createInsertSchema(favoriteFranchis
 export type FavoriteFranchise = typeof favoriteFranchises.$inferSelect;
 export type InsertFavoriteFranchise = z.infer<typeof insertFavoriteFranchiseSchema>;
 
+export const coachDailyRecords = pgTable("coach_daily_records", {
+  id: serial("id").primaryKey(),
+  coachId: integer("coach_id").references(() => coaches.id).notNull(),
+  date: text("date").notNull(),
+  totalSlots: integer("total_slots").default(0).notNull(),
+  checkedInSlots: integer("checked_in_slots").default(0).notNull(),
+  contactBookSlots: integer("contact_book_slots").default(0).notNull(),
+  isComplete: boolean("is_complete").default(false).notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCoachDailyRecordSchema = createInsertSchema(coachDailyRecords).omit({ id: true, createdAt: true });
+export type CoachDailyRecord = typeof coachDailyRecords.$inferSelect;
+export type InsertCoachDailyRecord = z.infer<typeof insertCoachDailyRecordSchema>;
+
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({ id: true, createdAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });

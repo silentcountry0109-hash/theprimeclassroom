@@ -16,6 +16,17 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -30,6 +41,9 @@ import {
   Edit,
   CheckCircle,
   Star,
+  XCircle,
+  ClipboardCheck,
+  AlertTriangle,
 } from "lucide-react";
 
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
@@ -37,7 +51,7 @@ const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 export default function CoachDashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "profile">("calendar");
+  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "salary" | "profile">("calendar");
   const [showBindingSuccess, setShowBindingSuccess] = useState(false);
 
   useEffect(() => {
@@ -81,6 +95,7 @@ export default function CoachDashboard() {
   const TABS = [
     { id: "calendar" as const, label: "行事曆", icon: Calendar },
     { id: "students" as const, label: "我的學生", icon: Users },
+    { id: "salary" as const, label: "工作記錄", icon: ClipboardCheck },
     { id: "profile" as const, label: "個人資料", icon: User },
   ];
 
@@ -125,6 +140,7 @@ export default function CoachDashboard() {
 
         {activeTab === "calendar" && <CalendarTab coachId={userData.coach?.id} />}
         {activeTab === "students" && <StudentsTab coachId={userData.coach?.id} />}
+        {activeTab === "salary" && <SalaryTab coachId={userData.coach?.id} />}
         {activeTab === "profile" && <ProfileTab />}
       </div>
 
@@ -251,6 +267,7 @@ function CalendarTab({ coachId }: { coachId: number }) {
 
       {selectedDate && (
         <div className="space-y-3">
+          <DailyProgressCard coachId={coachId} date={selectedDate} />
           <h3 className="text-sm font-semibold text-foreground px-1" data-testid="text-selected-date">
             {selectedDate} 的排課
           </h3>
@@ -260,7 +277,7 @@ function CalendarTab({ coachId }: { coachId: number }) {
             </div>
           ) : (
             selectedSlots.map(slot => (
-              <SlotCard key={slot.id} slot={slot} onOpenContactBook={() => setContactBookSlot(slot)} />
+              <SlotCard key={slot.id} slot={slot} selectedDate={selectedDate} onOpenContactBook={() => setContactBookSlot(slot)} />
             ))
           )}
         </div>
@@ -277,12 +294,44 @@ function CalendarTab({ coachId }: { coachId: number }) {
   );
 }
 
-function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: () => void }) {
+function useCheckInAvailability(slotDate: string, slotStartTime: string, slotEndTime: string) {
+  const [canCheckIn, setCanCheckIn] = useState(false);
+  const [isSlotEnded, setIsSlotEnded] = useState(false);
+  const [minutesUntilCheckIn, setMinutesUntilCheckIn] = useState(0);
+
+  useEffect(() => {
+    const check = () => {
+      const now = new Date();
+      const slotStart = new Date(`${slotDate}T${slotStartTime}:00+08:00`);
+      const slotEnd = new Date(`${slotDate}T${slotEndTime}:00+08:00`);
+      const earliest = new Date(slotStart.getTime() - 15 * 60 * 1000);
+
+      setIsSlotEnded(now > slotEnd);
+      setCanCheckIn(now >= earliest && now <= slotEnd);
+      if (now < earliest) {
+        setMinutesUntilCheckIn(Math.ceil((earliest.getTime() - now.getTime()) / 60000));
+      } else {
+        setMinutesUntilCheckIn(0);
+      }
+    };
+    check();
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, [slotDate, slotStartTime, slotEndTime]);
+
+  return { canCheckIn, isSlotEnded, minutesUntilCheckIn };
+}
+
+function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; selectedDate: string; onOpenContactBook: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: students = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/coach/slots", slot.id, "students"],
   });
+
+  const { canCheckIn, isSlotEnded, minutesUntilCheckIn } = useCheckInAvailability(
+    slot.date || selectedDate, slot.startTime, slot.endTime
+  );
 
   const checkInMutation = useMutation({
     mutationFn: async (bookingId: number) => {
@@ -290,10 +339,25 @@ function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: (
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
       toast({ title: "點名成功", description: "學生已標記為出席" });
     },
     onError: (error: any) => {
       toast({ title: "點名失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const uncheckInMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/uncheck-in`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      toast({ title: "已取消點名", description: "學生狀態已恢復為待點名" });
+    },
+    onError: (error: any) => {
+      toast({ title: "取消點名失敗", description: error.message, variant: "destructive" });
     },
   });
 
@@ -313,6 +377,18 @@ function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: (
         </div>
       </div>
 
+      {!canCheckIn && !isSlotEnded && minutesUntilCheckIn > 0 && students.length > 0 && (
+        <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg mb-3" data-testid={`notice-checkin-wait-${slot.id}`}>
+          <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>
+            {minutesUntilCheckIn > 60
+              ? `尚需 ${Math.floor(minutesUntilCheckIn / 60)} 小時 ${minutesUntilCheckIn % 60} 分鐘才可點名`
+              : `尚需 ${minutesUntilCheckIn} 分鐘才可點名（上課前 15 分鐘開放）`
+            }
+          </span>
+        </div>
+      )}
+
       {isLoading ? (
         <Skeleton className="h-8 w-full" />
       ) : students.length === 0 ? (
@@ -329,19 +405,51 @@ function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: (
               {s.childStudentCode && (
                 <span className="text-[10px] text-muted-foreground/70 font-mono">{s.childStudentCode}</span>
               )}
-              <span className="ml-auto">
+              <span className="ml-auto flex items-center gap-1">
                 {s.status === "checked_in" ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-checked-in-${s.bookingId}`}>
-                    <CheckCircle className="w-3 h-3" />
-                    已到
-                  </span>
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-checked-in-${s.bookingId}`}>
+                      <CheckCircle className="w-3 h-3" />
+                      已到
+                    </span>
+                    {!isSlotEnded && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
+                            data-testid={`button-uncheck-${s.bookingId}`}
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>確定要取消點名嗎？</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {s.childName} 的出席狀態將恢復為「待點名」，請確認是否為誤點。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>返回</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => uncheckInMutation.mutate(s.bookingId)}
+                              className="bg-red-500 hover:bg-red-600"
+                              data-testid={`button-confirm-uncheck-${s.bookingId}`}
+                            >
+                              確認取消點名
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </>
                 ) : (
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-6 px-2 text-xs border-tiffany/30 text-tiffany hover:bg-tiffany/5"
                     onClick={() => checkInMutation.mutate(s.bookingId)}
-                    disabled={checkInMutation.isPending}
+                    disabled={checkInMutation.isPending || !canCheckIn}
                     data-testid={`button-check-in-${s.bookingId}`}
                   >
                     <CheckCircle className="w-3 h-3 mr-1" />
@@ -365,6 +473,64 @@ function SlotCard({ slot, onOpenContactBook }: { slot: any; onOpenContactBook: (
         <FileText className="w-4 h-4 mr-1.5" />
         填寫聯絡簿
       </Button>
+    </div>
+  );
+}
+
+function DailyProgressCard({ coachId, date }: { coachId: number; date: string }) {
+  const { data: record, isLoading } = useQuery<any>({
+    queryKey: ["/api/coach/daily-record", date],
+    enabled: !!coachId,
+  });
+
+  if (isLoading) return <Skeleton className="h-16 w-full rounded-xl" />;
+  if (!record || record.totalSlots === 0) return null;
+
+  const checkInPercent = Math.round((record.checkedInSlots / record.totalSlots) * 100);
+  const contactBookPercent = Math.round((record.contactBookSlots / record.totalSlots) * 100);
+
+  return (
+    <div className={`rounded-xl border p-4 ${record.isComplete ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`} data-testid="card-daily-progress">
+      <div className="flex items-center gap-2 mb-3">
+        {record.isComplete ? (
+          <>
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <span className="text-sm font-semibold text-green-700" data-testid="text-daily-status">今日工作已完成</span>
+          </>
+        ) : (
+          <>
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
+            <span className="text-sm font-semibold text-amber-700" data-testid="text-daily-status">尚有未完成的工作</span>
+          </>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-muted-foreground">點名進度</span>
+            <span className={record.checkedInSlots === record.totalSlots ? "text-green-600 font-medium" : "text-amber-600 font-medium"} data-testid="text-checkin-progress">
+              {record.checkedInSlots}/{record.totalSlots}
+            </span>
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${record.checkedInSlots === record.totalSlots ? "bg-green-500" : "bg-amber-400"}`} style={{ width: `${checkInPercent}%` }} />
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-muted-foreground">聯絡簿進度</span>
+            <span className={record.contactBookSlots === record.totalSlots ? "text-green-600 font-medium" : "text-amber-600 font-medium"} data-testid="text-contactbook-progress">
+              {record.contactBookSlots}/{record.totalSlots}
+            </span>
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${record.contactBookSlots === record.totalSlots ? "bg-green-500" : "bg-amber-400"}`} style={{ width: `${contactBookPercent}%` }} />
+          </div>
+        </div>
+      </div>
+      {!record.isComplete && (
+        <p className="text-[10px] text-amber-600/80 mt-2">完成所有點名與聯絡簿填寫後，此日才計入薪資計算</p>
+      )}
     </div>
   );
 }
@@ -760,6 +926,124 @@ function ContactBookCard({ entry, showChild = true }: { entry: any; showChild?: 
               <p className="text-sm text-amber-800">{entry.teacherRemarks}</p>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SalaryTab({ coachId }: { coachId: number }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const { data: records = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/coach/monthly-records", year, month],
+    enabled: !!coachId,
+  });
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const allDates: string[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    allDates.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+  }
+
+  const recordMap = new Map(records.map(r => [r.date, r]));
+  const completedDays = records.filter(r => r.isComplete).length;
+  const workDays = records.filter(r => r.totalSlots > 0).length;
+  const completionRate = workDays > 0 ? Math.round((completedDays / workDays) * 100) : 0;
+
+  const prevMonth = () => {
+    if (month === 1) { setYear(y => y - 1); setMonth(12); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 12) { setYear(y => y + 1); setMonth(1); }
+    else setMonth(m => m + 1);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <Button variant="ghost" size="icon" onClick={prevMonth} data-testid="button-salary-prev">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <h2 className="text-base font-semibold" data-testid="text-salary-month">{year} 年 {month} 月 工作記錄</h2>
+          <Button variant="ghost" size="icon" onClick={nextMonth} data-testid="button-salary-next">
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="text-center p-3 rounded-lg bg-gray-50">
+            <p className="text-2xl font-bold text-foreground" data-testid="text-work-days">{workDays}</p>
+            <p className="text-xs text-muted-foreground">排課天數</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-green-50">
+            <p className="text-2xl font-bold text-green-600" data-testid="text-completed-days">{completedDays}</p>
+            <p className="text-xs text-muted-foreground">完成天數</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-tiffany/10">
+            <p className="text-2xl font-bold text-tiffany" data-testid="text-completion-rate">{completionRate}%</p>
+            <p className="text-xs text-muted-foreground">完成率</p>
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground bg-amber-50 p-2 rounded-lg mb-4">
+          <AlertTriangle className="w-3.5 h-3.5 inline mr-1 text-amber-500" />
+          只有完成所有當日工作（點名 + 聯絡簿）的日期才計入薪資計算
+        </p>
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-32 w-full rounded-xl" />
+      ) : records.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-6 text-center text-sm text-muted-foreground">
+          本月尚無工作記錄
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="divide-y divide-gray-50">
+            {records
+              .filter(r => r.totalSlots > 0)
+              .sort((a, b) => a.date.localeCompare(b.date))
+              .map((r: any) => {
+                const d = new Date(r.date + "T00:00:00");
+                const dayLabel = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+                return (
+                  <div key={r.date} className="flex items-center px-4 py-3 gap-3" data-testid={`salary-row-${r.date}`}>
+                    <div className="w-16 text-center">
+                      <p className="text-sm font-semibold">{r.date.slice(5)}</p>
+                      <p className="text-[10px] text-muted-foreground">週{dayLabel}</p>
+                    </div>
+                    <div className="flex-1 flex items-center gap-4">
+                      <div className="flex items-center gap-1 text-xs">
+                        <CheckCircle className={`w-3.5 h-3.5 ${r.checkedInSlots === r.totalSlots ? "text-green-500" : "text-gray-300"}`} />
+                        <span className="text-muted-foreground">點名 {r.checkedInSlots}/{r.totalSlots}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs">
+                        <FileText className={`w-3.5 h-3.5 ${r.contactBookSlots === r.totalSlots ? "text-green-500" : "text-gray-300"}`} />
+                        <span className="text-muted-foreground">聯絡簿 {r.contactBookSlots}/{r.totalSlots}</span>
+                      </div>
+                    </div>
+                    <div>
+                      {r.isComplete ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-complete-${r.date}`}>
+                          <CheckCircle className="w-3 h-3" />
+                          完成
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full" data-testid={`badge-incomplete-${r.date}`}>
+                          <AlertTriangle className="w-3 h-3" />
+                          未完成
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
     </div>

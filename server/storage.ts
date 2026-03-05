@@ -1,6 +1,7 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
+  coachDailyRecords,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -18,6 +19,7 @@ import {
   type SiteContent,
   type ContactBook, type InsertContactBook,
   type FavoriteFranchise,
+  type CoachDailyRecord,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte } from "drizzle-orm";
@@ -129,6 +131,10 @@ export interface IStorage {
   getTimeSlot(id: number): Promise<any | undefined>;
   getSlotStudents(slotId: number): Promise<any[]>;
   checkInBooking(id: number, coachId: number): Promise<void>;
+  uncheckInBooking(id: number, coachId: number): Promise<void>;
+  getCoachDailyRecord(coachId: number, date: string): Promise<any>;
+  updateCoachDailyRecord(coachId: number, date: string): Promise<CoachDailyRecord>;
+  getCoachMonthlyRecords(coachId: number, year: number, month: number): Promise<CoachDailyRecord[]>;
   createContactBook(data: InsertContactBook): Promise<ContactBook>;
   getContactBook(id: number): Promise<ContactBook | undefined>;
   updateContactBook(id: number, data: Partial<InsertContactBook>): Promise<ContactBook>;
@@ -1111,7 +1117,134 @@ export class DatabaseStorage implements IStorage {
     if (booking.status !== "confirmed") throw new Error("只有已確認的預約可以點名");
     const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
     if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
+
+    const now = new Date();
+    const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    const earliestCheckIn = new Date(slotStart.getTime() - 15 * 60 * 1000);
+
+    if (now < earliestCheckIn) {
+      const startTimeStr = slot.startTime;
+      throw new Error(`尚未到點名時間，請於 ${startTimeStr} 前 15 分鐘再進行點名`);
+    }
+    if (now > slotEnd) {
+      throw new Error("課程已結束，無法點名");
+    }
+
     await db.update(bookings).set({ status: "checked_in" }).where(eq(bookings.id, id));
+  }
+
+  async uncheckInBooking(id: number, coachId: number): Promise<void> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+    if (!booking) throw new Error("預約不存在");
+    if (booking.status !== "checked_in") throw new Error("只有已點名的預約可以取消點名");
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
+    if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
+
+    const now = new Date();
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    if (now > slotEnd) {
+      throw new Error("課程已結束，無法取消點名");
+    }
+
+    await db.update(bookings).set({ status: "confirmed" }).where(eq(bookings.id, id));
+  }
+
+  async getCoachDailyRecord(coachId: number, date: string): Promise<any> {
+    const coachSlots = await db.select().from(timeSlots)
+      .where(and(eq(timeSlots.coachId, coachId), eq(timeSlots.date, date)));
+
+    if (coachSlots.length === 0) {
+      return { totalSlots: 0, checkedInSlots: 0, contactBookSlots: 0, isComplete: true, date };
+    }
+
+    const slotIds = coachSlots.map(s => s.id);
+    const slotBookings = await db.select().from(bookings)
+      .where(and(inArray(bookings.slotId, slotIds), sql`${bookings.status} != 'cancelled'`));
+
+    const contactBookRecords = await db.select().from(contactBooks)
+      .where(and(eq(contactBooks.coachId, coachId), inArray(contactBooks.slotId, slotIds)));
+
+    let checkedInSlots = 0;
+    let contactBookSlots = 0;
+
+    for (const slot of coachSlots) {
+      const slotBks = slotBookings.filter(b => b.slotId === slot.id);
+      if (slotBks.length === 0) {
+        checkedInSlots++;
+        contactBookSlots++;
+        continue;
+      }
+
+      const allCheckedIn = slotBks.every(b => b.status === "checked_in" || b.status === "completed");
+      if (allCheckedIn) checkedInSlots++;
+
+      const studentIds = slotBks.map(b => b.childId);
+      const slotCBs = contactBookRecords.filter(cb => cb.slotId === slot.id);
+      const allHaveContactBook = studentIds.every(childId =>
+        slotCBs.some(cb => cb.childId === childId)
+      );
+      if (allHaveContactBook) contactBookSlots++;
+    }
+
+    const totalSlots = coachSlots.length;
+    const isComplete = checkedInSlots === totalSlots && contactBookSlots === totalSlots;
+
+    const [existing] = await db.select().from(coachDailyRecords)
+      .where(and(eq(coachDailyRecords.coachId, coachId), eq(coachDailyRecords.date, date)));
+
+    return {
+      id: existing?.id,
+      totalSlots,
+      checkedInSlots,
+      contactBookSlots,
+      isComplete,
+      date,
+      completedAt: existing?.completedAt,
+    };
+  }
+
+  async updateCoachDailyRecord(coachId: number, date: string): Promise<CoachDailyRecord> {
+    const record = await this.getCoachDailyRecord(coachId, date);
+
+    const [existing] = await db.select().from(coachDailyRecords)
+      .where(and(eq(coachDailyRecords.coachId, coachId), eq(coachDailyRecords.date, date)));
+
+    const data = {
+      totalSlots: record.totalSlots,
+      checkedInSlots: record.checkedInSlots,
+      contactBookSlots: record.contactBookSlots,
+      isComplete: record.isComplete,
+      completedAt: record.isComplete && !existing?.completedAt ? new Date() : existing?.completedAt || null,
+    };
+
+    if (existing) {
+      const [updated] = await db.update(coachDailyRecords)
+        .set(data)
+        .where(eq(coachDailyRecords.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(coachDailyRecords)
+        .values({ coachId, date, ...data })
+        .returning();
+      return created;
+    }
+  }
+
+  async getCoachMonthlyRecords(coachId: number, year: number, month: number): Promise<CoachDailyRecord[]> {
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endYear = month === 12 ? year + 1 : year;
+    const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+    return db.select().from(coachDailyRecords)
+      .where(and(
+        eq(coachDailyRecords.coachId, coachId),
+        gte(coachDailyRecords.date, startDate),
+        sql`${coachDailyRecords.date} < ${endDate}`,
+      ))
+      .orderBy(coachDailyRecords.date);
   }
 
   async createContactBook(data: InsertContactBook): Promise<ContactBook> {

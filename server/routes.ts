@@ -1152,9 +1152,53 @@ export async function registerRoutes(
     try {
       const bookingId = parseInt(req.params.id);
       await storage.checkInBooking(bookingId, req.coach.id);
+      const booking = await storage.getBooking(bookingId);
+      if (booking) {
+        const slot = await storage.getTimeSlot(booking.slotId);
+        if (slot) {
+          await storage.updateCoachDailyRecord(req.coach.id, slot.date);
+        }
+      }
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "點名失敗" });
+    }
+  });
+
+  app.patch("/api/coach/bookings/:id/uncheck-in", isCoach, async (req: any, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      await storage.uncheckInBooking(bookingId, req.coach.id);
+      const booking = await storage.getBooking(bookingId);
+      if (booking) {
+        const slot = await storage.getTimeSlot(booking.slotId);
+        if (slot) {
+          await storage.updateCoachDailyRecord(req.coach.id, slot.date);
+        }
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "取消點名失敗" });
+    }
+  });
+
+  app.get("/api/coach/daily-record/:date", isCoach, async (req: any, res) => {
+    try {
+      const record = await storage.getCoachDailyRecord(req.coach.id, req.params.date);
+      res.json(record);
+    } catch (error) {
+      res.status(500).json({ message: "取得每日記錄失敗" });
+    }
+  });
+
+  app.get("/api/coach/monthly-records/:year/:month", isCoach, async (req: any, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      const records = await storage.getCoachMonthlyRecords(req.coach.id, year, month);
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "取得月度記錄失敗" });
     }
   });
 
@@ -1185,6 +1229,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "請提供聯絡簿內容" });
       }
       const results = [];
+      const slotsToUpdate = new Set<string>();
       for (const entry of entries) {
         if (entry.bookingId) {
           const booking = await storage.getBooking(entry.bookingId);
@@ -1193,6 +1238,7 @@ export async function registerRoutes(
             if (!slot || slot.coachId !== req.coach.id) {
               return res.status(403).json({ message: "此預約不屬於您的時段" });
             }
+            if (slot.date) slotsToUpdate.add(slot.date);
           }
         }
         const created = await storage.createContactBook({
@@ -1200,6 +1246,9 @@ export async function registerRoutes(
           coachId: req.coach.id,
         });
         results.push(created);
+      }
+      for (const date of slotsToUpdate) {
+        await storage.updateCoachDailyRecord(req.coach.id, date);
       }
       res.json(results);
     } catch (error) {
