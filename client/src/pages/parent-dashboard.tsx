@@ -84,7 +84,7 @@ import {
   Building2,
   Hash,
 } from "lucide-react";
-import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem } from "@shared/schema";
+import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem, Notification } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
 import { TAIWAN_CITIES, getDistricts, getSchools } from "@shared/taiwan-schools";
@@ -215,6 +215,38 @@ export default function ParentDashboard() {
   const user = credUser || replitUser;
   const isCredentialUser = !!credUser;
 
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const { data: notifList = [] } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    enabled: !!user && user.role === "parent",
+    refetchInterval: 30000,
+  });
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    enabled: !!user && user.role === "parent",
+    refetchInterval: 30000,
+  });
+
+  const unreadCount = unreadData?.count || 0;
+
+  const markReadMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("PATCH", `/api/notifications/${id}/read`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => { await apiRequest("PATCH", "/api/notifications/read-all"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-washi flex items-center justify-center">
@@ -263,6 +295,77 @@ export default function ParentDashboard() {
                 <span className="text-sm font-medium text-foreground hidden sm:inline" data-testid="text-user-name">
                   {typedUser.firstName}
                 </span>
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1.5 relative"
+                  data-testid="button-notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1" data-testid="badge-unread-count">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[70vh] flex flex-col" data-testid="panel-notifications">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                        <h3 className="text-sm font-semibold">通知</h3>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={() => markAllReadMutation.mutate()}
+                            className="text-xs text-tiffany hover:underline"
+                            data-testid="button-mark-all-read"
+                          >
+                            全部標為已讀
+                          </button>
+                        )}
+                      </div>
+                      <div className="overflow-y-auto flex-1">
+                        {notifList.length === 0 ? (
+                          <div className="py-8 text-center text-sm text-muted-foreground">
+                            暫無通知
+                          </div>
+                        ) : (
+                          notifList.map((n) => (
+                            <button
+                              key={n.id}
+                              onClick={() => { if (!n.isRead) markReadMutation.mutate(n.id); }}
+                              className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.isRead ? "bg-tiffany/5" : ""}`}
+                              data-testid={`notification-item-${n.id}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                {n.type === "slot_cancelled" ? (
+                                  <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <XCircle className="w-3.5 h-3.5 text-red-500" />
+                                  </div>
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <Bell className="w-3.5 h-3.5 text-tiffany" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-sm font-medium ${!n.isRead ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</span>
+                                    {!n.isRead && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
+                                  <p className="text-[10px] text-gray-400 mt-1">
+                                    {n.createdAt ? new Date(n.createdAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               <button
                 onClick={handleLogout}

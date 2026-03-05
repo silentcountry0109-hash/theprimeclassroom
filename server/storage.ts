@@ -1,7 +1,7 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
-  coachDailyRecords, classrooms,
+  coachDailyRecords, classrooms, notifications,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -15,6 +15,7 @@ import {
   type CartItem, type InsertCartItem,
   type Order, type InsertOrder,
   type OrderItem, type InsertOrderItem,
+  type Notification, type InsertNotification,
   type User,
   type SiteContent,
   type ContactBook, type InsertContactBook,
@@ -165,6 +166,15 @@ export interface IStorage {
   createClassroom(data: InsertClassroom): Promise<Classroom>;
   updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom>;
   deleteClassroom(id: number): Promise<void>;
+
+  getSlotBookings(slotId: number): Promise<any[]>;
+  cancelSlotBookingsAndNotify(slotId: number): Promise<void>;
+
+  createNotification(data: InsertNotification): Promise<Notification>;
+  getNotificationsByUser(userId: string): Promise<Notification[]>;
+  markNotificationRead(id: number): Promise<void>;
+  markAllNotificationsRead(userId: string): Promise<void>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
 
   getFranchiseStudents(franchiseId: number): Promise<any[]>;
   createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
@@ -1671,6 +1681,68 @@ export class DatabaseStorage implements IStorage {
         reviewCount: f.reviewCount,
       };
     });
+  }
+
+  async getSlotBookings(slotId: number): Promise<any[]> {
+    const rows = await db
+      .select({
+        id: bookings.id,
+        slotId: bookings.slotId,
+        childId: bookings.childId,
+        parentId: bookings.parentId,
+        status: bookings.status,
+        childName: children.name,
+        childGrade: children.grade,
+      })
+      .from(bookings)
+      .leftJoin(children, eq(bookings.childId, children.id))
+      .where(and(eq(bookings.slotId, slotId), inArray(bookings.status, ["confirmed", "checked_in"])));
+    return rows;
+  }
+
+  async cancelSlotBookingsAndNotify(slotId: number): Promise<void> {
+    const slot = await db.select().from(timeSlots).where(eq(timeSlots.id, slotId)).then(r => r[0]);
+    if (!slot) return;
+
+    const activeBookings = await this.getSlotBookings(slotId);
+    if (activeBookings.length === 0) return;
+
+    const franchise = await db.select({ name: franchises.name }).from(franchises).where(eq(franchises.id, slot.franchiseId)).then(r => r[0]);
+    const franchiseName = franchise?.name || "教室";
+
+    for (const b of activeBookings) {
+      await db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
+
+      await db.insert(notifications).values({
+        userId: b.parentId,
+        type: "slot_cancelled",
+        title: "課程已取消",
+        message: `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消。`,
+        isRead: false,
+      });
+    }
+  }
+
+  async createNotification(data: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(data).returning();
+    return created;
+  }
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    return Number(result[0]?.count || 0);
   }
 }
 

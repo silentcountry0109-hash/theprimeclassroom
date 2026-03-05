@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -105,6 +105,138 @@ interface FranchiseBooking {
   date: string;
   startTime: string;
   endTime: string;
+}
+
+interface BookingConflictInfo {
+  childName: string;
+  childGrade: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+interface SliderConfirmState {
+  open: boolean;
+  bookingCount: number;
+  bookings: BookingConflictInfo[];
+  slotIds: number[];
+}
+
+function SliderConfirmDialog({
+  state,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  state: SliderConfirmState;
+  onClose: () => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  const [sliderValue, setSliderValue] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const targetValue = Math.max(state.bookingCount, 1);
+  const isUnlocked = sliderValue >= targetValue;
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    isDragging.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging.current || !trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const pct = x / rect.width;
+    const val = Math.round(pct * targetValue);
+    setSliderValue(val);
+  }, [targetValue]);
+
+  const handlePointerUp = useCallback(() => {
+    isDragging.current = false;
+    if (sliderValue < targetValue) {
+      setSliderValue(0);
+    }
+  }, [sliderValue, targetValue]);
+
+  return (
+    <Dialog open={state.open} onOpenChange={(open) => { if (!open) { setSliderValue(0); onClose(); } }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="w-5 h-5" />
+            警告：此操作將取消學生預約
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+            <p className="text-sm font-medium text-red-800 mb-2">
+              {state.slotIds.length > 1
+                ? `選取的時段中有 ${state.bookingCount} 位學生已預約`
+                : `此時段有 ${state.bookingCount} 位學生已預約`
+              }
+            </p>
+            <p className="text-xs text-red-600">刪除後將取消所有預約，並通知家長。</p>
+          </div>
+
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {state.bookings.map((b, i) => (
+              <div key={i} className="flex items-center gap-2 py-1 px-2 bg-gray-50 rounded text-sm">
+                <span className="font-medium">{b.childName}</span>
+                <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{b.childGrade}年級</span>
+                <span className="text-xs text-tiffany ml-auto">{b.date} {b.startTime}-{b.endTime}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground text-center">
+              拖曳滑桿至 <span className="font-bold text-red-600">{targetValue}</span> 以確認刪除
+            </p>
+            <div className="relative select-none" data-testid="slider-confirm-track">
+              <div
+                ref={trackRef}
+                className="h-12 bg-gray-100 rounded-full relative overflow-hidden cursor-pointer border-2 border-gray-200"
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+              >
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full transition-colors ${isUnlocked ? "bg-red-500" : "bg-red-300"}`}
+                  style={{ width: `${(sliderValue / targetValue) * 100}%` }}
+                />
+                <div
+                  className={`absolute top-1 h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md transition-colors ${isUnlocked ? "bg-red-600" : "bg-red-400"}`}
+                  style={{ left: `calc(${(sliderValue / targetValue) * 100}% - ${sliderValue === 0 ? 0 : 20}px)` }}
+                >
+                  {sliderValue}
+                </div>
+                {!isUnlocked && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-xs text-gray-400 ml-12">→ 拖曳至 {targetValue} 確認刪除</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => { setSliderValue(0); onClose(); }} data-testid="button-cancel-force-delete">
+            取消
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={!isUnlocked || isPending}
+            onClick={onConfirm}
+            data-testid="button-confirm-force-delete"
+          >
+            {isPending ? "刪除中..." : "確認刪除"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function FranchiseAdminDashboard() {
@@ -1696,14 +1828,51 @@ function TimeSlotsTab() {
     },
   });
 
-  const deleteSlotMutation = useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/franchise-admin/time-slots/${id}`); },
-    onSuccess: () => {
+  const [sliderConfirm, setSliderConfirm] = useState<SliderConfirmState>({ open: false, bookingCount: 0, bookings: [], slotIds: [] });
+  const [forceDeleting, setForceDeleting] = useState(false);
+
+  const handleDeleteSlot = async (id: number) => {
+    try {
+      const res = await fetch(`/api/franchise-admin/time-slots/${id}`, { method: "DELETE", credentials: "include" });
+      if (res.status === 409) {
+        const data = await res.json();
+        setSliderConfirm({ open: true, bookingCount: data.bookingCount, bookings: data.bookings, slotIds: [id] });
+        return;
+      }
+      if (!res.ok) throw new Error("Failed");
       toast({ title: "時段已刪除" });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
-    },
-  });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats/today"] });
+    } catch {
+      toast({ title: "刪除失敗", variant: "destructive" });
+    }
+  };
+
+  const handleForceDelete = async () => {
+    setForceDeleting(true);
+    let deleted = 0;
+    let failed = 0;
+    for (const id of sliderConfirm.slotIds) {
+      try {
+        await apiRequest("DELETE", `/api/franchise-admin/time-slots/${id}?force=true`);
+        deleted++;
+      } catch {
+        failed++;
+      }
+    }
+    setForceDeleting(false);
+    setSliderConfirm({ open: false, bookingCount: 0, bookings: [], slotIds: [] });
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats/today"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/bookings"] });
+    if (failed > 0) {
+      toast({ title: `已刪除 ${deleted} 個時段，${failed} 個失敗`, variant: "destructive" });
+    } else {
+      toast({ title: `已刪除 ${deleted} 個時段，預約已取消並通知家長` });
+    }
+  };
 
   const [batchDeleteMode, setBatchDeleteMode] = useState(false);
   const [selectedSlotIds, setSelectedSlotIds] = useState<Set<number>>(new Set());
@@ -1719,21 +1888,46 @@ function TimeSlotsTab() {
 
   const handleBatchDelete = async () => {
     if (selectedSlotIds.size === 0) return;
-    if (!confirm(`確定刪除選取的 ${selectedSlotIds.size} 個時段？`)) return;
     setBatchDeleting(true);
-    let deleted = 0;
+    const conflictBookings: BookingConflictInfo[] = [];
+    const conflictSlotIds: number[] = [];
+    const noConflictIds: number[] = [];
+
     for (const id of selectedSlotIds) {
       try {
-        await apiRequest("DELETE", `/api/franchise-admin/time-slots/${id}`);
-        deleted++;
+        const res = await fetch(`/api/franchise-admin/time-slots/${id}`, { method: "DELETE", credentials: "include" });
+        if (res.status === 409) {
+          const data = await res.json();
+          conflictSlotIds.push(id);
+          conflictBookings.push(...data.bookings);
+        } else if (res.ok) {
+          // deleted successfully (no bookings)
+        }
       } catch {}
     }
+
     setBatchDeleting(false);
+
+    if (conflictSlotIds.length > 0) {
+      setSliderConfirm({
+        open: true,
+        bookingCount: conflictBookings.length,
+        bookings: conflictBookings,
+        slotIds: conflictSlotIds,
+      });
+    }
+
     setSelectedSlotIds(new Set());
     setBatchDeleteMode(false);
     queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
     queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
-    toast({ title: `已刪除 ${deleted} 個時段` });
+    queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats/today"] });
+    const deletedCount = selectedSlotIds.size - conflictSlotIds.length;
+    if (deletedCount > 0 && conflictSlotIds.length > 0) {
+      toast({ title: `已刪除 ${deletedCount} 個無預約時段，另有 ${conflictSlotIds.length} 個時段需確認` });
+    } else if (deletedCount > 0) {
+      toast({ title: `已刪除 ${deletedCount} 個時段` });
+    }
   };
 
   const [manualBookSlot, setManualBookSlot] = useState<TimeSlot | null>(null);
@@ -1958,7 +2152,7 @@ function TimeSlotsTab() {
                         <UserPlus className="w-4 h-4 text-tiffany" />
                       </Button>
                     )}
-                    <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-franchise-slot-${slot.id}`}>
+                    <Button variant="outline" size="icon" onClick={() => handleDeleteSlot(slot.id)} data-testid={`button-delete-franchise-slot-${slot.id}`}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -2067,7 +2261,7 @@ function TimeSlotsTab() {
                               <UserPlus className="w-4 h-4 text-tiffany" />
                             </Button>
                           )}
-                          <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-cal-slot-${slot.id}`}>
+                          <Button variant="outline" size="icon" onClick={() => handleDeleteSlot(slot.id)} data-testid={`button-delete-cal-slot-${slot.id}`}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -2280,6 +2474,13 @@ function TimeSlotsTab() {
           )}
         </DialogContent>
       </Dialog>
+
+      <SliderConfirmDialog
+        state={sliderConfirm}
+        onClose={() => setSliderConfirm({ open: false, bookingCount: 0, bookings: [], slotIds: [] })}
+        onConfirm={handleForceDelete}
+        isPending={forceDeleting}
+      />
 
       <Dialog open={!!manualBookSlot} onOpenChange={(open) => { if (!open) { setManualBookSlot(null); setStudentSearch(""); } }}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">

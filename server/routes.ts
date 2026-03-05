@@ -567,6 +567,50 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/notifications", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const notificationList = await storage.getNotificationsByUser(userId);
+      res.json(notificationList);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const notifId = parseInt(req.params.id);
+      const userNotifs = await storage.getNotificationsByUser(userId);
+      const owns = userNotifs.some((n) => n.id === notifId);
+      if (!owns) return res.status(403).json({ message: "Forbidden" });
+      await storage.markNotificationRead(notifId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark notification read" });
+    }
+  });
+
+  app.patch("/api/notifications/read-all", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      await storage.markAllNotificationsRead(userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark all notifications read" });
+    }
+  });
+
   app.get("/api/admin/stats", isAdmin, async (_req, res) => {
     try {
       const stats = await storage.getAdminStats();
@@ -779,7 +823,29 @@ export async function registerRoutes(
 
   app.delete("/api/admin/time-slots/:id", isAdmin, async (req, res) => {
     try {
-      await storage.deleteSlot(parseInt(req.params.id));
+      const slotId = parseInt(req.params.id);
+      const activeBookings = await storage.getSlotBookings(slotId);
+      const force = req.query.force === "true";
+
+      if (activeBookings.length > 0 && !force) {
+        const slot = await storage.getSlot(slotId);
+        return res.status(409).json({
+          message: `此時段有 ${activeBookings.length} 位學生已預約`,
+          bookingCount: activeBookings.length,
+          bookings: activeBookings.map((b: any) => ({
+            childName: b.childName,
+            childGrade: b.childGrade,
+            date: slot?.date,
+            startTime: slot?.startTime,
+            endTime: slot?.endTime,
+          })),
+        });
+      }
+
+      if (activeBookings.length > 0) {
+        await storage.cancelSlotBookingsAndNotify(slotId);
+      }
+      await storage.deleteSlot(slotId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete time slot" });
@@ -1053,10 +1119,32 @@ export async function registerRoutes(
 
   app.delete("/api/franchise-admin/time-slots/:id", isFranchiseAdmin, async (req: any, res) => {
     try {
+      const slotId = parseInt(req.params.id);
       const slotList = await storage.getSlotsByFranchise(req.franchiseId);
-      const slot = slotList.find((s) => s.id === parseInt(req.params.id));
+      const slot = slotList.find((s) => s.id === slotId);
       if (!slot) return res.status(403).json({ message: "Forbidden" });
-      await storage.deleteSlot(parseInt(req.params.id));
+
+      const activeBookings = await storage.getSlotBookings(slotId);
+      const force = req.query.force === "true";
+
+      if (activeBookings.length > 0 && !force) {
+        return res.status(409).json({
+          message: `此時段有 ${activeBookings.length} 位學生已預約`,
+          bookingCount: activeBookings.length,
+          bookings: activeBookings.map((b: any) => ({
+            childName: b.childName,
+            childGrade: b.childGrade,
+            date: slot.date,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+          })),
+        });
+      }
+
+      if (activeBookings.length > 0) {
+        await storage.cancelSlotBookingsAndNotify(slotId);
+      }
+      await storage.deleteSlot(slotId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete time slot" });
