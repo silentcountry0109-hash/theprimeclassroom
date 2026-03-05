@@ -1,5 +1,20 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+let activeFranchiseId: number | null = null;
+
+export function setActiveFranchiseId(id: number | null) {
+  activeFranchiseId = id;
+}
+
+export function getActiveFranchiseId(): number | null {
+  return activeFranchiseId;
+}
+
+function getFranchiseHeaders(): Record<string, string> {
+  if (activeFranchiseId) return { "X-Franchise-Id": String(activeFranchiseId) };
+  return {};
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,9 +27,13 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...getFranchiseHeaders(),
+    ...(data ? { "Content-Type": "application/json" } : {}),
+  };
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -31,6 +50,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers: getFranchiseHeaders(),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

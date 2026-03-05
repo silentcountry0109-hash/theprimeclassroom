@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,9 +71,11 @@ import {
   Search,
   BookOpen,
   ClipboardList,
+  ChevronsUpDown,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
+import { setActiveFranchiseId, queryClient } from "@/lib/queryClient";
 import { DAY_LABELS } from "@shared/constants";
 
 interface FranchiseStats {
@@ -245,11 +247,23 @@ function SliderConfirmDialog({
 export default function FranchiseAdminDashboard() {
   const { user, isLoading: authLoading, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showFranchiseSwitcher, setShowFranchiseSwitcher] = useState(false);
+
+  const { data: managedFranchises } = useQuery<{ id: number; name: string; city: string; district: string }[]>({
+    queryKey: ["/api/franchise-admin/managed-franchises"],
+    enabled: !!user && user.role === "franchise_admin",
+  });
 
   const { data: myFranchise } = useQuery<Franchise>({
     queryKey: ["/api/franchise-admin/my-franchise"],
     enabled: !!user && user.role === "franchise_admin",
   });
+
+  const handleSwitchFranchise = (franchiseId: number) => {
+    setActiveFranchiseId(franchiseId);
+    setShowFranchiseSwitcher(false);
+    queryClient.invalidateQueries();
+  };
 
   if (authLoading) {
     return (
@@ -263,6 +277,8 @@ export default function FranchiseAdminDashboard() {
     window.location.href = "/franchise-login";
     return null;
   }
+
+  const canSwitch = managedFranchises && managedFranchises.length > 1;
 
   const menuItems = [
     { id: "overview", label: "分校總覽", icon: BarChart3 },
@@ -281,9 +297,40 @@ export default function FranchiseAdminDashboard() {
             <div className="p-4 border-b border-sidebar-border">
               <p className="font-serif text-lg tracking-[0.1em] text-foreground">質數教室</p>
               {myFranchise ? (
-                <p className="text-xs text-tiffany font-medium mt-1" data-testid="sidebar-franchise-name">
-                  {myFranchise.city} {myFranchise.district.replace("區", "")}教室
-                </p>
+                <div className="mt-1">
+                  {canSwitch ? (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowFranchiseSwitcher(!showFranchiseSwitcher)}
+                        className="flex items-center gap-1 text-xs text-tiffany font-medium hover:bg-tiffany/5 rounded-md px-1.5 py-1 -ml-1.5 transition-colors w-full"
+                        data-testid="button-switch-franchise"
+                      >
+                        <span>{myFranchise.city} {myFranchise.district.replace("區", "")}教室</span>
+                        <ChevronsUpDown className="w-3 h-3 ml-auto text-tiffany/60" />
+                      </button>
+                      {showFranchiseSwitcher && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1" data-testid="franchise-switcher-dropdown">
+                          {managedFranchises.map((f) => (
+                            <button
+                              key={f.id}
+                              onClick={() => handleSwitchFranchise(f.id)}
+                              className={`w-full text-left px-3 py-2 text-xs hover:bg-tiffany/5 transition-colors flex items-center gap-2 ${f.id === myFranchise.id ? "text-tiffany font-medium bg-tiffany/5" : "text-foreground"}`}
+                              data-testid={`button-franchise-option-${f.id}`}
+                            >
+                              <Building2 className="w-3 h-3 shrink-0" />
+                              <span>{f.city} {f.district.replace("區", "")}教室</span>
+                              {f.id === myFranchise.id && <Check className="w-3 h-3 ml-auto" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-tiffany font-medium" data-testid="sidebar-franchise-name">
+                      {myFranchise.city} {myFranchise.district.replace("區", "")}教室
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p className="text-xs text-muted-foreground mt-0.5">分校管理系統</p>
               )}

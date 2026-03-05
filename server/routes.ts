@@ -62,7 +62,17 @@ const isFranchiseAdmin: RequestHandler = async (req: any, res, next) => {
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const user = await authStorage.getUser(userId);
   if (!user || user.role !== "franchise_admin" || !user.franchiseId) return res.status(403).json({ message: "Forbidden" });
-  req.franchiseId = user.franchiseId;
+  const switchTo = req.headers["x-franchise-id"];
+  if (switchTo) {
+    const targetId = parseInt(switchTo);
+    if (isNaN(targetId)) return res.status(400).json({ message: "Invalid franchise ID" });
+    const managed = user.managedFranchiseIds || [];
+    const allowed = new Set([user.franchiseId, ...managed]);
+    if (!allowed.has(targetId)) return res.status(403).json({ message: "無權管理此分校" });
+    req.franchiseId = targetId;
+  } else {
+    req.franchiseId = user.franchiseId;
+  }
   req.currentUser = user;
   next();
 };
@@ -975,6 +985,22 @@ export async function registerRoutes(
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  app.get("/api/franchise-admin/managed-franchises", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser;
+      const managed = user.managedFranchiseIds || [];
+      const uniqueIds = [...new Set([user.franchiseId, ...managed].filter(Boolean))];
+      const results = [];
+      for (const id of uniqueIds) {
+        const f = await storage.getFranchise(id);
+        if (f) results.push({ id: f.id, name: f.name, city: f.city, district: f.district });
+      }
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ message: "取得管理分校列表失敗" });
     }
   });
 
