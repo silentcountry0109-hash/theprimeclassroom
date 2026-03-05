@@ -1,7 +1,7 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
-  coachDailyRecords,
+  coachDailyRecords, classrooms,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -20,6 +20,7 @@ import {
   type ContactBook, type InsertContactBook,
   type FavoriteFranchise,
   type CoachDailyRecord,
+  type Classroom, type InsertClassroom,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte } from "drizzle-orm";
@@ -156,6 +157,13 @@ export interface IStorage {
   getCoachScheduleAcrossFranchises(coachId: number): Promise<any[]>;
   getOverlappingSlots(franchiseId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]>;
   getCoachOverlappingSlots(coachId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<any[]>;
+
+  getClassroomOverlappingSlots(classroomId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]>;
+  getSlotsByClassroom(classroomId: number): Promise<TimeSlot[]>;
+  getClassroomsByFranchise(franchiseId: number): Promise<Classroom[]>;
+  createClassroom(data: InsertClassroom): Promise<Classroom>;
+  updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom>;
+  deleteClassroom(id: number): Promise<void>;
 
   getFranchiseStudents(franchiseId: number): Promise<any[]>;
   createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
@@ -538,6 +546,20 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(timeSlots).where(and(...conditions));
   }
 
+  async getClassroomOverlappingSlots(classroomId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]> {
+    const conditions = [
+      eq(timeSlots.classroomId, classroomId),
+      eq(timeSlots.date, date),
+      eq(timeSlots.isActive, true),
+      sql`${timeSlots.startTime} < ${endTime}`,
+      sql`${timeSlots.endTime} > ${startTime}`,
+    ];
+    if (excludeSlotId) {
+      conditions.push(sql`${timeSlots.id} != ${excludeSlotId}`);
+    }
+    return db.select().from(timeSlots).where(and(...conditions));
+  }
+
   async getCoachOverlappingSlots(coachId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<any[]> {
     const conditions = [
       eq(timeSlots.coachId, coachId),
@@ -562,6 +584,31 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
       .where(and(...conditions));
     return rows;
+  }
+
+  async getSlotsByClassroom(classroomId: number): Promise<TimeSlot[]> {
+    return db.select().from(timeSlots)
+      .where(and(eq(timeSlots.classroomId, classroomId), eq(timeSlots.isActive, true)));
+  }
+
+  async getClassroomsByFranchise(franchiseId: number): Promise<Classroom[]> {
+    return db.select().from(classrooms)
+      .where(and(eq(classrooms.franchiseId, franchiseId), eq(classrooms.isActive, true)))
+      .orderBy(classrooms.name);
+  }
+
+  async createClassroom(data: InsertClassroom): Promise<Classroom> {
+    const [created] = await db.insert(classrooms).values(data).returning();
+    return created;
+  }
+
+  async updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom> {
+    const [updated] = await db.update(classrooms).set(data).where(eq(classrooms.id, id)).returning();
+    return updated;
+  }
+
+  async deleteClassroom(id: number): Promise<void> {
+    await db.update(classrooms).set({ isActive: false }).where(eq(classrooms.id, id));
   }
 
   async getFranchiseStudents(franchiseId: number): Promise<any[]> {

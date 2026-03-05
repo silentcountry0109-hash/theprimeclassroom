@@ -54,10 +54,19 @@ export const children = pgTable("children", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const classrooms = pgTable("classrooms", {
+  id: serial("id").primaryKey(),
+  franchiseId: integer("franchise_id").references(() => franchises.id).notNull(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const timeSlots = pgTable("time_slots", {
   id: serial("id").primaryKey(),
   franchiseId: integer("franchise_id").references(() => franchises.id).notNull(),
   coachId: integer("coach_id").references(() => coaches.id),
+  classroomId: integer("classroom_id").references(() => classrooms.id),
   date: text("date").notNull(),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
@@ -150,6 +159,10 @@ export const orderItems = pgTable("order_items", {
 export const insertFranchiseSchema = createInsertSchema(franchises).omit({ id: true, createdAt: true });
 export const insertCoachSchema = createInsertSchema(coaches).omit({ id: true, createdAt: true });
 export const insertChildSchema = createInsertSchema(children).omit({ id: true, createdAt: true, studentCode: true });
+export const insertClassroomSchema = createInsertSchema(classrooms).omit({ id: true, createdAt: true });
+export type Classroom = typeof classrooms.$inferSelect;
+export type InsertClassroom = z.infer<typeof insertClassroomSchema>;
+
 export const insertTimeSlotSchema = createInsertSchema(timeSlots).omit({ id: true, createdAt: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true });
 export const insertFaqSchema = createInsertSchema(faqs).omit({ id: true });

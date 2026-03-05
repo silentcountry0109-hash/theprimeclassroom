@@ -64,8 +64,11 @@ import {
   AlertTriangle,
   List,
   ChevronLeft,
+  DoorOpen,
+  Check,
+  X,
 } from "lucide-react";
-import type { Franchise, Coach, TimeSlot } from "@shared/schema";
+import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { DAY_LABELS } from "@shared/constants";
 
@@ -610,10 +613,134 @@ function FranchiseInfoTab() {
       )}
 
       <div className="mt-8">
+        <h2 className="text-lg font-semibold text-foreground mb-1">教室管理</h2>
+        <p className="text-sm text-muted-foreground mb-4">管理分校的上課教室，排課時需指定教室</p>
+        <ClassroomManager />
+      </div>
+
+      <div className="mt-8">
         <h2 className="text-lg font-semibold text-foreground mb-1">教室照片管理</h2>
         <p className="text-sm text-muted-foreground mb-4">上傳教室環境照片，將顯示在分校頁面的照片輪播中</p>
         <PhotoManager franchiseId={franchise.id} photos={franchise.photos || []} coverPhoto={franchise.coverPhoto || null} />
       </div>
+    </div>
+  );
+}
+
+function ClassroomManager() {
+  const { toast } = useToast();
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+
+  const { data: classroomsList = [], isLoading } = useQuery<Classroom[]>({
+    queryKey: ["/api/franchise-admin/classrooms"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/franchise-admin/classrooms", { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "教室已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/classrooms"] });
+      setNewName("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "新增失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await apiRequest("PATCH", `/api/franchise-admin/classrooms/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "教室已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/classrooms"] });
+      setEditingId(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/franchise-admin/classrooms/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "教室已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/classrooms"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "刪除失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="bg-white rounded-md border border-gray-100 p-6">
+      <div className="flex gap-2 mb-4">
+        <Input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="輸入新教室名稱（如：A教室）"
+          onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) { e.preventDefault(); createMutation.mutate(newName.trim()); } }}
+          data-testid="input-new-classroom"
+        />
+        <Button
+          onClick={() => { if (newName.trim()) createMutation.mutate(newName.trim()); }}
+          disabled={!newName.trim() || createMutation.isPending}
+          data-testid="button-add-classroom"
+        >
+          <Plus className="w-4 h-4 mr-1" />{createMutation.isPending ? "新增中..." : "新增"}
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-12 rounded-md" />
+      ) : classroomsList.length === 0 ? (
+        <div className="text-center py-8">
+          <DoorOpen className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">尚未新增教室</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {classroomsList.map((cr) => (
+            <div key={cr.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-md" data-testid={`classroom-item-${cr.id}`}>
+              {editingId === cr.id ? (
+                <>
+                  <DoorOpen className="w-4 h-4 text-tiffany shrink-0" />
+                  <Input
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    className="flex-1 h-8 text-sm"
+                    onKeyDown={(e) => { if (e.key === "Enter" && editingName.trim()) { e.preventDefault(); updateMutation.mutate({ id: cr.id, name: editingName.trim() }); } }}
+                    autoFocus
+                    data-testid={`input-edit-classroom-${cr.id}`}
+                  />
+                  <button onClick={() => { if (editingName.trim()) updateMutation.mutate({ id: cr.id, name: editingName.trim() }); }} className="p-1 text-tiffany hover:bg-tiffany/10 rounded" data-testid={`button-save-classroom-${cr.id}`}>
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setEditingId(null)} className="p-1 text-muted-foreground hover:bg-gray-200 rounded" data-testid={`button-cancel-edit-classroom-${cr.id}`}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <DoorOpen className="w-4 h-4 text-tiffany shrink-0" />
+                  <span className="text-sm font-medium flex-1">{cr.name}</span>
+                  <button onClick={() => { setEditingId(cr.id); setEditingName(cr.name); }} className="p-1 text-muted-foreground hover:bg-gray-200 rounded" data-testid={`button-edit-classroom-${cr.id}`}>
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => { if (confirm(`確定刪除「${cr.name}」？`)) deleteMutation.mutate(cr.id); }} className="p-1 text-muted-foreground hover:bg-red-50 hover:text-red-500 rounded" data-testid={`button-delete-classroom-${cr.id}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1384,15 +1511,16 @@ function TimeSlotsTab() {
   const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
-  const [slotForm, setSlotForm] = useState({ date: "", startTime: "", endTime: "", coachId: 0, maxSeats: 5 });
+  const [slotForm, setSlotForm] = useState({ date: "", startTime: "", endTime: "", coachId: 0, classroomId: 0, maxSeats: 5 });
   const [batchForm, setBatchForm] = useState({
     startDate: "", endDate: "", weekdays: [1, 2, 3, 4, 5] as number[],
-    startTimes: ["09:00"] as string[], coachId: 0,
+    startTimes: ["09:00"] as string[], coachId: 0, classroomId: 0,
   });
   const [batchSubmitting, setBatchSubmitting] = useState(false);
 
   const { data: slots = [], isLoading } = useQuery<TimeSlot[]>({ queryKey: ["/api/franchise-admin/time-slots"] });
   const { data: coaches = [] } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
+  const { data: classroomsList = [] } = useQuery<Classroom[]>({ queryKey: ["/api/franchise-admin/classrooms"] });
 
   const computeEndTime = (start: string) => {
     const [h, m] = start.split(":").map(Number);
@@ -1401,7 +1529,7 @@ function TimeSlotsTab() {
   };
 
   const handleBatchSubmit = async () => {
-    const { startDate, endDate, weekdays, startTimes, coachId } = batchForm;
+    const { startDate, endDate, weekdays, startTimes, coachId, classroomId } = batchForm;
     if (!startDate || !endDate || weekdays.length === 0 || startTimes.length === 0) return;
     setBatchSubmitting(true);
     const dates: string[] = [];
@@ -1425,7 +1553,7 @@ function TimeSlotsTab() {
           const res = await fetch("/api/franchise-admin/time-slots", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ date, startTime, endTime, coachId: coachId || null, maxSeats: 5 }),
+            body: JSON.stringify({ date, startTime, endTime, coachId: coachId || null, classroomId: classroomId || null, maxSeats: 5 }),
             credentials: "include",
           });
           if (res.ok) { created++; }
@@ -1452,7 +1580,7 @@ function TimeSlotsTab() {
 
   const addSlotMutation = useMutation({
     mutationFn: async (data: typeof slotForm) => {
-      const payload = { ...data, coachId: data.coachId || null };
+      const payload = { ...data, coachId: data.coachId || null, classroomId: data.classroomId || null };
       const res = await fetch("/api/franchise-admin/time-slots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1639,12 +1767,18 @@ function TimeSlotsTab() {
         <div className="space-y-2">
           {sortedSlots.map((slot) => {
             const coachName = coaches.find((c) => c.id === slot.coachId)?.name || "未指派";
+            const classroomName = classroomsList.find((c) => c.id === slot.classroomId)?.name;
             return (
               <div key={slot.id} className="bg-white rounded-md border border-gray-100 p-3 flex items-center gap-4" data-testid={`franchise-slot-${slot.id}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-sm font-medium">{slot.date} ({getDayLabel(slot.date)})</span>
                     <span className="text-sm text-tiffany font-medium">{slot.startTime} - {slot.endTime}</span>
+                    {classroomName && (
+                      <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <DoorOpen className="w-3 h-3" />{classroomName}
+                      </span>
+                    )}
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{coachName}</span>
                     <span className="text-xs text-muted-foreground">已預約 {slot.bookedSeats}/{slot.maxSeats}</span>
                     {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
@@ -1742,11 +1876,17 @@ function TimeSlotsTab() {
                 <div className="space-y-2">
                   {selectedDaySlots.map((slot) => {
                     const coachName = coaches.find((c) => c.id === slot.coachId)?.name || "未指派";
+                    const classroomName = classroomsList.find((c) => c.id === slot.classroomId)?.name;
                     return (
                       <div key={slot.id} className="bg-white rounded-md border border-gray-100 p-3 flex items-center gap-4" data-testid={`cal-slot-${slot.id}`}>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 flex-wrap">
                             <span className="text-sm text-tiffany font-medium">{slot.startTime} - {slot.endTime}</span>
+                            {classroomName && (
+                              <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <DoorOpen className="w-3 h-3" />{classroomName}
+                              </span>
+                            )}
                             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{coachName}</span>
                             <span className="text-xs text-muted-foreground">已預約 {slot.bookedSeats}/{slot.maxSeats}</span>
                             {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
@@ -1817,6 +1957,15 @@ function TimeSlotsTab() {
                   </div>
                 </div>
                 <div>
+                  <Label>教室 {classroomsList.length > 0 && "*"}</Label>
+                  <Select value={slotForm.classroomId ? slotForm.classroomId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, classroomId: parseInt(v) || 0 })}>
+                    <SelectTrigger data-testid="select-franchise-slot-classroom"><SelectValue placeholder={classroomsList.length > 0 ? "選擇教室" : "尚未建立教室"} /></SelectTrigger>
+                    <SelectContent>
+                      {classroomsList.map((cr) => <SelectItem key={cr.id} value={cr.id.toString()}>{cr.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label>指派老師</Label>
                   <Select value={slotForm.coachId ? slotForm.coachId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, coachId: parseInt(v) || 0 })}>
                     <SelectTrigger data-testid="select-franchise-slot-coach"><SelectValue placeholder="選擇老師（可不選）" /></SelectTrigger>
@@ -1830,7 +1979,7 @@ function TimeSlotsTab() {
                 <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
                 <Button
                   onClick={() => addSlotMutation.mutate(slotForm)}
-                  disabled={!slotForm.date || !slotForm.startTime || addSlotMutation.isPending}
+                  disabled={!slotForm.date || !slotForm.startTime || (classroomsList.length > 0 && !slotForm.classroomId) || addSlotMutation.isPending}
                   data-testid="button-submit-franchise-slot"
                 >
                   {addSlotMutation.isPending ? "新增中..." : "新增時段"}
@@ -1916,6 +2065,15 @@ function TimeSlotsTab() {
                   </div>
                 </div>
                 <div>
+                  <Label>教室 {classroomsList.length > 0 && "*"}</Label>
+                  <Select value={batchForm.classroomId ? batchForm.classroomId.toString() : ""} onValueChange={(v) => setBatchForm({ ...batchForm, classroomId: parseInt(v) || 0 })}>
+                    <SelectTrigger data-testid="select-batch-classroom"><SelectValue placeholder={classroomsList.length > 0 ? "選擇教室" : "尚未建立教室"} /></SelectTrigger>
+                    <SelectContent>
+                      {classroomsList.map((cr) => <SelectItem key={cr.id} value={cr.id.toString()}>{cr.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label>指派老師</Label>
                   <Select value={batchForm.coachId ? batchForm.coachId.toString() : ""} onValueChange={(v) => setBatchForm({ ...batchForm, coachId: parseInt(v) || 0 })}>
                     <SelectTrigger data-testid="select-batch-coach"><SelectValue placeholder="選擇老師（可不選）" /></SelectTrigger>
@@ -1945,7 +2103,7 @@ function TimeSlotsTab() {
                 <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
                 <Button
                   onClick={handleBatchSubmit}
-                  disabled={!batchForm.startDate || !batchForm.endDate || batchForm.weekdays.length === 0 || batchForm.startTimes.filter(Boolean).length === 0 || batchSubmitting}
+                  disabled={!batchForm.startDate || !batchForm.endDate || batchForm.weekdays.length === 0 || batchForm.startTimes.filter(Boolean).length === 0 || (classroomsList.length > 0 && !batchForm.classroomId) || batchSubmitting}
                   data-testid="button-submit-batch-slot"
                 >
                   {batchSubmitting ? "排課中..." : "批次建立"}

@@ -984,17 +984,27 @@ export async function registerRoutes(
 
   app.post("/api/franchise-admin/time-slots", isFranchiseAdmin, async (req: any, res) => {
     try {
-      const { date, startTime, endTime, coachId } = req.body;
+      const { date, startTime, endTime, coachId, classroomId } = req.body;
       const franchiseId = req.franchiseId;
 
-      const roomConflicts = await storage.getOverlappingSlots(franchiseId, date, startTime, endTime);
-      if (roomConflicts.length > 0) {
-        const detail = roomConflicts.map((s) => `${s.startTime}-${s.endTime}`).join("、");
-        return res.status(409).json({
-          message: `教室時段衝突：${date} 已有時段 ${detail} 與此時段重疊`,
-          type: "room_conflict",
-          conflicts: roomConflicts,
-        });
+      const allClassrooms = await storage.getClassroomsByFranchise(franchiseId);
+      if (allClassrooms.length > 0 && !classroomId) {
+        return res.status(400).json({ message: "此分校已建立教室，排課時必須指定教室" });
+      }
+
+      if (classroomId) {
+        const cr = allClassrooms.find((c) => c.id === classroomId);
+        if (!cr) return res.status(400).json({ message: "教室不存在" });
+
+        const roomConflicts = await storage.getClassroomOverlappingSlots(classroomId, date, startTime, endTime);
+        if (roomConflicts.length > 0) {
+          const detail = roomConflicts.map((s) => `${s.startTime}-${s.endTime}`).join("、");
+          return res.status(409).json({
+            message: `教室「${cr.name}」時段衝突：${date} 已有時段 ${detail} 與此時段重疊`,
+            type: "room_conflict",
+            conflicts: roomConflicts,
+          });
+        }
       }
 
       if (coachId) {
@@ -1046,6 +1056,57 @@ export async function registerRoutes(
       res.json(bookingList);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // ========== Franchise Admin: Classroom Management ==========
+  app.get("/api/franchise-admin/classrooms", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const list = await storage.getClassroomsByFranchise(req.franchiseId);
+      res.json(list);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch classrooms" });
+    }
+  });
+
+  app.post("/api/franchise-admin/classrooms", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || !name.trim()) return res.status(400).json({ message: "請輸入教室名稱" });
+      const created = await storage.createClassroom({ name: name.trim(), franchiseId: req.franchiseId, isActive: true });
+      res.json(created);
+    } catch (error) {
+      res.status(500).json({ message: "新增教室失敗" });
+    }
+  });
+
+  app.patch("/api/franchise-admin/classrooms/:id", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name } = req.body;
+      if (!name || !name.trim()) return res.status(400).json({ message: "請輸入教室名稱" });
+      const existing = await storage.getClassroomsByFranchise(req.franchiseId);
+      if (!existing.find((c) => c.id === id)) return res.status(403).json({ message: "Forbidden" });
+      const updated = await storage.updateClassroom(id, { name: name.trim() });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "更新教室失敗" });
+    }
+  });
+
+  app.delete("/api/franchise-admin/classrooms/:id", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const existing = await storage.getClassroomsByFranchise(req.franchiseId);
+      if (!existing.find((c) => c.id === id)) return res.status(403).json({ message: "Forbidden" });
+      const slotsUsingClassroom = await storage.getSlotsByClassroom(id);
+      if (slotsUsingClassroom.length > 0) {
+        return res.status(400).json({ message: `此教室仍有 ${slotsUsingClassroom.length} 個排課時段，無法刪除` });
+      }
+      await storage.deleteClassroom(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "刪除教室失敗" });
     }
   });
 
