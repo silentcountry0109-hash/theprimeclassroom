@@ -1834,6 +1834,11 @@ function TimeSlotsTab() {
   const handleDeleteSlot = async (id: number) => {
     try {
       const res = await fetch(`/api/franchise-admin/time-slots/${id}`, { method: "DELETE", credentials: "include" });
+      if (res.status === 403) {
+        const data = await res.json();
+        toast({ title: data.message || "此時段有學生正在上課，無法刪除", variant: "destructive" });
+        return;
+      }
       if (res.status === 409) {
         const data = await res.json();
         setSliderConfirm({ open: true, bookingCount: data.bookingCount, bookings: data.bookings, slotIds: [id] });
@@ -1893,17 +1898,21 @@ function TimeSlotsTab() {
     const conflictSlotIds: number[] = [];
     const noConflictIds: number[] = [];
 
+    const inClassIds: number[] = [];
     for (const id of selectedSlotIds) {
       try {
         const res = await fetch(`/api/franchise-admin/time-slots/${id}`, { method: "DELETE", credentials: "include" });
-        if (res.status === 409) {
+        if (res.status === 403) {
+          inClassIds.push(id);
+        } else if (res.status === 409) {
           const data = await res.json();
           conflictSlotIds.push(id);
           conflictBookings.push(...data.bookings);
-        } else if (res.ok) {
-          // deleted successfully (no bookings)
         }
       } catch {}
+    }
+    if (inClassIds.length > 0) {
+      toast({ title: `${inClassIds.length} 個時段有學生正在上課，無法刪除`, variant: "destructive" });
     }
 
     setBatchDeleting(false);

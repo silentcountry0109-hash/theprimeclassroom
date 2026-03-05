@@ -815,6 +815,19 @@ export async function registerRoutes(
   app.post("/api/admin/time-slots", isAdmin, async (req, res) => {
     try {
       const slot = await storage.createSlot(req.body);
+      if (slot.coachId) {
+        const coach = await storage.getCoach(slot.coachId);
+        if (coach?.userId) {
+          const franchise = await storage.getFranchise(slot.franchiseId);
+          await storage.createNotification({
+            userId: coach.userId,
+            type: "slot_assigned",
+            title: "新排課通知",
+            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）有新的排課。`,
+            isRead: false,
+          });
+        }
+      }
       res.json(slot);
     } catch (error) {
       res.status(500).json({ message: "Failed to create time slot" });
@@ -827,12 +840,18 @@ export async function registerRoutes(
       const activeBookings = await storage.getSlotBookings(slotId);
       const force = req.query.force === "true";
 
-      if (activeBookings.length > 0 && !force) {
+      const checkedInBookings = activeBookings.filter((b: any) => b.status === "checked_in");
+      if (checkedInBookings.length > 0) {
+        return res.status(403).json({ message: "此時段有學生正在上課，無法刪除" });
+      }
+
+      const confirmedBookings = activeBookings.filter((b: any) => b.status === "confirmed");
+      if (confirmedBookings.length > 0 && !force) {
         const slot = await storage.getSlot(slotId);
         return res.status(409).json({
-          message: `此時段有 ${activeBookings.length} 位學生已預約`,
-          bookingCount: activeBookings.length,
-          bookings: activeBookings.map((b: any) => ({
+          message: `此時段有 ${confirmedBookings.length} 位學生已預約`,
+          bookingCount: confirmedBookings.length,
+          bookings: confirmedBookings.map((b: any) => ({
             childName: b.childName,
             childGrade: b.childGrade,
             date: slot?.date,
@@ -842,10 +861,27 @@ export async function registerRoutes(
         });
       }
 
-      if (activeBookings.length > 0) {
+      const slot = await storage.getSlot(slotId);
+
+      if (confirmedBookings.length > 0) {
         await storage.cancelSlotBookingsAndNotify(slotId);
       }
       await storage.deleteSlot(slotId);
+
+      if (slot?.coachId) {
+        const coach = await storage.getCoach(slot.coachId);
+        if (coach?.userId) {
+          const franchise = await storage.getFranchise(slot.franchiseId);
+          await storage.createNotification({
+            userId: coach.userId,
+            type: "slot_removed",
+            title: "排課已取消",
+            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）的排課已被取消。`,
+            isRead: false,
+          });
+        }
+      }
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete time slot" });
@@ -1099,6 +1135,19 @@ export async function registerRoutes(
       }
 
       const slot = await storage.createSlot({ ...req.body, franchiseId });
+      if (slot.coachId) {
+        const coach = await storage.getCoach(slot.coachId);
+        if (coach?.userId) {
+          const franchise = await storage.getFranchise(franchiseId);
+          await storage.createNotification({
+            userId: coach.userId,
+            type: "slot_assigned",
+            title: "新排課通知",
+            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）有新的排課。`,
+            isRead: false,
+          });
+        }
+      }
       res.json(slot);
     } catch (error) {
       res.status(500).json({ message: "Failed to create time slot" });
@@ -1127,11 +1176,17 @@ export async function registerRoutes(
       const activeBookings = await storage.getSlotBookings(slotId);
       const force = req.query.force === "true";
 
-      if (activeBookings.length > 0 && !force) {
+      const checkedInBookings = activeBookings.filter((b: any) => b.status === "checked_in");
+      if (checkedInBookings.length > 0) {
+        return res.status(403).json({ message: "此時段有學生正在上課，無法刪除" });
+      }
+
+      const confirmedBookings = activeBookings.filter((b: any) => b.status === "confirmed");
+      if (confirmedBookings.length > 0 && !force) {
         return res.status(409).json({
-          message: `此時段有 ${activeBookings.length} 位學生已預約`,
-          bookingCount: activeBookings.length,
-          bookings: activeBookings.map((b: any) => ({
+          message: `此時段有 ${confirmedBookings.length} 位學生已預約`,
+          bookingCount: confirmedBookings.length,
+          bookings: confirmedBookings.map((b: any) => ({
             childName: b.childName,
             childGrade: b.childGrade,
             date: slot.date,
@@ -1141,10 +1196,25 @@ export async function registerRoutes(
         });
       }
 
-      if (activeBookings.length > 0) {
+      if (confirmedBookings.length > 0) {
         await storage.cancelSlotBookingsAndNotify(slotId);
       }
       await storage.deleteSlot(slotId);
+
+      if (slot.coachId) {
+        const coach = await storage.getCoach(slot.coachId);
+        if (coach?.userId) {
+          const franchise = await storage.getFranchise(slot.franchiseId);
+          await storage.createNotification({
+            userId: coach.userId,
+            type: "slot_removed",
+            title: "排課已取消",
+            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）的排課已被取消。`,
+            isRead: false,
+          });
+        }
+      }
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete time slot" });
