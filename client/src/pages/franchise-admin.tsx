@@ -79,6 +79,8 @@ interface FranchiseStats {
 
 interface FranchiseBooking {
   id: number;
+  slotId: number;
+  childId: number;
   status: string;
   createdAt: string;
   childName: string;
@@ -1484,6 +1486,48 @@ function TimeSlotsTab() {
     },
   });
 
+  const [manualBookSlot, setManualBookSlot] = useState<TimeSlot | null>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+
+  const { data: availableStudents = [] } = useQuery<{ id: number; name: string; grade: number; school: string | null; parentId: string }[]>({
+    queryKey: ["/api/franchise-admin/available-students"],
+    enabled: !!manualBookSlot,
+  });
+
+  const { data: slotBookings = [] } = useQuery<{ id: number; slotId: number; childId: number; childName: string; status: string }[]>({
+    queryKey: ["/api/franchise-admin/bookings"],
+  });
+
+  const manualBookMutation = useMutation({
+    mutationFn: async ({ slotId, childId }: { slotId: number; childId: number }) => {
+      const res = await apiRequest("POST", "/api/franchise-admin/manual-booking", { slotId, childId });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "加排成功", description: `已成功加排 ${data.childName || "學生"}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
+      setManualBookSlot(null);
+      setStudentSearch("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "加排失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const isSlotExpired = (slot: TimeSlot) => {
+    const now = new Date();
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    return now > slotEnd;
+  };
+
+  const getSlotBookedChildIds = (slotId: number) => {
+    return slotBookings
+      .filter((b: any) => b.slotId === slotId && (b.status === "confirmed" || b.status === "checked_in"))
+      .map((b: any) => b.childId);
+  };
+
   const getDayLabel = (dateStr: string) => {
     const d = new Date(dateStr + "T00:00:00");
     return DAY_LABELS[d.getDay().toString()] || "";
@@ -1603,11 +1647,21 @@ function TimeSlotsTab() {
                     <span className="text-sm text-tiffany font-medium">{slot.startTime} - {slot.endTime}</span>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{coachName}</span>
                     <span className="text-xs text-muted-foreground">已預約 {slot.bookedSeats}/{slot.maxSeats}</span>
+                    {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
+                      <span className="text-xs text-tiffany">剩 {slot.maxSeats - slot.bookedSeats} 位</span>
+                    )}
                   </div>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-franchise-slot-${slot.id}`}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
+                    <Button variant="outline" size="icon" onClick={() => { setManualBookSlot(slot); setStudentSearch(""); }} data-testid={`button-manual-book-${slot.id}`} title="加排學生">
+                      <UserPlus className="w-4 h-4 text-tiffany" />
+                    </Button>
+                  )}
+                  <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-franchise-slot-${slot.id}`}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             );
           })}
@@ -1695,11 +1749,21 @@ function TimeSlotsTab() {
                             <span className="text-sm text-tiffany font-medium">{slot.startTime} - {slot.endTime}</span>
                             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{coachName}</span>
                             <span className="text-xs text-muted-foreground">已預約 {slot.bookedSeats}/{slot.maxSeats}</span>
+                            {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
+                              <span className="text-xs text-tiffany">剩 {slot.maxSeats - slot.bookedSeats} 位</span>
+                            )}
                           </div>
                         </div>
-                        <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-cal-slot-${slot.id}`}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
+                            <Button variant="outline" size="icon" onClick={() => { setManualBookSlot(slot); setStudentSearch(""); }} data-testid={`button-manual-book-cal-${slot.id}`} title="加排學生">
+                              <UserPlus className="w-4 h-4 text-tiffany" />
+                            </Button>
+                          )}
+                          <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-cal-slot-${slot.id}`}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1888,6 +1952,90 @@ function TimeSlotsTab() {
                 </Button>
               </DialogFooter>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!manualBookSlot} onOpenChange={(open) => { if (!open) { setManualBookSlot(null); setStudentSearch(""); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>手動加排學生</DialogTitle>
+          </DialogHeader>
+          {manualBookSlot && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-md p-3 space-y-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-medium">{manualBookSlot.date} ({getDayLabel(manualBookSlot.date)})</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-tiffany font-medium">{manualBookSlot.startTime} - {manualBookSlot.endTime}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span>已預約 {manualBookSlot.bookedSeats}/{manualBookSlot.maxSeats}（剩 {manualBookSlot.maxSeats - manualBookSlot.bookedSeats} 位）</span>
+                </div>
+              </div>
+
+              <div>
+                <Label>搜尋學生</Label>
+                <Input
+                  placeholder="輸入學生姓名搜尋..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  data-testid="input-student-search"
+                />
+              </div>
+
+              <div className="border rounded-md max-h-[300px] overflow-y-auto">
+                {availableStudents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">尚無學生資料</p>
+                ) : (
+                  (() => {
+                    const bookedChildIds = getSlotBookedChildIds(manualBookSlot.id);
+                    const filtered = availableStudents.filter((s) =>
+                      !studentSearch || s.name.includes(studentSearch)
+                    );
+                    if (filtered.length === 0) {
+                      return <p className="text-sm text-muted-foreground text-center py-6">找不到符合的學生</p>;
+                    }
+                    return filtered.map((student) => {
+                      const isBooked = bookedChildIds.includes(student.id);
+                      return (
+                        <div
+                          key={student.id}
+                          className={`flex items-center justify-between p-3 border-b last:border-b-0 ${isBooked ? "bg-gray-50 opacity-60" : "hover:bg-gray-50"}`}
+                          data-testid={`student-option-${student.id}`}
+                        >
+                          <div>
+                            <span className="text-sm font-medium">{student.name}</span>
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {student.grade}年級{student.school ? ` · ${student.school}` : ""}
+                            </span>
+                          </div>
+                          {isBooked ? (
+                            <span className="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full" data-testid={`badge-already-booked-${student.id}`}>已預約</span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-tiffany border-tiffany/30 hover:bg-tiffany/5"
+                              onClick={() => manualBookMutation.mutate({ slotId: manualBookSlot.id, childId: student.id })}
+                              disabled={manualBookMutation.isPending}
+                              data-testid={`button-book-student-${student.id}`}
+                            >
+                              <UserPlus className="w-3.5 h-3.5 mr-1" />
+                              {manualBookMutation.isPending ? "加排中..." : "加排"}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()
+                )}
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

@@ -157,6 +157,9 @@ export interface IStorage {
   getOverlappingSlots(franchiseId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]>;
   getCoachOverlappingSlots(coachId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<any[]>;
 
+  getFranchiseStudents(franchiseId: number): Promise<any[]>;
+  createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
+
   getAllFranchiseAnalytics(): Promise<any[]>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
@@ -561,6 +564,70 @@ export class DatabaseStorage implements IStorage {
     return rows;
   }
 
+  async getFranchiseStudents(franchiseId: number): Promise<any[]> {
+    const rows = await db
+      .selectDistinctOn([children.id], {
+        id: children.id,
+        name: children.name,
+        grade: children.grade,
+        school: children.school,
+        parentId: children.parentId,
+      })
+      .from(bookings)
+      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+      .innerJoin(children, eq(bookings.childId, children.id))
+      .where(eq(timeSlots.franchiseId, franchiseId))
+      .orderBy(children.id, children.name);
+    return rows;
+  }
+
+  async createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any> {
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, slotId));
+    if (!slot) throw new Error("時段不存在");
+    if (slot.franchiseId !== franchiseId) throw new Error("此時段不屬於您的分校");
+    if (slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿");
+
+    const now = new Date();
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    if (now > slotEnd) throw new Error("此時段已結束，無法加排");
+
+    const existing = await db.select().from(bookings).where(
+      and(
+        eq(bookings.slotId, slotId),
+        eq(bookings.childId, childId),
+        inArray(bookings.status, ["confirmed", "checked_in"])
+      )
+    );
+    if (existing.length > 0) throw new Error("此學生已預約此時段");
+
+    const [child] = await db.select().from(children).where(eq(children.id, childId));
+    if (!child) throw new Error("學生不存在");
+
+    const franchiseBookings = await db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+      .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId)))
+      .limit(1);
+    if (franchiseBookings.length === 0) throw new Error("此學生非本分校學生，無法加排");
+
+    const [updated] = await db
+      .update(timeSlots)
+      .set({ bookedSeats: sql`LEAST(${timeSlots.bookedSeats} + 1, ${timeSlots.maxSeats})` })
+      .where(and(eq(timeSlots.id, slotId), sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`))
+      .returning();
+    if (!updated) throw new Error("此時段已額滿");
+
+    const [created] = await db.insert(bookings).values({
+      slotId,
+      childId,
+      parentId: child.parentId,
+      status: "confirmed",
+    }).returning();
+
+    return { ...created, childName: child.name };
+  }
+
   async getBooking(id: number): Promise<any | undefined> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     return booking;
@@ -779,6 +846,8 @@ export class DatabaseStorage implements IStorage {
 
     return results.map((r) => ({
       id: r.booking.id,
+      slotId: r.booking.slotId,
+      childId: r.booking.childId,
       status: r.booking.status,
       createdAt: r.booking.createdAt,
       childName: r.child.name,

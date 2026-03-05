@@ -1049,6 +1049,28 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/franchise-admin/available-students", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const students = await storage.getFranchiseStudents(req.franchiseId);
+      res.json(students);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  app.post("/api/franchise-admin/manual-booking", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { slotId, childId } = req.body;
+      if (!slotId || !childId) {
+        return res.status(400).json({ message: "缺少必要參數" });
+      }
+      const result = await storage.createManualBooking(slotId, childId, req.franchiseId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "加排失敗" });
+    }
+  });
+
   // ========== Franchise Admin: Coach Account Management ==========
   app.post("/api/franchise-admin/coaches/:id/account", isFranchiseAdmin, async (req: any, res) => {
     try {
