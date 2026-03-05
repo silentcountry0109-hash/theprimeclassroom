@@ -1696,9 +1696,6 @@ function CoachesTab() {
                 <Button variant="outline" size="icon" onClick={() => openEdit(coach)} data-testid={`button-edit-franchise-coach-${coach.id}`}>
                   <Edit className="w-4 h-4" />
                 </Button>
-                <Button variant="outline" size="icon" onClick={() => { if (confirm("確定要刪除此老師？")) deleteMutation.mutate(coach.id); }} data-testid={`button-delete-franchise-coach-${coach.id}`}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
               </div>
             </div>
           ))}
