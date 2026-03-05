@@ -566,12 +566,6 @@ function OverviewTab({
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
-                    {nc.coachName && (
-                      <span className="flex items-center gap-1">
-                        <GraduationCap className="w-3.5 h-3.5 text-tiffany" />
-                        {nc.coachName} 老師
-                      </span>
-                    )}
                     <span className="text-muted-foreground/60">
                       {nc.slotStartTime?.slice(0,5)} - {nc.slotEndTime?.slice(0,5)}
                     </span>
