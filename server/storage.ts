@@ -177,6 +177,8 @@ export interface IStorage {
   getUnreadNotificationCount(userId: string): Promise<number>;
 
   getFranchiseStudents(franchiseId: number): Promise<any[]>;
+  getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]>;
+  getFranchiseStudentContactBooks(franchiseId: number, childId: number): Promise<any[]>;
   createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
 
   getAllFranchiseAnalytics(): Promise<any[]>;
@@ -629,6 +631,7 @@ export class DatabaseStorage implements IStorage {
         name: children.name,
         grade: children.grade,
         school: children.school,
+        studentCode: children.studentCode,
         parentId: children.parentId,
       })
       .from(bookings)
@@ -636,7 +639,79 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(children, eq(bookings.childId, children.id))
       .where(eq(timeSlots.franchiseId, franchiseId))
       .orderBy(children.id, children.name);
-    return rows;
+
+    const result = [];
+    for (const row of rows) {
+      const [parent] = row.parentId
+        ? await db.select({ firstName: users.firstName, lastName: users.lastName, phone: users.phone }).from(users).where(eq(users.id, row.parentId))
+        : [null];
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookings)
+        .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+        .where(and(eq(bookings.childId, row.id), eq(timeSlots.franchiseId, franchiseId)));
+      result.push({
+        ...row,
+        parentName: parent ? `${parent.lastName || ""}${parent.firstName || ""}`.trim() || "未設定" : "未設定",
+        parentPhone: parent?.phone || null,
+        bookingCount: countRow?.count || 0,
+      });
+    }
+    return result;
+  }
+
+  async getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        id: bookings.id,
+        status: bookings.status,
+        createdAt: bookings.createdAt,
+        date: timeSlots.date,
+        startTime: timeSlots.startTime,
+        endTime: timeSlots.endTime,
+        coachName: coaches.name,
+        classroomId: timeSlots.classroomId,
+      })
+      .from(bookings)
+      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+      .leftJoin(coaches, eq(timeSlots.coachId, coaches.id))
+      .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId)))
+      .orderBy(desc(timeSlots.date), desc(timeSlots.startTime));
+
+    const enriched = [];
+    for (const r of results) {
+      let classroomName = null;
+      if (r.classroomId) {
+        const [cr] = await db.select({ name: classrooms.name }).from(classrooms).where(eq(classrooms.id, r.classroomId));
+        classroomName = cr?.name || null;
+      }
+      enriched.push({ id: r.id, status: r.status, createdAt: r.createdAt, date: r.date, startTime: r.startTime, endTime: r.endTime, coachName: r.coachName, classroomName });
+    }
+    return enriched;
+  }
+
+  async getFranchiseStudentContactBooks(franchiseId: number, childId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        id: contactBooks.id,
+        lessonDate: contactBooks.lessonDate,
+        lessonUnit: contactBooks.lessonUnit,
+        lessonProgress: contactBooks.lessonProgress,
+        performance: contactBooks.performance,
+        teacherRemarks: contactBooks.teacherRemarks,
+        quizScore: contactBooks.quizScore,
+        quizTotal: contactBooks.quizTotal,
+        homework: contactBooks.homework,
+        coachId: contactBooks.coachId,
+        coachName: coaches.name,
+        createdAt: contactBooks.createdAt,
+      })
+      .from(contactBooks)
+      .innerJoin(coaches, eq(contactBooks.coachId, coaches.id))
+      .where(and(eq(contactBooks.childId, childId), eq(coaches.franchiseId, franchiseId)))
+      .orderBy(desc(contactBooks.lessonDate));
+
+    return results;
   }
 
   async createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any> {

@@ -68,6 +68,9 @@ import {
   Check,
   X,
   ChevronDown,
+  Search,
+  BookOpen,
+  ClipboardList,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -267,6 +270,7 @@ export default function FranchiseAdminDashboard() {
     { id: "coaches", label: "師資管理", icon: GraduationCap },
     { id: "timeslots", label: "時段管理", icon: Clock },
     { id: "bookings", label: "預約管理", icon: CalendarCheck },
+    { id: "students", label: "學生管理", icon: Users },
   ];
 
   return (
@@ -325,6 +329,7 @@ export default function FranchiseAdminDashboard() {
             {activeTab === "coaches" && <CoachesTab />}
             {activeTab === "timeslots" && <TimeSlotsTab />}
             {activeTab === "bookings" && <BookingsTab />}
+            {activeTab === "students" && <StudentsTab />}
           </main>
         </div>
       </div>
@@ -2799,6 +2804,247 @@ function BookingsTab() {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudentsTab() {
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [schoolFilter, setSchoolFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const { data: students = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/franchise-admin/students"],
+  });
+
+  const schools = [...new Set(students.map((s: any) => s.school).filter(Boolean))].sort();
+
+  const filtered = students.filter((s: any) => {
+    if (gradeFilter && gradeFilter !== "all" && s.grade !== parseInt(gradeFilter)) return false;
+    if (schoolFilter && schoolFilter !== "all" && s.school !== schoolFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        s.name?.toLowerCase().includes(q) ||
+        s.studentCode?.toLowerCase().includes(q) ||
+        s.parentName?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="max-w-4xl">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-foreground">學生管理</h1>
+        <p className="text-sm text-muted-foreground">查看分校所有學生資料、預約紀錄和聯絡簿</p>
+      </div>
+
+      <div className="flex flex-wrap gap-3 mb-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="搜尋學生姓名、編碼、家長姓名..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-student-search"
+          />
+        </div>
+        <Select value={gradeFilter} onValueChange={setGradeFilter}>
+          <SelectTrigger className="w-32" data-testid="select-student-grade">
+            <SelectValue placeholder="年級" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部年級</SelectItem>
+            {[1, 2, 3, 4, 5, 6].map((g) => (
+              <SelectItem key={g} value={g.toString()}>{g}年級</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+          <SelectTrigger className="w-40" data-testid="select-student-school">
+            <SelectValue placeholder="學校" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部學校</SelectItem>
+            {schools.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <p className="text-xs text-muted-foreground mb-3" data-testid="text-student-count">
+        共 {filtered.length} 位學生
+      </p>
+
+      {isLoading ? (
+        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12">
+          <Users className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">尚無學生資料</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((student: any) => (
+            <div key={student.id} className="bg-white rounded-md border border-gray-100 overflow-hidden" data-testid={`card-student-${student.id}`}>
+              <button
+                className="w-full text-left p-4 hover:bg-gray-50/50 transition-colors"
+                onClick={() => setExpandedId(expandedId === student.id ? null : student.id)}
+                data-testid={`button-expand-student-${student.id}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-tiffany/10 flex items-center justify-center shrink-0">
+                      <span className="text-sm font-medium text-tiffany">{student.name?.[0]}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium" data-testid={`text-student-name-${student.id}`}>{student.name}</span>
+                        <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">{student.grade}年級</span>
+                        {student.school && <span className="text-xs text-muted-foreground">{student.school}</span>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                        {student.studentCode && <span>編碼：{student.studentCode}</span>}
+                        <span>家長：{student.parentName}</span>
+                        {student.parentPhone && (
+                          <span className="flex items-center gap-0.5">
+                            <Phone className="w-3 h-3" />{student.parentPhone}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-muted-foreground">{student.bookingCount} 次預約</span>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === student.id ? "rotate-180" : ""}`} />
+                  </div>
+                </div>
+              </button>
+
+              {expandedId === student.id && (
+                <StudentDetailPanel childId={student.id} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudentDetailPanel({ childId }: { childId: number }) {
+  const [activeDetailTab, setActiveDetailTab] = useState<"bookings" | "contactbooks">("bookings");
+
+  const { data: studentBookings = [], isLoading: bookingsLoading } = useQuery<any[]>({
+    queryKey: ["/api/franchise-admin/students", childId, "bookings"],
+    queryFn: async () => {
+      const res = await fetch(`/api/franchise-admin/students/${childId}/bookings`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const { data: contactBooksList = [], isLoading: contactBooksLoading } = useQuery<any[]>({
+    queryKey: ["/api/franchise-admin/students", childId, "contact-books"],
+    queryFn: async () => {
+      const res = await fetch(`/api/franchise-admin/students/${childId}/contact-books`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const statusMap: Record<string, { label: string; color: string }> = {
+    confirmed: { label: "已確認", color: "bg-tiffany/10 text-tiffany" },
+    checked_in: { label: "上課中", color: "bg-amber-100 text-amber-700" },
+    completed: { label: "已完成", color: "bg-green-50 text-green-600" },
+    cancelled: { label: "已取消", color: "bg-gray-100 text-gray-500" },
+  };
+
+  return (
+    <div className="border-t border-gray-100 bg-gray-50/50 px-4 pb-4" data-testid={`panel-student-detail-${childId}`}>
+      <div className="flex gap-2 py-3 border-b border-gray-100">
+        <button
+          onClick={() => setActiveDetailTab("bookings")}
+          className={`text-xs px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 ${
+            activeDetailTab === "bookings" ? "bg-tiffany/10 text-tiffany font-medium" : "text-muted-foreground hover:bg-gray-100"
+          }`}
+          data-testid={`tab-student-bookings-${childId}`}
+        >
+          <ClipboardList className="w-3.5 h-3.5" />預約紀錄
+        </button>
+        <button
+          onClick={() => setActiveDetailTab("contactbooks")}
+          className={`text-xs px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 ${
+            activeDetailTab === "contactbooks" ? "bg-tiffany/10 text-tiffany font-medium" : "text-muted-foreground hover:bg-gray-100"
+          }`}
+          data-testid={`tab-student-contactbooks-${childId}`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />聯絡簿
+        </button>
+      </div>
+
+      {activeDetailTab === "bookings" && (
+        <div className="pt-3">
+          {bookingsLoading ? (
+            <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 rounded" />)}</div>
+          ) : studentBookings.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">暫無預約紀錄</p>
+          ) : (
+            <div className="space-y-1.5">
+              {studentBookings.map((b: any) => {
+                const s = statusMap[b.status] || { label: b.status, color: "bg-gray-100 text-gray-500" };
+                return (
+                  <div key={b.id} className="flex items-center justify-between bg-white rounded px-3 py-2 text-xs" data-testid={`booking-row-${b.id}`}>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-foreground">{b.date}</span>
+                      <span className="text-muted-foreground">{b.startTime}-{b.endTime}</span>
+                      {b.coachName && <span className="text-muted-foreground">{b.coachName} 老師</span>}
+                      {b.classroomName && <span className="text-muted-foreground flex items-center gap-0.5"><DoorOpen className="w-3 h-3" />{b.classroomName}</span>}
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full ${s.color}`}>{s.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeDetailTab === "contactbooks" && (
+        <div className="pt-3">
+          {contactBooksLoading ? (
+            <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded" />)}</div>
+          ) : contactBooksList.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">暫無聯絡簿紀錄</p>
+          ) : (
+            <div className="space-y-2">
+              {contactBooksList.map((cb: any) => (
+                <div key={cb.id} className="bg-white rounded px-3 py-2.5 text-xs" data-testid={`contactbook-row-${cb.id}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{cb.lessonDate}</span>
+                      {cb.coachName && <span className="text-muted-foreground">{cb.coachName} 老師</span>}
+                    </div>
+                    {cb.quizScore != null && (
+                      <span className="text-tiffany font-medium">小考 {cb.quizScore}/{cb.quizTotal || 100}</span>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-muted-foreground">
+                    <p><span className="text-foreground font-medium">單元：</span>{cb.lessonUnit}</p>
+                    {cb.performance && <p><span className="text-foreground font-medium">表現：</span>{cb.performance}</p>}
+                    {cb.teacherRemarks && <p><span className="text-foreground font-medium">老師評語：</span>{cb.teacherRemarks}</p>}
+                    {cb.homework && <p><span className="text-foreground font-medium">回家作業：</span>{cb.homework}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

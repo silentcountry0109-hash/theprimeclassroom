@@ -1335,6 +1335,35 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/franchise-admin/students", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const students = await storage.getFranchiseStudents(req.franchiseId);
+      res.json(students);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  app.get("/api/franchise-admin/students/:childId/bookings", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const childId = parseInt(req.params.childId);
+      const result = await storage.getFranchiseStudentBookings(req.franchiseId, childId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch student bookings" });
+    }
+  });
+
+  app.get("/api/franchise-admin/students/:childId/contact-books", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const childId = parseInt(req.params.childId);
+      const result = await storage.getFranchiseStudentContactBooks(req.franchiseId, childId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch student contact books" });
+    }
+  });
+
   app.post("/api/franchise-admin/manual-booking", isFranchiseAdmin, async (req: any, res) => {
     try {
       const { slotId, childId } = req.body;
