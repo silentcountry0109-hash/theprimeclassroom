@@ -569,6 +569,12 @@ function OverviewTab({
                     <span className="text-muted-foreground/60">
                       {nc.slotStartTime?.slice(0,5)} - {nc.slotEndTime?.slice(0,5)}
                     </span>
+                    {nc.coachName && (
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <GraduationCap className="w-3.5 h-3.5 text-tiffany" />
+                        {nc.coachName} 老師
+                      </span>
+                    )}
                   </div>
                   {nc.childName && (
                     <div className="flex items-center gap-1.5 mt-2" data-testid={`text-next-class-child-${nc.childId}`}>
