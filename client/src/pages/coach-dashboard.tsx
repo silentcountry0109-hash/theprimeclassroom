@@ -52,6 +52,9 @@ import {
   ChevronDown,
   HelpCircle,
   Settings,
+  DollarSign,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
 import type { Notification } from "@shared/schema";
 
@@ -137,7 +140,7 @@ export default function CoachDashboard() {
   const TABS = [
     { id: "calendar" as const, label: "行事曆", icon: Calendar },
     { id: "students" as const, label: "我的學生", icon: Users },
-    { id: "salary" as const, label: "工作記錄", icon: ClipboardCheck },
+    { id: "salary" as const, label: "收入總覽", icon: DollarSign },
     { id: "profile" as const, label: "個人資料", icon: User },
     { id: "manual" as const, label: "使用手冊", icon: BookOpen },
   ];
@@ -258,7 +261,7 @@ export default function CoachDashboard() {
 
         {activeTab === "calendar" && <CalendarTab coachId={userData.coach?.id} />}
         {activeTab === "students" && <StudentsTab coachId={userData.coach?.id} />}
-        {activeTab === "salary" && <SalaryTab coachId={userData.coach?.id} />}
+        {activeTab === "salary" && <SalaryTab coachId={userData.coach?.id} coach={userData.coach} />}
         {activeTab === "profile" && <ProfileTab />}
         {activeTab === "manual" && <ManualTab />}
       </div>
@@ -1115,26 +1118,25 @@ function ContactBookCard({ entry, showChild = true }: { entry: any; showChild?: 
   );
 }
 
-function SalaryTab({ coachId }: { coachId: number }) {
+function SalaryTab({ coachId, coach }: { coachId: number; coach?: any }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
 
-  const { data: records = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/coach/monthly-records", year, month],
-    enabled: !!coachId,
-  });
-
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
   const daysInMonth = new Date(year, month, 0).getDate();
-  const allDates: string[] = [];
-  for (let d = 1; d <= daysInMonth; d++) {
-    allDates.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-  }
+  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
-  const recordMap = new Map(records.map(r => [r.date, r]));
-  const completedDays = records.filter(r => r.isComplete).length;
-  const workDays = records.filter(r => r.totalSlots > 0).length;
-  const completionRate = workDays > 0 ? Math.round((completedDays / workDays) * 100) : 0;
+  const { data: earnings, isLoading } = useQuery<any>({
+    queryKey: ["/api/coach/earnings", startDate, endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/coach/earnings?startDate=${startDate}&endDate=${endDate}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch earnings");
+      return res.json();
+    },
+    enabled: !!coachId,
+    retry: 1,
+  });
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -1145,6 +1147,14 @@ function SalaryTab({ coachId }: { coachId: number }) {
     else setMonth(m => m + 1);
   };
 
+  const compType = earnings?.compensationType ?? coach?.compensationType ?? "fixed";
+  const compAmount = earnings?.compensationAmount ?? coach?.compensationAmount ?? 200;
+  const compensationLabel = compType === "fixed"
+    ? `每堂 $${compAmount}`
+    : `課堂收入 ${compAmount}%`;
+
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -1152,81 +1162,131 @@ function SalaryTab({ coachId }: { coachId: number }) {
           <Button variant="ghost" size="icon" onClick={prevMonth} data-testid="button-salary-prev">
             <ChevronLeft className="w-5 h-5" />
           </Button>
-          <h2 className="text-base font-semibold" data-testid="text-salary-month">{year} 年 {month} 月 工作記錄</h2>
+          <h2 className="text-base font-semibold" data-testid="text-salary-month">{year} 年 {month} 月 收入總覽</h2>
           <Button variant="ghost" size="icon" onClick={nextMonth} data-testid="button-salary-next">
             <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="text-center p-3 rounded-lg bg-gray-50">
-            <p className="text-2xl font-bold text-foreground" data-testid="text-work-days">{workDays}</p>
-            <p className="text-xs text-muted-foreground">排課天數</p>
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-tiffany/5 border border-tiffany/20 mb-4" data-testid="card-compensation-method">
+          <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+            <Wallet className="w-5 h-5 text-tiffany" />
           </div>
-          <div className="text-center p-3 rounded-lg bg-green-50">
-            <p className="text-2xl font-bold text-green-600" data-testid="text-completed-days">{completedDays}</p>
-            <p className="text-xs text-muted-foreground">完成天數</p>
-          </div>
-          <div className="text-center p-3 rounded-lg bg-tiffany/10">
-            <p className="text-2xl font-bold text-tiffany" data-testid="text-completion-rate">{completionRate}%</p>
-            <p className="text-xs text-muted-foreground">完成率</p>
+          <div>
+            <p className="text-xs text-muted-foreground">薪酬計算方式</p>
+            <p className="text-sm font-semibold text-foreground" data-testid="text-compensation-type">
+              {compType === "fixed" ? "每堂固定金額" : "按比例抽成"}
+            </p>
+            <p className="text-lg font-bold text-tiffany" data-testid="text-compensation-value">
+              {compensationLabel}
+            </p>
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground bg-amber-50 p-2 rounded-lg mb-4">
-          <AlertTriangle className="w-3.5 h-3.5 inline mr-1 text-amber-500" />
-          只有完成所有當日工作（點名 + 聯絡簿）的日期才計入薪資計算
-        </p>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full rounded-lg" />
+        ) : earnings ? (
+          <>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="text-center p-3 rounded-lg bg-gray-50">
+                <div className="w-8 h-8 rounded-full bg-gray-200/60 flex items-center justify-center mx-auto mb-1">
+                  <BookOpen className="w-4 h-4 text-foreground/70" />
+                </div>
+                <p className="text-2xl font-bold text-foreground" data-testid="text-total-lessons">{earnings.totalLessons}</p>
+                <p className="text-xs text-muted-foreground">已完成課消</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-green-50">
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-1">
+                  <DollarSign className="w-4 h-4 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold text-green-600" data-testid="text-coach-earnings">${earnings.coachEarnings.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">已確認收入</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-tiffany/10">
+                <div className="w-8 h-8 rounded-full bg-tiffany/20 flex items-center justify-center mx-auto mb-1">
+                  <TrendingUp className="w-4 h-4 text-tiffany" />
+                </div>
+                <p className="text-2xl font-bold text-tiffany" data-testid="text-projected-earnings">
+                  {isCurrentMonth ? `$${earnings.monthlyProjection.projectedEarnings.toLocaleString()}` : "-"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isCurrentMonth ? "預估月收入" : "非當月"}
+                </p>
+              </div>
+            </div>
+
+            {isCurrentMonth && earnings.monthlyProjection.totalSlots > 0 && (
+              <p className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-lg">
+                <TrendingUp className="w-3.5 h-3.5 inline mr-1 text-tiffany" />
+                本月共排定 {earnings.monthlyProjection.totalSlots} 堂課，預估月收入根據已排定時段計算
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="text-center p-3 rounded-lg bg-gray-50">
+              <p className="text-2xl font-bold text-foreground" data-testid="text-total-lessons">0</p>
+              <p className="text-xs text-muted-foreground">已完成課消</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-green-50">
+              <p className="text-2xl font-bold text-green-600" data-testid="text-coach-earnings">$0</p>
+              <p className="text-xs text-muted-foreground">已確認收入</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-tiffany/10">
+              <p className="text-2xl font-bold text-tiffany" data-testid="text-projected-earnings">-</p>
+              <p className="text-xs text-muted-foreground">本月無資料</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {isLoading ? (
-        <Skeleton className="h-32 w-full rounded-xl" />
-      ) : records.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-6 text-center text-sm text-muted-foreground">
-          本月尚無工作記錄
-        </div>
-      ) : (
+      {!isLoading && earnings && earnings.dailyStats.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="divide-y divide-gray-50">
-            {records
-              .filter(r => r.totalSlots > 0)
-              .sort((a, b) => a.date.localeCompare(b.date))
-              .map((r: any) => {
-                const d = new Date(r.date + "T00:00:00");
-                const dayLabel = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
-                return (
-                  <div key={r.date} className="flex items-center px-4 py-3 gap-3" data-testid={`salary-row-${r.date}`}>
-                    <div className="w-16 text-center">
-                      <p className="text-sm font-semibold">{r.date.slice(5)}</p>
-                      <p className="text-[10px] text-muted-foreground">週{dayLabel}</p>
-                    </div>
-                    <div className="flex-1 flex items-center gap-4">
-                      <div className="flex items-center gap-1 text-xs">
-                        <CheckCircle className={`w-3.5 h-3.5 ${r.checkedInSlots === r.totalSlots ? "text-green-500" : "text-gray-300"}`} />
-                        <span className="text-muted-foreground">點名 {r.checkedInSlots}/{r.totalSlots}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs">
-                        <FileText className={`w-3.5 h-3.5 ${r.contactBookSlots === r.totalSlots ? "text-green-500" : "text-gray-300"}`} />
-                        <span className="text-muted-foreground">聯絡簿 {r.contactBookSlots}/{r.totalSlots}</span>
-                      </div>
-                    </div>
-                    <div>
-                      {r.isComplete ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-complete-${r.date}`}>
-                          <CheckCircle className="w-3 h-3" />
-                          完成
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full" data-testid={`badge-incomplete-${r.date}`}>
-                          <AlertTriangle className="w-3 h-3" />
-                          未完成
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="px-4 py-3 border-b border-gray-50">
+            <h3 className="text-sm font-semibold text-foreground" data-testid="text-daily-detail-title">每日收入明細</h3>
           </div>
+          <div className="divide-y divide-gray-50">
+            {earnings.dailyStats.map((day: any) => {
+              const d = new Date(day.date + "T00:00:00");
+              const dayLabel = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+              return (
+                <div key={day.date} className="flex items-center px-4 py-3 gap-3" data-testid={`salary-row-${day.date}`}>
+                  <div className="w-16 text-center">
+                    <p className="text-sm font-semibold">{day.date.slice(5)}</p>
+                    <p className="text-[10px] text-muted-foreground">週{dayLabel}</p>
+                  </div>
+                  <div className="flex-1 flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-1 text-xs">
+                      <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground">{day.lessons} 堂</span>
+                    </div>
+                    {earnings.compensationType === "percentage" && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">實收 ${Math.round(day.revenue).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-semibold text-green-600" data-testid={`text-daily-earnings-${day.date}`}>
+                      ${Math.round(day.earnings).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">合計</span>
+            <span className="text-sm font-bold text-foreground" data-testid="text-daily-total">
+              ${earnings.coachEarnings.toLocaleString()}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && earnings && earnings.dailyStats.length === 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-6 text-center text-sm text-muted-foreground">
+          本月尚無課消收入記錄
         </div>
       )}
     </div>

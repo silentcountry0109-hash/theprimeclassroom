@@ -40,6 +40,8 @@ export const coaches = pgTable("coaches", {
   isActive: boolean("is_active").default(true).notNull(),
   rating: real("rating").default(0),
   reviewCount: integer("review_count").default(0),
+  compensationType: text("compensation_type").default("fixed"),
+  compensationAmount: integer("compensation_amount").default(200),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -156,6 +156,8 @@ export async function seedDatabase() {
           rating: 4.8,
           reviewCount: 35,
           franchiseId: insertedFranchises[0].id,
+          compensationType: "fixed",
+          compensationAmount: 250,
         },
         {
           name: "王雅琪",

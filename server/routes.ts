@@ -1120,6 +1120,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/franchise-admin/coach-earnings", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) return res.status(400).json({ message: "請提供日期範圍" });
+      const stats = await storage.getFranchiseCoachEarnings(req.franchiseId, startDate as string, endDate as string);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "取得老師薪酬統計失敗" });
+    }
+  });
+
   app.get("/api/franchise-admin/coaches", isFranchiseAdmin, async (req: any, res) => {
     try {
       const coachList = await storage.getCoachesByFranchise(req.franchiseId);
@@ -1138,7 +1149,19 @@ export async function registerRoutes(
 
   app.post("/api/franchise-admin/coaches", isFranchiseAdmin, async (req: any, res) => {
     try {
-      const coach = await storage.createCoach({ ...req.body, franchiseId: req.franchiseId });
+      const { compensationType, compensationAmount, ...rest } = req.body;
+      const data: any = { ...rest, franchiseId: req.franchiseId };
+      if (compensationType !== undefined) {
+        if (!["fixed", "percentage"].includes(compensationType)) return res.status(400).json({ message: "薪酬類型必須是 fixed 或 percentage" });
+        data.compensationType = compensationType;
+      }
+      if (compensationAmount !== undefined) {
+        const amt = Number(compensationAmount);
+        if (isNaN(amt) || amt < 0) return res.status(400).json({ message: "薪酬金額不可為負數" });
+        if (compensationType === "percentage" && amt > 100) return res.status(400).json({ message: "抽成比例不可超過 100%" });
+        data.compensationAmount = amt;
+      }
+      const coach = await storage.createCoach(data);
       res.json(coach);
     } catch (error) {
       res.status(500).json({ message: "Failed to create coach" });
@@ -1149,7 +1172,20 @@ export async function registerRoutes(
     try {
       const coach = await storage.getCoach(parseInt(req.params.id));
       if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
-      const updated = await storage.updateCoach(parseInt(req.params.id), req.body);
+      const { compensationType, compensationAmount, ...rest } = req.body;
+      const data: any = { ...rest };
+      if (compensationType !== undefined) {
+        if (!["fixed", "percentage"].includes(compensationType)) return res.status(400).json({ message: "薪酬類型必須是 fixed 或 percentage" });
+        data.compensationType = compensationType;
+      }
+      if (compensationAmount !== undefined) {
+        const amt = Number(compensationAmount);
+        if (isNaN(amt) || amt < 0) return res.status(400).json({ message: "薪酬金額不可為負數" });
+        const effectiveType = compensationType || coach.compensationType;
+        if (effectiveType === "percentage" && amt > 100) return res.status(400).json({ message: "抽成比例不可超過 100%" });
+        data.compensationAmount = amt;
+      }
+      const updated = await storage.updateCoach(parseInt(req.params.id), data);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update coach" });
@@ -1622,6 +1658,18 @@ export async function registerRoutes(
       res.json(history);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch history" });
+    }
+  });
+
+  // ========== Coach: Earnings ==========
+  app.get("/api/coach/earnings", isCoach, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) return res.status(400).json({ message: "請提供日期範圍" });
+      const stats = await storage.getCoachEarningsStats(req.coach.id, startDate as string, endDate as string);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "取得收入統計失敗" });
     }
   });
 

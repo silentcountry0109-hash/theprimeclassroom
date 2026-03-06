@@ -220,6 +220,9 @@ export interface IStorage {
   createCreditTransaction(data: InsertCreditTransaction): Promise<CreditTransaction>;
   getTransactionsByParent(parentId: string): Promise<CreditTransaction[]>;
 
+  getCoachEarningsStats(coachId: number, startDate: string, endDate: string): Promise<any>;
+  getFranchiseCoachEarnings(franchiseId: number, startDate: string, endDate: string): Promise<any>;
+
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
     totalBookings: number;
@@ -2084,6 +2087,149 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(creditTransactions)
       .where(eq(creditTransactions.parentId, parentId))
       .orderBy(desc(creditTransactions.createdAt));
+  }
+
+  async getCoachEarningsStats(coachId: number, startDate: string, endDate: string): Promise<any> {
+    const coach = await db.select().from(coaches).where(eq(coaches.id, coachId)).then(r => r[0]);
+    if (!coach) throw new Error("找不到老師資料");
+
+    const compensationType = coach.compensationType ?? "fixed";
+    const compensationAmount = coach.compensationAmount ?? 200;
+
+    const deductRows = await db.execute(sql`
+      SELECT ct.id, ct.credits, ct.booking_id, ct.created_at,
+             ts.date, ts.start_time, ts.end_time,
+             cp.original_amount as purchase_original, cp.discount_amount as purchase_discount,
+             cp.final_amount as purchase_final, cp.credits as purchase_credits
+      FROM credit_transactions ct
+      JOIN bookings b ON ct.booking_id = b.id
+      JOIN time_slots ts ON b.slot_id = ts.id
+      LEFT JOIN credit_balances cb ON ct.balance_id = cb.id
+      LEFT JOIN credit_purchases cp ON cb.purchase_id = cp.id
+      WHERE ct.type = 'deduct'
+        AND ts.coach_id = ${coachId}
+        AND ts.date >= ${startDate}
+        AND ts.date <= ${endDate}
+    `);
+
+    const refundRows = await db.execute(sql`
+      SELECT ct.booking_id
+      FROM credit_transactions ct
+      JOIN bookings b ON ct.booking_id = b.id
+      JOIN time_slots ts ON b.slot_id = ts.id
+      WHERE ct.type = 'refund'
+        AND ts.coach_id = ${coachId}
+        AND ts.date >= ${startDate}
+        AND ts.date <= ${endDate}
+    `);
+
+    const refundedBookingIds = new Set(refundRows.rows.map((r: any) => r.booking_id));
+    const netDeductions = deductRows.rows.filter((r: any) => !refundedBookingIds.has(r.booking_id));
+
+    let totalLessons = 0;
+    let totalNetRevenue = 0;
+    const dailyMap: Record<string, { lessons: number; revenue: number; earnings: number }> = {};
+
+    for (const row of netDeductions as any[]) {
+      const lessons = Math.abs(row.credits);
+      const perCreditRevenue = row.purchase_credits && row.purchase_final
+        ? row.purchase_final / row.purchase_credits
+        : 0;
+      const revenue = lessons * perCreditRevenue;
+
+      totalLessons += lessons;
+      totalNetRevenue += revenue;
+
+      const date = row.date;
+      if (!dailyMap[date]) dailyMap[date] = { lessons: 0, revenue: 0, earnings: 0 };
+      dailyMap[date].lessons += lessons;
+      dailyMap[date].revenue += revenue;
+
+      const earning = compensationType === "fixed"
+        ? compensationAmount * lessons
+        : revenue * compensationAmount / 100;
+      dailyMap[date].earnings += earning;
+    }
+
+    const coachEarnings = compensationType === "fixed"
+      ? compensationAmount * totalLessons
+      : totalNetRevenue * compensationAmount / 100;
+
+    const dailyStats = Object.entries(dailyMap)
+      .map(([date, stats]) => ({ date, ...stats }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const monthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const monthEnd = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${new Date(currentYear, currentMonth, 0).getDate()}`;
+
+    const projectionRows = await db.execute(sql`
+      SELECT COUNT(*) as upcoming_bookings
+      FROM bookings b
+      JOIN time_slots ts ON b.slot_id = ts.id
+      WHERE ts.coach_id = ${coachId}
+        AND ts.date >= ${monthStart}
+        AND ts.date <= ${monthEnd}
+        AND b.status IN ('confirmed', 'checked_in', 'completed')
+    `);
+    const upcomingBookings = Number((projectionRows.rows[0] as any)?.upcoming_bookings || 0);
+
+    const avgRevenuePerLesson = totalLessons > 0 ? totalNetRevenue / totalLessons : 0;
+    const projectedEarnings = compensationType === "fixed"
+      ? compensationAmount * upcomingBookings
+      : avgRevenuePerLesson * upcomingBookings * compensationAmount / 100;
+
+    return {
+      compensationType,
+      compensationAmount,
+      totalLessons,
+      totalNetRevenue: Math.round(totalNetRevenue),
+      coachEarnings: Math.round(coachEarnings),
+      dailyStats,
+      monthlyProjection: {
+        totalSlots: upcomingBookings,
+        projectedEarnings: Math.round(projectedEarnings),
+        month: `${currentYear}-${String(currentMonth).padStart(2, '0')}`,
+      },
+    };
+  }
+
+  async getFranchiseCoachEarnings(franchiseId: number, startDate: string, endDate: string): Promise<any> {
+    const franchiseCoaches = await db.select().from(coaches)
+      .where(eq(coaches.franchiseId, franchiseId));
+
+    let totalLessons = 0;
+    let totalNetRevenue = 0;
+    let totalCoachPay = 0;
+    const coachStats = [];
+
+    for (const coach of franchiseCoaches) {
+      try {
+        const stats = await this.getCoachEarningsStats(coach.id, startDate, endDate);
+        totalLessons += stats.totalLessons;
+        totalNetRevenue += stats.totalNetRevenue;
+        totalCoachPay += stats.coachEarnings;
+        coachStats.push({
+          coachId: coach.id,
+          coachName: coach.name,
+          compensationType: stats.compensationType,
+          compensationAmount: stats.compensationAmount,
+          totalLessons: stats.totalLessons,
+          totalNetRevenue: stats.totalNetRevenue,
+          coachEarnings: stats.coachEarnings,
+        });
+      } catch (e) {
+      }
+    }
+
+    return {
+      totalLessons,
+      totalNetRevenue: Math.round(totalNetRevenue),
+      totalCoachPay: Math.round(totalCoachPay),
+      coachStats,
+    };
   }
 }
 

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getActiveFranchiseId } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -429,6 +429,18 @@ function OverviewTab() {
     },
   });
 
+  const { data: earningsStats, isLoading: earningsLoading } = useQuery<CoachEarningsStats>({
+    queryKey: ["/api/franchise-admin/coach-earnings", startDate, endDate],
+    queryFn: async () => {
+      const headers: Record<string, string> = { };
+      const fid = getActiveFranchiseId();
+      if (fid) headers["X-Franchise-Id"] = String(fid);
+      const res = await fetch(`/api/franchise-admin/coach-earnings?startDate=${startDate}&endDate=${endDate}`, { credentials: "include", headers });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
   const maxDailySeats = rangeStats?.dailyStats ? Math.max(...rangeStats.dailyStats.map((d) => d.totalSeats), 1) : 1;
 
   const todayDateLabel = todayStats?.date
@@ -716,6 +728,71 @@ function OverviewTab() {
           )}
         </>
       ) : null}
+
+      <div className="bg-white rounded-md border border-gray-100 p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Percent className="w-4 h-4 text-tiffany" />老師薪酬
+        </h3>
+        {earningsLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}
+          </div>
+        ) : earningsStats ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-gray-50 rounded-md p-4" data-testid="earnings-total-lessons">
+                <p className="text-2xl font-bold text-foreground">{earningsStats.totalLessons}</p>
+                <p className="text-xs text-muted-foreground">總課消堂數</p>
+              </div>
+              <div className="bg-gray-50 rounded-md p-4" data-testid="earnings-total-revenue">
+                <p className="text-2xl font-bold text-foreground">${earningsStats.totalNetRevenue.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">總實收金額</p>
+              </div>
+              <div className="bg-gray-50 rounded-md p-4" data-testid="earnings-total-pay">
+                <p className="text-2xl font-bold text-foreground">${earningsStats.totalCoachPay.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">總老師薪酬支出</p>
+              </div>
+            </div>
+
+            {earningsStats.coachStats.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="earnings-coach-table">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left">
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground">老師</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">薪酬方式</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">課消堂數</th>
+                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">實收金額</th>
+                      <th className="py-2 text-xs font-medium text-muted-foreground text-center">老師薪酬</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {earningsStats.coachStats.map((coach) => (
+                      <tr key={coach.coachId} className="border-b border-gray-50" data-testid={`earnings-coach-${coach.coachId}`}>
+                        <td className="py-3 pr-4 font-medium text-foreground whitespace-nowrap">{coach.coachName}</td>
+                        <td className="py-3 pr-4 text-center">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-tiffany/10 text-tiffany">
+                            {coach.compensationType === "fixed" ? `每堂 $${coach.compensationAmount}` : `${coach.compensationAmount}%`}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-center text-muted-foreground">{coach.totalLessons}</td>
+                        <td className="py-3 pr-4 text-center text-muted-foreground">${coach.totalNetRevenue.toLocaleString()}</td>
+                        <td className="py-3 text-center font-medium text-foreground">${coach.coachEarnings.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {earningsStats.coachStats.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">此時間區間尚無薪酬資料</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">無法載入薪酬資料</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -732,6 +809,21 @@ interface DateRangeStats {
   occupancyRate: number;
   dailyStats: Array<{ date: string; slots: number; bookings: number; bookedSeats: number; totalSeats: number }>;
   coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; confirmedBookings: number; cancelledBookings: number; completedBookings: number; bookedSeats: number }>;
+}
+
+interface CoachEarningsStats {
+  totalLessons: number;
+  totalNetRevenue: number;
+  totalCoachPay: number;
+  coachStats: Array<{
+    coachId: number;
+    coachName: string;
+    compensationType: string;
+    compensationAmount: number;
+    totalLessons: number;
+    totalNetRevenue: number;
+    coachEarnings: number;
+  }>;
 }
 
 function FranchiseInfoTab() {
@@ -1522,6 +1614,7 @@ function CoachesTab() {
   const [editingCoach, setEditingCoach] = useState<Coach | null>(null);
   const [formData, setFormData] = useState({
     name: "", phone: "", bio: "", specialties: [] as string[], isCertified: true, rating: 0, reviewCount: 0,
+    compensationType: "fixed" as string, compensationAmount: 200,
   });
   const [specialtyInput, setSpecialtyInput] = useState("");
   const [scheduleCoach, setScheduleCoach] = useState<Coach | null>(null);
@@ -1534,7 +1627,7 @@ function CoachesTab() {
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0 });
+    setFormData({ name: "", phone: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0, compensationType: "fixed", compensationAmount: 200 });
     setSpecialtyInput("");
     setEditingCoach(null);
   };
@@ -1550,6 +1643,7 @@ function CoachesTab() {
     setFormData({
       name: c.name, phone: c.phone || "", bio: c.bio || "", specialties: c.specialties || [],
       isCertified: c.isCertified, rating: c.rating || 0, reviewCount: c.reviewCount || 0,
+      compensationType: c.compensationType || "fixed", compensationAmount: c.compensationAmount ?? 200,
     });
     setShowDialog(true);
   };
@@ -1710,6 +1804,13 @@ function CoachesTab() {
                     <Phone className="w-3 h-3" />{coach.phone}
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1" data-testid={`coach-compensation-${coach.id}`}>
+                  <Tag className="w-3 h-3" />
+                  {coach.compensationType === "percentage"
+                    ? `按比例抽成 ${coach.compensationAmount ?? 0}%`
+                    : `每堂固定 $${coach.compensationAmount ?? 200}`
+                  }
+                </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {coach.rating != null && coach.rating > 0 && (
@@ -1787,6 +1888,40 @@ function CoachesTab() {
               <Label>認證狀態</Label>
               <Switch checked={formData.isCertified} onCheckedChange={(checked) => setFormData({ ...formData, isCertified: checked })} data-testid="switch-franchise-coach-certified" />
               <span className="text-sm text-muted-foreground">{formData.isCertified ? "已認證" : "未認證"}</span>
+            </div>
+            <div className="border-t border-gray-100 pt-4 mt-2">
+              <Label className="text-sm font-semibold mb-2 block">薪酬設定</Label>
+              <div className="space-y-3">
+                <div>
+                  <Label>薪酬類型</Label>
+                  <Select value={formData.compensationType} onValueChange={(val) => setFormData({ ...formData, compensationType: val, compensationAmount: val === "fixed" ? 200 : 40 })} data-testid="select-coach-compensation-type">
+                    <SelectTrigger data-testid="select-trigger-coach-compensation-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">每堂固定金額</SelectItem>
+                      <SelectItem value="percentage">按比例抽成</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>{formData.compensationType === "fixed" ? "每堂金額（元）" : "抽成比例（%）"}</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={formData.compensationType === "percentage" ? 100 : undefined}
+                      value={formData.compensationAmount}
+                      onChange={(e) => setFormData({ ...formData, compensationAmount: parseInt(e.target.value) || 0 })}
+                      placeholder={formData.compensationType === "fixed" ? "每堂 $___" : "____%"}
+                      data-testid="input-coach-compensation-amount"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      {formData.compensationType === "fixed" ? "元/堂" : "%"}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
