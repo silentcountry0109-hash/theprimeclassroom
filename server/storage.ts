@@ -166,6 +166,7 @@ export interface IStorage {
 
   getCoachScheduleAcrossFranchises(coachId: number): Promise<any[]>;
   getOverlappingSlots(franchiseId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]>;
+  getChildOverlappingBookings(childId: number, date: string, startTime: string, endTime: string, excludeBookingId?: number): Promise<any[]>;
   getCoachOverlappingSlots(coachId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<any[]>;
 
   getClassroomOverlappingSlots(classroomId: number, date: string, startTime: string, endTime: string, excludeSlotId?: number): Promise<TimeSlot[]>;
@@ -784,6 +785,12 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     if (franchiseBookings.length === 0) throw new Error("此學生非本分校學生，無法加排");
 
+    const overlapping = await this.getChildOverlappingBookings(childId, slot.date, slot.startTime, slot.endTime);
+    if (overlapping.length > 0) {
+      const conflict = overlapping[0];
+      throw new Error(`此學生在 ${conflict.date} ${conflict.startTime}-${conflict.endTime} 已有其他預約，時間衝突無法加排`);
+    }
+
     const [updated] = await db
       .update(timeSlots)
       .set({ bookedSeats: sql`LEAST(${timeSlots.bookedSeats} + 1, ${timeSlots.maxSeats})` })
@@ -835,6 +842,30 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getChildOverlappingBookings(childId: number, date: string, startTime: string, endTime: string, excludeBookingId?: number): Promise<any[]> {
+    const conditions = [
+      eq(bookings.childId, childId),
+      eq(timeSlots.date, date),
+      inArray(bookings.status, ["confirmed", "checked_in"]),
+      sql`${timeSlots.startTime} < ${endTime}`,
+      sql`${timeSlots.endTime} > ${startTime}`,
+    ];
+    if (excludeBookingId) {
+      conditions.push(sql`${bookings.id} != ${excludeBookingId}`);
+    }
+    return db
+      .select({
+        bookingId: bookings.id,
+        slotId: bookings.slotId,
+        date: timeSlots.date,
+        startTime: timeSlots.startTime,
+        endTime: timeSlots.endTime,
+      })
+      .from(bookings)
+      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+      .where(and(...conditions));
+  }
+
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const [slot] = await db
       .select()
@@ -856,13 +887,41 @@ export class DatabaseStorage implements IStorage {
       );
     if (existing.length > 0) throw new Error("此孩子已預約過此時段，無法重複預約");
 
-    await db
-      .update(timeSlots)
-      .set({ bookedSeats: slot.bookedSeats + 1 })
-      .where(eq(timeSlots.id, booking.slotId));
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${booking.childId})`);
 
-    const [created] = await db.insert(bookings).values(booking).returning();
-    return created;
+      const overlapping = await tx
+        .select({
+          bookingId: bookings.id,
+          slotId: bookings.slotId,
+          date: timeSlots.date,
+          startTime: timeSlots.startTime,
+          endTime: timeSlots.endTime,
+        })
+        .from(bookings)
+        .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+        .where(and(
+          eq(bookings.childId, booking.childId),
+          eq(timeSlots.date, slot.date),
+          inArray(bookings.status, ["confirmed", "checked_in"]),
+          sql`${timeSlots.startTime} < ${slot.endTime}`,
+          sql`${timeSlots.endTime} > ${slot.startTime}`,
+        ));
+      if (overlapping.length > 0) {
+        const conflict = overlapping[0];
+        throw new Error(`此孩子在 ${conflict.date} ${conflict.startTime}-${conflict.endTime} 已有其他預約，時間衝突無法預約`);
+      }
+
+      const [updated] = await tx
+        .update(timeSlots)
+        .set({ bookedSeats: sql`${timeSlots.bookedSeats} + 1` })
+        .where(and(eq(timeSlots.id, booking.slotId), sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`))
+        .returning();
+      if (!updated) throw new Error("此時段已額滿");
+
+      const [created] = await tx.insert(bookings).values(booking).returning();
+      return created;
+    });
   }
 
   async hasExistingBooking(slotId: number, childId: number): Promise<boolean> {
