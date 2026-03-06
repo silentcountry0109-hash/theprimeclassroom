@@ -36,6 +36,7 @@ The design is Japanese minimalist, featuring a grid paper background.
 - **Deactivated Coach Login Block**: When a coach's `isActive` is set to `false` in the `coaches` table, they cannot log in. The `POST /api/credential-login` endpoint checks `coaches.isActive` after password verification and returns 403 with "此帳號已被停用，請聯繫管理員".
 
 - **Simulation Data**: `server/simulate-data.ts` generates realistic monthly operational data for 大安分校 (franchise 9). Creates simulated parents (`sim-parent-*`), children, time slots, completed bookings, and credit transactions for February 2026. Idempotent — safe to re-run (cleans up previous simulation data first). Uses `payment_method='simulation'` and `sim-parent-*` prefix for isolation. Run with `npx tsx server/simulate-data.ts`.
+- **Textbook/Curriculum Management System**: HQ admin can manage textbook units (教材) organized by grade (1-6). Each unit has a code (e.g., A_01), name, and associated quizzes (考卷). 127 units seeded across 6 grades with 2 default quizzes each (小考A, 小考B, totalScore: 100). Tables: `textbooks`, `textbook_quizzes`. API: `GET /api/textbooks?grade=N`, `POST/PATCH/DELETE /api/admin/textbooks`, `POST/PATCH/DELETE /api/admin/quizzes`. Coach contact book has a searchable textbook unit selector (grouped by student grade) with quiz auto-fill. Student learning history is shown in franchise admin (progress bar + quiz scores) and parent dashboard (summary stats).
 
 ## External Dependencies
 - **Replit Auth**: OpenID Connect for user authentication.

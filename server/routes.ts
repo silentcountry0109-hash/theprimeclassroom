@@ -6,7 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
-import { coaches, creditPurchases } from "@shared/schema";
+import { coaches, creditPurchases, insertTextbookSchema, insertTextbookQuizSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -2292,6 +2292,89 @@ export async function registerRoutes(
       res.json({ totalRevenue, totalCredits, totalPurchases, packageStats: Array.from(packageStats.values()), couponStats });
     } catch (error) {
       res.status(500).json({ message: "取得銷售報表失敗" });
+    }
+  });
+
+  // ========== Textbook / Curriculum Management ==========
+  app.get("/api/textbooks", async (req: any, res) => {
+    try {
+      const grade = req.query.grade ? parseInt(req.query.grade) : null;
+      if (grade) {
+        const items = await storage.getTextbooksByGrade(grade);
+        const quizzesMap: Record<number, any[]> = {};
+        for (const t of items) {
+          quizzesMap[t.id] = await storage.getQuizzesByTextbook(t.id);
+        }
+        return res.json(items.map(t => ({ ...t, quizzes: quizzesMap[t.id] || [] })));
+      }
+      const items = await storage.getTextbooksWithQuizzes();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ message: "取得教材失敗" });
+    }
+  });
+
+  app.post("/api/admin/textbooks", isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertTextbookSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "資料格式錯誤", errors: parsed.error.flatten() });
+      const created = await storage.createTextbook(parsed.data);
+      res.json(created);
+    } catch (error) {
+      res.status(500).json({ message: "新增教材失敗" });
+    }
+  });
+
+  app.patch("/api/admin/textbooks/:id", isAdmin, async (req: any, res) => {
+    try {
+      const partial = insertTextbookSchema.partial().safeParse(req.body);
+      if (!partial.success) return res.status(400).json({ message: "資料格式錯誤", errors: partial.error.flatten() });
+      const updated = await storage.updateTextbook(parseInt(req.params.id), partial.data);
+      if (!updated) return res.status(404).json({ message: "教材不存在" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "更新教材失敗" });
+    }
+  });
+
+  app.delete("/api/admin/textbooks/:id", isAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteTextbook(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "刪除教材失敗" });
+    }
+  });
+
+  app.post("/api/admin/textbooks/:id/quizzes", isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertTextbookQuizSchema.safeParse({ ...req.body, textbookId: parseInt(req.params.id) });
+      if (!parsed.success) return res.status(400).json({ message: "資料格式錯誤", errors: parsed.error.flatten() });
+      const created = await storage.createQuiz(parsed.data);
+      res.json(created);
+    } catch (error) {
+      res.status(500).json({ message: "新增考卷失敗" });
+    }
+  });
+
+  app.patch("/api/admin/quizzes/:id", isAdmin, async (req: any, res) => {
+    try {
+      const partial = insertTextbookQuizSchema.partial().safeParse(req.body);
+      if (!partial.success) return res.status(400).json({ message: "資料格式錯誤", errors: partial.error.flatten() });
+      const updated = await storage.updateQuiz(parseInt(req.params.id), partial.data);
+      if (!updated) return res.status(404).json({ message: "考卷不存在" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "更新考卷失敗" });
+    }
+  });
+
+  app.delete("/api/admin/quizzes/:id", isAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteQuiz(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "刪除考卷失敗" });
     }
   });
 

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { franchises, coaches, faqs, successStories, timeSlots, creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions } from "@shared/schema";
+import { franchises, coaches, faqs, successStories, timeSlots, creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions, textbooks, textbookQuizzes } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { sql, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -13,6 +13,7 @@ export async function seedDatabase() {
     if (Number(existing.count) > 0) {
       await seedAccounts();
       await seedCreditData();
+      await seedTextbooks();
       return;
     }
 
@@ -430,6 +431,7 @@ export async function seedDatabase() {
 
     await seedAccounts();
     await seedCreditData();
+    await seedTextbooks();
 
     console.log("Database seeded successfully!");
   } catch (error) {
@@ -581,4 +583,198 @@ async function seedCreditData() {
   }
 
   console.log("Credit system seed data created successfully!");
+}
+
+async function seedTextbooks() {
+  const [existingTb] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(textbooks);
+
+  if (Number(existingTb.count) > 0) {
+    return;
+  }
+
+  console.log("Seeding textbooks and quizzes...");
+
+  const curriculum: { grade: number; units: { code: string; name: string }[] }[] = [
+    {
+      grade: 1,
+      units: [
+        { code: "A_01", name: "10以內的數" },
+        { code: "A_02", name: "比長短" },
+        { code: "A_03", name: "分與合" },
+        { code: "A_04", name: "找規律-奧數延伸單元" },
+        { code: "A_05", name: "10以內的加減與應用" },
+        { code: "A_06", name: "順序與多少" },
+        { code: "A_07", name: "數到30" },
+        { code: "A_08", name: "認識形狀" },
+        { code: "A_09", name: "時間" },
+        { code: "A_10", name: "數到100" },
+        { code: "A_11", name: "20以內的加減" },
+        { code: "A_12", name: "長度" },
+        { code: "A_13", name: "數積木-奧數延伸單元" },
+        { code: "A_14", name: "立體形體" },
+        { code: "A_15", name: "幾月幾日星期幾" },
+        { code: "A_16", name: "二位數的加減法" },
+        { code: "A_17", name: "做紀錄" },
+        { code: "A_18", name: "數線段-奧數延伸單元" },
+        { code: "A_19", name: "認識錢幣" },
+      ],
+    },
+    {
+      grade: 2,
+      units: [
+        { code: "B_01", name: "300以內的數" },
+        { code: "B_02", name: "二位數的加減" },
+        { code: "B_03", name: "長度的測量" },
+        { code: "B_04", name: "數圖形-奧數延伸單元" },
+        { code: "B_05", name: "容量" },
+        { code: "B_06", name: "乘法(一)" },
+        { code: "B_07", name: "乘法(二)" },
+        { code: "B_08", name: "幾時幾分" },
+        { code: "B_09", name: "重量" },
+        { code: "B_10", name: "應用問題-奧數延伸單元" },
+        { code: "B_11", name: "面積的比較" },
+        { code: "B_12", name: "兩步驟的加減" },
+        { code: "B_13", name: "數到1000" },
+        { code: "B_14", name: "公尺和公分" },
+        { code: "B_15", name: "三位數的加減" },
+        { code: "B_16", name: "加減法的應用" },
+        { code: "B_17", name: "巧填算式-奧數延伸單元" },
+        { code: "B_18", name: "乘法" },
+        { code: "B_19", name: "年月日" },
+        { code: "B_20", name: "分分看" },
+        { code: "B_21", name: "填數字、找規律-奧數延伸單元" },
+        { code: "B_22", name: "立體和平面圖形" },
+        { code: "B_23", name: "認識分數" },
+        { code: "B_24", name: "乘與加減兩步驟的應用" },
+      ],
+    },
+    {
+      grade: 3,
+      units: [
+        { code: "C_01", name: "一萬以內的數" },
+        { code: "C_02", name: "初階乘法" },
+        { code: "C_03", name: "周界與周長" },
+        { code: "C_04", name: "重量" },
+        { code: "C_05", name: "認識除法" },
+        { code: "C_07", name: "角與圓" },
+        { code: "C_08", name: "認識分數" },
+        { code: "C_09", name: "周長與面積" },
+        { code: "C_11", name: "乘法" },
+        { code: "C_12", name: "除法" },
+        { code: "C_13", name: "兩步驟的加減" },
+        { code: "C_14", name: "兩步驟的乘除" },
+        { code: "C_15", name: "長度" },
+        { code: "C_16", name: "分數的加減" },
+        { code: "C_17", name: "時間和日期" },
+        { code: "C_18", name: "長條圖與統計圖表" },
+        { code: "C_19", name: "小數" },
+        { code: "C_20", name: "公升與毫升" },
+        { code: "C_21", name: "規律問題" },
+        { code: "C_22", name: "數線" },
+      ],
+    },
+    {
+      grade: 4,
+      units: [
+        { code: "D_01", name: "一億以內的數" },
+        { code: "D_02", name: "角度" },
+        { code: "D_03", name: "數量關係" },
+        { code: "D_04", name: "整數的除法" },
+        { code: "D_05", name: "整數四則" },
+        { code: "D_06", name: "公里" },
+        { code: "D_07", name: "體積" },
+        { code: "D_08", name: "分數" },
+        { code: "D_09", name: "小數" },
+        { code: "D_10", name: "三角形" },
+        { code: "D_11", name: "一億以上的數" },
+        { code: "D_12", name: "整數的乘法" },
+        { code: "D_13", name: "小數的乘法" },
+        { code: "D_14", name: "周長與面積(一)" },
+        { code: "D_15", name: "周長與面積(二)" },
+        { code: "D_17", name: "同分母分數加減與整數倍" },
+        { code: "D_18", name: "時間的計算" },
+        { code: "D_19", name: "重量與容量的乘除" },
+        { code: "D_20", name: "四邊形" },
+        { code: "D_21", name: "概數" },
+        { code: "D_22", name: "統計圖表" },
+      ],
+    },
+    {
+      grade: 5,
+      units: [
+        { code: "E_01", name: "整數的簡化計算" },
+        { code: "E_02", name: "因數和倍數" },
+        { code: "E_03", name: "平面圖形" },
+        { code: "E_04", name: "擴分、約分和通分" },
+        { code: "E_05", name: "方體與球體" },
+        { code: "E_06", name: "異分母分數加減" },
+        { code: "E_07", name: "面積" },
+        { code: "E_08", name: "時間" },
+        { code: "E_09", name: "體積、容積與容量" },
+        { code: "E_11", name: "分數的乘法" },
+        { code: "E_12", name: "大數的乘除" },
+        { code: "E_13", name: "體積" },
+        { code: "E_14", name: "表面積" },
+        { code: "E_15", name: "比率與百分率" },
+        { code: "E_16", name: "怎樣列式" },
+        { code: "E_17", name: "生活中使用的大單位" },
+        { code: "E_19", name: "線對稱圖形" },
+        { code: "E_20", name: "小數的乘除" },
+        { code: "E_21", name: "分數的除法(一)" },
+        { code: "E_22", name: "柱體錐體" },
+        { code: "E_23", name: "多位小數的加減" },
+      ],
+    },
+    {
+      grade: 6,
+      units: [
+        { code: "F_01", name: "公因數" },
+        { code: "F_02", name: "公倍數" },
+        { code: "F_03", name: "分數的除法(二)" },
+        { code: "F_05", name: "小數除法" },
+        { code: "F_06", name: "比和比值" },
+        { code: "F_07", name: "縮圖與比例尺" },
+        { code: "F_08", name: "圓周長與扇形" },
+        { code: "F_09", name: "圓面積與扇形" },
+        { code: "F_10", name: "速率" },
+        { code: "F_11", name: "等量公理" },
+        { code: "F_12", name: "四則混合計算" },
+        { code: "F_13", name: "柱體的體積" },
+        { code: "F_14", name: "怎樣解題(一)" },
+        { code: "F_15", name: "基準量與比較量(一)" },
+        { code: "F_16", name: "基準量與比較量(二)" },
+        { code: "F_17", name: "怎樣解題(二)" },
+        { code: "F_18", name: "柱體的表面積" },
+        { code: "F_20", name: "平均數中位數眾數" },
+        { code: "F_21", name: "統計圖表與圓形圖" },
+        { code: "F_22", name: "數量關係" },
+        { code: "F_23", name: "怎樣解題(一)" },
+        { code: "F_24", name: "怎樣解題(二)" },
+      ],
+    },
+  ];
+
+  for (const gradeData of curriculum) {
+    for (let i = 0; i < gradeData.units.length; i++) {
+      const unit = gradeData.units[i];
+      const [inserted] = await db.insert(textbooks).values({
+        grade: gradeData.grade,
+        subject: "數學",
+        unitCode: unit.code,
+        unitName: unit.name,
+        sortOrder: i + 1,
+        isActive: true,
+      }).returning();
+
+      await db.insert(textbookQuizzes).values([
+        { textbookId: inserted.id, quizName: `${unit.code} 小考A`, totalScore: 100, sortOrder: 1, isActive: true },
+        { textbookId: inserted.id, quizName: `${unit.code} 小考B`, totalScore: 100, sortOrder: 2, isActive: true },
+      ]);
+    }
+  }
+
+  const totalUnits = curriculum.reduce((sum, g) => sum + g.units.length, 0);
+  console.log(`Seeded ${totalUnits} textbook units with ${totalUnits * 2} quizzes`);
 }

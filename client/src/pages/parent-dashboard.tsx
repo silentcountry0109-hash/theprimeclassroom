@@ -3245,6 +3245,10 @@ function ContactBookTab() {
     queryKey: ["/api/parent/contact-books"],
   });
 
+  const { data: textbooksData = [] } = useQuery<any[]>({
+    queryKey: ["/api/textbooks"],
+  });
+
   const contactBooks = useMemo(() => {
     if (selectedChildId === "all") return contactBooksRaw;
     return contactBooksRaw.filter((cb) => cb.childId === parseInt(selectedChildId));
@@ -3253,6 +3257,48 @@ function ContactBookTab() {
   const toggleExpand = (id: number) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
+
+  const textbookMap = useMemo(() => new Map(textbooksData.map((t: any) => [t.unitCode, t])), [textbooksData]);
+  const textbookByName = useMemo(() => new Map(textbooksData.map((t: any) => [`${t.unitCode} ${t.unitName}`, t])), [textbooksData]);
+
+  const matchTextbook = useCallback((lessonUnit: string) => {
+    if (textbookMap.has(lessonUnit)) return textbookMap.get(lessonUnit);
+    if (textbookByName.has(lessonUnit)) return textbookByName.get(lessonUnit);
+    const entries = Array.from(textbookMap.values());
+    for (let i = 0; i < entries.length; i++) {
+      const t = entries[i];
+      if (lessonUnit.includes(t.unitCode) || lessonUnit.includes(t.unitName)) return t;
+    }
+    return null;
+  }, [textbookMap, textbookByName]);
+
+  const gradeLabels = ["一", "二", "三", "四", "五", "六"];
+
+  const learningSummaries = useMemo(() => {
+    const targetChildren = selectedChildId === "all"
+      ? childrenList
+      : childrenList.filter(c => c.id === parseInt(selectedChildId));
+
+    return targetChildren.map(child => {
+      const childBooks = contactBooksRaw.filter(cb => cb.childId === child.id);
+      const gradeTextbooks = textbooksData.filter((t: any) => t.grade === child.grade);
+      const completedUnits = new Set<string>();
+      childBooks.forEach(cb => {
+        const matched = matchTextbook(cb.lessonUnit);
+        if (matched && matched.grade === child.grade) {
+          completedUnits.add(matched.unitCode);
+        }
+      });
+      const totalUnits = gradeTextbooks.length;
+      const completed = completedUnits.size;
+      const pct = totalUnits > 0 ? Math.round((completed / totalUnits) * 100) : 0;
+      const quizzes = childBooks.filter(cb => cb.quizScore != null);
+      const avgScore = quizzes.length > 0
+        ? Math.round(quizzes.reduce((sum, cb) => sum + (cb.quizScore! / (cb.quizTotal || 100)) * 100, 0) / quizzes.length)
+        : null;
+      return { child, completed, totalUnits, pct, quizCount: quizzes.length, avgScore, totalLessons: childBooks.length };
+    });
+  }, [childrenList, contactBooksRaw, textbooksData, selectedChildId, matchTextbook]);
 
   if (isLoading) {
     return (
@@ -3287,6 +3333,53 @@ function ContactBookTab() {
           </Select>
         )}
       </div>
+
+      {learningSummaries.length > 0 && learningSummaries.some(s => s.totalLessons > 0) && (
+        <div className="space-y-3" data-testid="learning-summary-section">
+          {learningSummaries.filter(s => s.totalLessons > 0).map(({ child, completed, totalUnits, pct, quizCount, avgScore, totalLessons }) => (
+            <div key={child.id} className="bg-white rounded-xl border border-gray-100 p-4" data-testid={`learning-summary-${child.id}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-tiffany" />
+                <span className="text-sm font-semibold text-foreground">{child.name} 的學習歷程</span>
+                <span className="text-[10px] bg-tiffany/10 text-tiffany px-1.5 py-0.5 rounded-full">
+                  {gradeLabels[child.grade - 1] || child.grade}年級
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-foreground" data-testid={`text-total-lessons-${child.id}`}>{totalLessons}</p>
+                  <p className="text-[10px] text-muted-foreground">上課次數</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-foreground" data-testid={`text-quiz-count-${child.id}`}>{quizCount}</p>
+                  <p className="text-[10px] text-muted-foreground">考試次數</p>
+                </div>
+                <div className="text-center">
+                  <p className={`text-lg font-bold ${avgScore !== null ? (avgScore >= 80 ? "text-tiffany" : avgScore >= 60 ? "text-amber-500" : "text-red-500") : "text-muted-foreground"}`} data-testid={`text-avg-score-${child.id}`}>
+                    {avgScore !== null ? `${avgScore}%` : "--"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">平均成績</p>
+                </div>
+              </div>
+              {totalUnits > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-muted-foreground">教材進度</span>
+                    <span className="text-[10px] text-tiffany font-medium" data-testid={`text-parent-progress-${child.id}`}>{completed}/{totalUnits} 單元 ({pct}%)</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${pct}%`, backgroundColor: "#81D8D0" }}
+                      data-testid={`parent-progress-bar-${child.id}`}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {contactBooks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center" data-testid="contact-book-empty">

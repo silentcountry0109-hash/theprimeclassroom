@@ -378,3 +378,32 @@ export const creditTransactions = pgTable("credit_transactions", {
 export const insertCreditTransactionSchema = createInsertSchema(creditTransactions).omit({ id: true, createdAt: true });
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
 export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
+
+export const textbooks = pgTable("textbooks", {
+  id: serial("id").primaryKey(),
+  grade: integer("grade").notNull(),
+  subject: text("subject").default("數學").notNull(),
+  unitCode: text("unit_code").notNull(),
+  unitName: text("unit_name").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTextbookSchema = createInsertSchema(textbooks).omit({ id: true, createdAt: true });
+export type Textbook = typeof textbooks.$inferSelect;
+export type InsertTextbook = z.infer<typeof insertTextbookSchema>;
+
+export const textbookQuizzes = pgTable("textbook_quizzes", {
+  id: serial("id").primaryKey(),
+  textbookId: integer("textbook_id").references(() => textbooks.id).notNull(),
+  quizName: text("quiz_name").notNull(),
+  totalScore: integer("total_score").default(100).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTextbookQuizSchema = createInsertSchema(textbookQuizzes).omit({ id: true, createdAt: true });
+export type TextbookQuiz = typeof textbookQuizzes.$inferSelect;
+export type InsertTextbookQuiz = z.infer<typeof insertTextbookQuizSchema>;

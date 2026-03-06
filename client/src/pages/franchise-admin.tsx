@@ -3116,7 +3116,7 @@ function StudentsTab() {
 }
 
 function StudentDetailPanel({ childId }: { childId: number }) {
-  const [activeDetailTab, setActiveDetailTab] = useState<"bookings" | "contactbooks">("bookings");
+  const [activeDetailTab, setActiveDetailTab] = useState<"bookings" | "contactbooks" | "learning">("bookings");
 
   const { data: studentBookings = [], isLoading: bookingsLoading } = useQuery<any[]>({
     queryKey: ["/api/franchise-admin/students", childId, "bookings"],
@@ -3136,12 +3136,57 @@ function StudentDetailPanel({ childId }: { childId: number }) {
     },
   });
 
+  const { data: students = [] } = useQuery<any[]>({
+    queryKey: ["/api/franchise-admin/students"],
+  });
+
+  const student = students.find((s: any) => s.id === childId);
+  const studentGrade = student?.grade || 0;
+
+  const { data: textbooksData = [] } = useQuery<any[]>({
+    queryKey: ["/api/textbooks"],
+    enabled: activeDetailTab === "learning",
+  });
+
+  const gradeTextbooks = textbooksData.filter((t: any) => t.grade === studentGrade);
+  const textbookMap = new Map(textbooksData.map((t: any) => [t.unitCode, t]));
+  const textbookByName = new Map(textbooksData.map((t: any) => [`${t.unitCode} ${t.unitName}`, t]));
+
+  const matchTextbook = (lessonUnit: string) => {
+    if (textbookMap.has(lessonUnit)) return textbookMap.get(lessonUnit);
+    if (textbookByName.has(lessonUnit)) return textbookByName.get(lessonUnit);
+    const entries = Array.from(textbookMap.values());
+    for (let i = 0; i < entries.length; i++) {
+      const t = entries[i];
+      if (lessonUnit.includes(t.unitCode) || lessonUnit.includes(t.unitName)) return t;
+    }
+    return null;
+  };
+
+  const completedUnits = new Set<string>();
+  contactBooksList.forEach((cb: any) => {
+    const matched = matchTextbook(cb.lessonUnit);
+    if (matched && matched.grade === studentGrade) {
+      completedUnits.add(matched.unitCode);
+    }
+  });
+
+  const totalGradeUnits = gradeTextbooks.length;
+  const completedCount = completedUnits.size;
+  const progressPct = totalGradeUnits > 0 ? Math.round((completedCount / totalGradeUnits) * 100) : 0;
+
+  const quizRecords = contactBooksList
+    .filter((cb: any) => cb.quizScore != null)
+    .sort((a: any, b: any) => b.lessonDate.localeCompare(a.lessonDate));
+
   const statusMap: Record<string, { label: string; color: string }> = {
     confirmed: { label: "已確認", color: "bg-tiffany/10 text-tiffany" },
     checked_in: { label: "上課中", color: "bg-amber-100 text-amber-700" },
     completed: { label: "已完成", color: "bg-green-50 text-green-600" },
     cancelled: { label: "已取消", color: "bg-gray-100 text-gray-500" },
   };
+
+  const gradeLabels = ["一", "二", "三", "四", "五", "六"];
 
   return (
     <div className="border-t border-gray-100 bg-gray-50/50 px-4 pb-4" data-testid={`panel-student-detail-${childId}`}>
@@ -3163,6 +3208,15 @@ function StudentDetailPanel({ childId }: { childId: number }) {
           data-testid={`tab-student-contactbooks-${childId}`}
         >
           <BookOpen className="w-3.5 h-3.5" />聯絡簿
+        </button>
+        <button
+          onClick={() => setActiveDetailTab("learning")}
+          className={`text-xs px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 ${
+            activeDetailTab === "learning" ? "bg-tiffany/10 text-tiffany font-medium" : "text-muted-foreground hover:bg-gray-100"
+          }`}
+          data-testid={`tab-student-learning-${childId}`}
+        >
+          <TrendingUp className="w-3.5 h-3.5" />學習歷程
         </button>
       </div>
 
@@ -3221,6 +3275,123 @@ function StudentDetailPanel({ childId }: { childId: number }) {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {activeDetailTab === "learning" && (
+        <div className="pt-3 space-y-4" data-testid={`panel-learning-history-${childId}`}>
+          {contactBooksLoading ? (
+            <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded" />)}</div>
+          ) : (
+            <>
+              {studentGrade > 0 && totalGradeUnits > 0 && (
+                <div className="bg-white rounded-md p-4 border border-gray-100" data-testid={`progress-card-${childId}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-foreground">
+                      {gradeLabels[studentGrade - 1] || studentGrade}年級教材進度
+                    </span>
+                    <span className="text-xs text-tiffany font-semibold" data-testid={`text-progress-ratio-${childId}`}>
+                      {completedCount} / {totalGradeUnits} 單元
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${progressPct}%`, backgroundColor: "#81D8D0" }}
+                      data-testid={`progress-bar-${childId}`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5" data-testid={`text-progress-pct-${childId}`}>
+                    完成 {progressPct}%
+                  </p>
+                </div>
+              )}
+
+              {quizRecords.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
+                    <Star className="w-3.5 h-3.5 text-tiffany" />
+                    考卷成績
+                  </h4>
+                  <div className="space-y-1.5">
+                    {quizRecords.map((cb: any) => {
+                      const matched = matchTextbook(cb.lessonUnit);
+                      const scorePct = cb.quizTotal ? Math.round((cb.quizScore / cb.quizTotal) * 100) : 0;
+                      return (
+                        <div key={cb.id} className="flex items-center justify-between bg-white rounded px-3 py-2 text-xs" data-testid={`quiz-record-${cb.id}`}>
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="font-medium text-foreground shrink-0">{cb.lessonDate}</span>
+                            {matched && (
+                              <span className="text-[10px] bg-tiffany/10 text-tiffany px-1.5 py-0.5 rounded-full shrink-0">
+                                {gradeLabels[matched.grade - 1] || matched.grade}年級
+                              </span>
+                            )}
+                            <span className="text-muted-foreground truncate">{cb.lessonUnit}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${scorePct}%`,
+                                  backgroundColor: scorePct >= 80 ? "#81D8D0" : scorePct >= 60 ? "#f59e0b" : "#ef4444",
+                                }}
+                              />
+                            </div>
+                            <span className={`font-semibold ${scorePct >= 80 ? "text-tiffany" : scorePct >= 60 ? "text-amber-500" : "text-red-500"}`}>
+                              {cb.quizScore}/{cb.quizTotal || 100}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h4 className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-tiffany" />
+                  學習紀錄
+                </h4>
+                {contactBooksList.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">暫無學習紀錄</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {[...contactBooksList].sort((a: any, b: any) => b.lessonDate.localeCompare(a.lessonDate)).map((cb: any) => {
+                      const matched = matchTextbook(cb.lessonUnit);
+                      return (
+                        <div key={cb.id} className="bg-white rounded px-3 py-2.5 text-xs" data-testid={`learning-record-${cb.id}`}>
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium text-foreground">{cb.lessonDate}</span>
+                            {matched && (
+                              <span className="text-[10px] bg-tiffany/10 text-tiffany px-1.5 py-0.5 rounded-full">
+                                {gradeLabels[matched.grade - 1] || matched.grade}年級
+                              </span>
+                            )}
+                            {cb.coachName && <span className="text-muted-foreground">{cb.coachName} 老師</span>}
+                            {cb.quizScore != null && (
+                              <span className="text-tiffany font-medium ml-auto">
+                                {cb.quizScore}/{cb.quizTotal || 100}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-muted-foreground">
+                            <span className="text-foreground font-medium">單元：</span>{cb.lessonUnit}
+                          </p>
+                          {cb.lessonProgress && (
+                            <p className="text-muted-foreground">
+                              <span className="text-foreground font-medium">進度：</span>{cb.lessonProgress}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       )}

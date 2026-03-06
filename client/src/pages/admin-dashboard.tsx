@@ -76,7 +76,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
+import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode, Textbook, TextbookQuiz } from "@shared/schema";
+import { BookOpen, Search as SearchIcon } from "lucide-react";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS } from "@shared/constants";
 
@@ -116,6 +117,7 @@ export default function AdminDashboard() {
     { id: "users", label: "帳號管理", icon: UserCog },
     { id: "announcements", label: "公告管理", icon: Megaphone },
     { id: "shop", label: "商城管理", icon: ShoppingBag },
+    { id: "textbooks", label: "教材管理", icon: BookOpen },
     { id: "credits", label: "點數管理", icon: Coins },
     { id: "site-editor", label: "官網編輯", icon: Globe },
   ];
@@ -186,6 +188,7 @@ export default function AdminDashboard() {
             {activeTab === "users" && <UsersTab />}
             {activeTab === "announcements" && <AnnouncementsTab />}
             {activeTab === "shop" && <ShopManagementTab />}
+            {activeTab === "textbooks" && <TextbooksTab />}
             {activeTab === "credits" && <CreditsManagementTab />}
             {activeTab === "site-editor" && <SiteEditorTab />}
           </main>
@@ -3203,6 +3206,645 @@ function SiteEditorTab() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+interface TextbookWithQuizzes extends Textbook {
+  quizzes: TextbookQuiz[];
+}
+
+const GRADE_LABELS: Record<number, string> = {
+  1: "一年級",
+  2: "二年級",
+  3: "三年級",
+  4: "四年級",
+  5: "五年級",
+  6: "六年級",
+};
+
+function TextbooksTab() {
+  const { toast } = useToast();
+  const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [searchText, setSearchText] = useState("");
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingTextbook, setEditingTextbook] = useState<TextbookWithQuizzes | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showQuizDialog, setShowQuizDialog] = useState(false);
+  const [editingQuiz, setEditingQuiz] = useState<TextbookQuiz | null>(null);
+  const [quizTextbookId, setQuizTextbookId] = useState<number | null>(null);
+
+  const [addGrade, setAddGrade] = useState("1");
+  const [addUnitCode, setAddUnitCode] = useState("");
+  const [addUnitName, setAddUnitName] = useState("");
+  const [addSortOrder, setAddSortOrder] = useState("0");
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchText, setBatchText] = useState("");
+
+  const [editGrade, setEditGrade] = useState("1");
+  const [editUnitCode, setEditUnitCode] = useState("");
+  const [editUnitName, setEditUnitName] = useState("");
+  const [editSortOrder, setEditSortOrder] = useState("0");
+
+  const [quizName, setQuizName] = useState("");
+  const [quizTotalScore, setQuizTotalScore] = useState("100");
+  const [quizSortOrder, setQuizSortOrder] = useState("0");
+
+  const { data: textbooks = [], isLoading } = useQuery<TextbookWithQuizzes[]>({
+    queryKey: ["/api/textbooks"],
+  });
+
+  const filtered = textbooks.filter((t) => {
+    if (gradeFilter !== "all" && t.grade !== parseInt(gradeFilter)) return false;
+    if (searchText) {
+      const q = searchText.toLowerCase();
+      return t.unitCode.toLowerCase().includes(q) || t.unitName.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const createTextbookMutation = useMutation({
+    mutationFn: async (data: { grade: number; unitCode: string; unitName: string; sortOrder: number }) => {
+      const res = await apiRequest("POST", "/api/admin/textbooks", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "教材已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
+      if (!batchMode) {
+        setShowAddDialog(false);
+        setAddUnitCode("");
+        setAddUnitName("");
+        setAddSortOrder("0");
+      }
+    },
+    onError: () => {
+      toast({ title: "新增失敗", variant: "destructive" });
+    },
+  });
+
+  const batchCreateMutation = useMutation({
+    mutationFn: async (items: { grade: number; unitCode: string; unitName: string; sortOrder: number }[]) => {
+      const results = [];
+      for (const item of items) {
+        const res = await apiRequest("POST", "/api/admin/textbooks", item);
+        results.push(await res.json());
+      }
+      return results;
+    },
+    onSuccess: (data) => {
+      toast({ title: `已批次新增 ${data.length} 個教材` });
+      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
+      setShowAddDialog(false);
+      setBatchText("");
+    },
+    onError: () => {
+      toast({ title: "批次新增失敗", variant: "destructive" });
+    },
+  });
+
+  const updateTextbookMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { grade?: number; unitCode?: string; unitName?: string; sortOrder?: number } }) => {
+      const res = await apiRequest("PATCH", `/api/admin/textbooks/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "教材已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
+      setShowEditDialog(false);
+      setEditingTextbook(null);
+    },
+  });
+
+  const deleteTextbookMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/textbooks/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "教材已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
+    },
+  });
+
+  const createQuizMutation = useMutation({
+    mutationFn: async ({ textbookId, data }: { textbookId: number; data: { quizName: string; totalScore: number; sortOrder: number } }) => {
+      const res = await apiRequest("POST", `/api/admin/textbooks/${textbookId}/quizzes`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: editingQuiz ? "考卷已更新" : "考卷已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
+      setShowQuizDialog(false);
+      setEditingQuiz(null);
+      setQuizTextbookId(null);
+    },
+  });
+
+  const updateQuizMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { quizName?: string; totalScore?: number; sortOrder?: number } }) => {
+      const res = await apiRequest("PATCH", `/api/admin/quizzes/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "考卷已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
+      setShowQuizDialog(false);
+      setEditingQuiz(null);
+    },
+  });
+
+  const deleteQuizMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/quizzes/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "考卷已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
+    },
+  });
+
+  const openAddDialog = () => {
+    setAddGrade("1");
+    setAddUnitCode("");
+    setAddUnitName("");
+    setAddSortOrder("0");
+    setBatchMode(false);
+    setBatchText("");
+    setShowAddDialog(true);
+  };
+
+  const openEditDialog = (tb: TextbookWithQuizzes) => {
+    setEditingTextbook(tb);
+    setEditGrade(tb.grade.toString());
+    setEditUnitCode(tb.unitCode);
+    setEditUnitName(tb.unitName);
+    setEditSortOrder(tb.sortOrder.toString());
+    setShowEditDialog(true);
+  };
+
+  const openAddQuizDialog = (textbookId: number) => {
+    setEditingQuiz(null);
+    setQuizTextbookId(textbookId);
+    setQuizName("");
+    setQuizTotalScore("100");
+    setQuizSortOrder("0");
+    setShowQuizDialog(true);
+  };
+
+  const openEditQuizDialog = (quiz: TextbookQuiz) => {
+    setEditingQuiz(quiz);
+    setQuizTextbookId(quiz.textbookId);
+    setQuizName(quiz.quizName);
+    setQuizTotalScore(quiz.totalScore.toString());
+    setQuizSortOrder(quiz.sortOrder.toString());
+    setShowQuizDialog(true);
+  };
+
+  const handleAddSubmit = () => {
+    if (batchMode) {
+      const lines = batchText.split("\n").filter((l) => l.trim());
+      const items = lines.map((line, idx) => {
+        const parts = line.split(/[,\t]/).map((s) => s.trim());
+        return {
+          grade: parseInt(addGrade),
+          unitCode: parts[0] || "",
+          unitName: parts[1] || parts[0] || "",
+          sortOrder: idx + 1,
+        };
+      }).filter((item) => item.unitCode);
+      if (items.length === 0) {
+        toast({ title: "請輸入教材資料", variant: "destructive" });
+        return;
+      }
+      batchCreateMutation.mutate(items);
+    } else {
+      if (!addUnitCode || !addUnitName) {
+        toast({ title: "請填寫編號和名稱", variant: "destructive" });
+        return;
+      }
+      createTextbookMutation.mutate({
+        grade: parseInt(addGrade),
+        unitCode: addUnitCode,
+        unitName: addUnitName,
+        sortOrder: parseInt(addSortOrder) || 0,
+      });
+    }
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingTextbook || !editUnitCode || !editUnitName) return;
+    updateTextbookMutation.mutate({
+      id: editingTextbook.id,
+      data: {
+        grade: parseInt(editGrade),
+        unitCode: editUnitCode,
+        unitName: editUnitName,
+        sortOrder: parseInt(editSortOrder) || 0,
+      },
+    });
+  };
+
+  const handleQuizSubmit = () => {
+    if (!quizName) return;
+    if (editingQuiz) {
+      updateQuizMutation.mutate({
+        id: editingQuiz.id,
+        data: {
+          quizName,
+          totalScore: parseInt(quizTotalScore) || 100,
+          sortOrder: parseInt(quizSortOrder) || 0,
+        },
+      });
+    } else if (quizTextbookId) {
+      createQuizMutation.mutate({
+        textbookId: quizTextbookId,
+        data: {
+          quizName,
+          totalScore: parseInt(quizTotalScore) || 100,
+          sortOrder: parseInt(quizSortOrder) || 0,
+        },
+      });
+    }
+  };
+
+  const gradeFilterTabs = [
+    { value: "all", label: "全部" },
+    { value: "1", label: "一年級" },
+    { value: "2", label: "二年級" },
+    { value: "3", label: "三年級" },
+    { value: "4", label: "四年級" },
+    { value: "5", label: "五年級" },
+    { value: "6", label: "六年級" },
+  ];
+
+  const gradeColors: Record<number, string> = {
+    1: "bg-red-50 text-red-700",
+    2: "bg-orange-50 text-orange-700",
+    3: "bg-amber-50 text-amber-700",
+    4: "bg-green-50 text-green-700",
+    5: "bg-blue-50 text-blue-700",
+    6: "bg-purple-50 text-purple-700",
+  };
+
+  return (
+    <div className="max-w-4xl">
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground" data-testid="text-textbooks-title">教材管理</h1>
+          <p className="text-sm text-muted-foreground">管理教材單元和配套考卷</p>
+        </div>
+        <Button onClick={openAddDialog} className="rounded-full" data-testid="button-add-textbook">
+          <Plus className="w-4 h-4 mr-1.5" />新增教材
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="flex gap-1 flex-wrap">
+          {gradeFilterTabs.map((tab) => (
+            <Button
+              key={tab.value}
+              variant={gradeFilter === tab.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => setGradeFilter(tab.value)}
+              data-testid={`button-grade-filter-${tab.value}`}
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        <div className="relative flex-1 min-w-[180px]">
+          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="搜尋編號或名稱..."
+            className="pl-8"
+            data-testid="input-textbook-search"
+          />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-16 rounded-md" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-sm text-muted-foreground" data-testid="text-no-textbooks">
+          {searchText ? "找不到符合條件的教材" : "尚無教材資料"}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((tb) => {
+            const isExpanded = expandedIds.has(tb.id);
+            return (
+              <div
+                key={tb.id}
+                className="bg-white rounded-md border border-gray-100"
+                data-testid={`textbook-card-${tb.id}`}
+              >
+                <div
+                  className="flex items-center gap-3 p-3 cursor-pointer"
+                  onClick={() => toggleExpand(tb.id)}
+                  data-testid={`textbook-row-${tb.id}`}
+                >
+                  <div className="flex-shrink-0">
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                  </div>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${gradeColors[tb.grade] || "bg-gray-50 text-gray-700"}`} data-testid={`badge-grade-${tb.id}`}>
+                    {GRADE_LABELS[tb.grade] || `${tb.grade}年級`}
+                  </span>
+                  <span className="text-sm font-mono text-muted-foreground" data-testid={`text-unit-code-${tb.id}`}>{tb.unitCode}</span>
+                  <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate" data-testid={`text-unit-name-${tb.id}`}>{tb.unitName}</span>
+                  <span className="text-xs text-muted-foreground flex-shrink-0" data-testid={`text-quiz-count-${tb.id}`}>
+                    {tb.quizzes?.length || 0} 張考卷
+                  </span>
+                  <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="outline" size="icon" onClick={() => openEditDialog(tb)} data-testid={`button-edit-textbook-${tb.id}`}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        if (confirm(`確定刪除教材「${tb.unitCode} ${tb.unitName}」？相關考卷也會一併刪除。`)) {
+                          deleteTextbookMutation.mutate(tb.id);
+                        }
+                      }}
+                      data-testid={`button-delete-textbook-${tb.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="border-t border-gray-100 bg-gray-50/50 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-muted-foreground">配套考卷</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openAddQuizDialog(tb.id)}
+                        data-testid={`button-add-quiz-${tb.id}`}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />新增考卷
+                      </Button>
+                    </div>
+                    {(!tb.quizzes || tb.quizzes.length === 0) ? (
+                      <p className="text-xs text-muted-foreground py-2" data-testid={`text-no-quizzes-${tb.id}`}>尚無考卷</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {tb.quizzes.map((quiz) => (
+                          <div
+                            key={quiz.id}
+                            className="flex items-center justify-between gap-3 bg-white rounded border border-gray-100 px-3 py-2"
+                            data-testid={`quiz-row-${quiz.id}`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm text-foreground" data-testid={`text-quiz-name-${quiz.id}`}>{quiz.quizName}</span>
+                              <span className="text-xs text-muted-foreground" data-testid={`text-quiz-score-${quiz.id}`}>滿分 {quiz.totalScore}</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <Button variant="outline" size="icon" onClick={() => openEditQuizDialog(quiz)} data-testid={`button-edit-quiz-${quiz.id}`}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => {
+                                  if (confirm(`確定刪除考卷「${quiz.quizName}」？`)) {
+                                    deleteQuizMutation.mutate(quiz.id);
+                                  }
+                                }}
+                                data-testid={`button-delete-quiz-${quiz.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新增教材</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3">
+              <Label className="flex-shrink-0">模式</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={!batchMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBatchMode(false)}
+                  data-testid="button-single-mode"
+                >
+                  單筆新增
+                </Button>
+                <Button
+                  variant={batchMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBatchMode(true)}
+                  data-testid="button-batch-mode"
+                >
+                  批次新增
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label>年級</Label>
+              <Select value={addGrade} onValueChange={setAddGrade}>
+                <SelectTrigger data-testid="select-add-grade"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6].map((g) => (
+                    <SelectItem key={g} value={g.toString()}>{GRADE_LABELS[g]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {batchMode ? (
+              <div>
+                <Label>批次資料（每行一筆，格式：編號,名稱）</Label>
+                <Textarea
+                  value={batchText}
+                  onChange={(e) => setBatchText(e.target.value)}
+                  placeholder={"A_01,10以內的數\nA_02,比比看\nA_03,排順序"}
+                  rows={8}
+                  data-testid="textarea-batch-textbooks"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  每行用逗號或 Tab 分隔編號和名稱
+                </p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label>單元編號</Label>
+                  <Input
+                    value={addUnitCode}
+                    onChange={(e) => setAddUnitCode(e.target.value)}
+                    placeholder="例如：A_01"
+                    data-testid="input-add-unit-code"
+                  />
+                </div>
+                <div>
+                  <Label>單元名稱</Label>
+                  <Input
+                    value={addUnitName}
+                    onChange={(e) => setAddUnitName(e.target.value)}
+                    placeholder="例如：10以內的數"
+                    data-testid="input-add-unit-name"
+                  />
+                </div>
+                <div>
+                  <Label>排序</Label>
+                  <Input
+                    type="number"
+                    value={addSortOrder}
+                    onChange={(e) => setAddSortOrder(e.target.value)}
+                    data-testid="input-add-sort-order"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>取消</Button>
+            <Button
+              onClick={handleAddSubmit}
+              disabled={createTextbookMutation.isPending || batchCreateMutation.isPending}
+              data-testid="button-submit-add-textbook"
+            >
+              {(createTextbookMutation.isPending || batchCreateMutation.isPending) ? "新增中..." : batchMode ? "批次新增" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) setEditingTextbook(null); setShowEditDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>編輯教材</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>年級</Label>
+              <Select value={editGrade} onValueChange={setEditGrade}>
+                <SelectTrigger data-testid="select-edit-grade"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6].map((g) => (
+                    <SelectItem key={g} value={g.toString()}>{GRADE_LABELS[g]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>單元編號</Label>
+              <Input
+                value={editUnitCode}
+                onChange={(e) => setEditUnitCode(e.target.value)}
+                data-testid="input-edit-unit-code"
+              />
+            </div>
+            <div>
+              <Label>單元名稱</Label>
+              <Input
+                value={editUnitName}
+                onChange={(e) => setEditUnitName(e.target.value)}
+                data-testid="input-edit-unit-name"
+              />
+            </div>
+            <div>
+              <Label>排序</Label>
+              <Input
+                type="number"
+                value={editSortOrder}
+                onChange={(e) => setEditSortOrder(e.target.value)}
+                data-testid="input-edit-sort-order"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>取消</Button>
+            <Button
+              onClick={handleEditSubmit}
+              disabled={!editUnitCode || !editUnitName || updateTextbookMutation.isPending}
+              data-testid="button-submit-edit-textbook"
+            >
+              {updateTextbookMutation.isPending ? "更新中..." : "更新"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showQuizDialog} onOpenChange={(open) => { if (!open) { setEditingQuiz(null); setQuizTextbookId(null); } setShowQuizDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingQuiz ? "編輯考卷" : "新增考卷"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>考卷名稱</Label>
+              <Input
+                value={quizName}
+                onChange={(e) => setQuizName(e.target.value)}
+                placeholder="例如：小考A"
+                data-testid="input-quiz-name"
+              />
+            </div>
+            <div>
+              <Label>滿分分數</Label>
+              <Input
+                type="number"
+                value={quizTotalScore}
+                onChange={(e) => setQuizTotalScore(e.target.value)}
+                data-testid="input-quiz-total-score"
+              />
+            </div>
+            <div>
+              <Label>排序</Label>
+              <Input
+                type="number"
+                value={quizSortOrder}
+                onChange={(e) => setQuizSortOrder(e.target.value)}
+                data-testid="input-quiz-sort-order"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuizDialog(false)}>取消</Button>
+            <Button
+              onClick={handleQuizSubmit}
+              disabled={!quizName || createQuizMutation.isPending || updateQuizMutation.isPending}
+              data-testid="button-submit-quiz"
+            >
+              {(createQuizMutation.isPending || updateQuizMutation.isPending) ? "儲存中..." : editingQuiz ? "更新" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

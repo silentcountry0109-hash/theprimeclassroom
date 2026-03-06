@@ -721,6 +721,209 @@ function DailyProgressCard({ coachId, date }: { coachId: number; date: string })
   );
 }
 
+function TextbookUnitSelector({
+  childGrade,
+  value,
+  onChange,
+  onSelectTextbook,
+}: {
+  childGrade: number;
+  value: string;
+  onChange: (val: string) => void;
+  onSelectTextbook: (textbook: any | null) => void;
+}) {
+  const { data: allTextbooks = [] } = useQuery<any[]>({
+    queryKey: ["/api/textbooks"],
+  });
+
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [freeInput, setFreeInput] = useState(false);
+
+  const gradeTextbooks = useMemo(() => allTextbooks.filter((t: any) => t.grade === childGrade && t.isActive), [allTextbooks, childGrade]);
+  const otherTextbooks = useMemo(() => allTextbooks.filter((t: any) => t.grade !== childGrade && t.isActive), [allTextbooks, childGrade]);
+
+  const otherByGrade = useMemo(() => {
+    const map: Record<number, any[]> = {};
+    for (const t of otherTextbooks) {
+      if (!map[t.grade]) map[t.grade] = [];
+      map[t.grade].push(t);
+    }
+    return Object.entries(map).sort(([a], [b]) => Number(a) - Number(b));
+  }, [otherTextbooks]);
+
+  const [expandedOtherGrade, setExpandedOtherGrade] = useState<number | null>(null);
+
+  const filteredGrade = useMemo(() => {
+    if (!searchTerm) return gradeTextbooks;
+    const term = searchTerm.toLowerCase();
+    return gradeTextbooks.filter((t: any) =>
+      t.unitCode.toLowerCase().includes(term) || t.unitName.toLowerCase().includes(term)
+    );
+  }, [gradeTextbooks, searchTerm]);
+
+  const filteredOther = useMemo(() => {
+    if (!searchTerm) return otherByGrade;
+    const term = searchTerm.toLowerCase();
+    return otherByGrade
+      .map(([grade, items]) => [grade, items.filter((t: any) =>
+        t.unitCode.toLowerCase().includes(term) || t.unitName.toLowerCase().includes(term)
+      )] as [string, any[]])
+      .filter(([, items]) => items.length > 0);
+  }, [otherByGrade, searchTerm]);
+
+  const handleSelect = (textbook: any) => {
+    onChange(`${textbook.unitCode} ${textbook.unitName}`);
+    onSelectTextbook(textbook);
+    setOpen(false);
+    setSearchTerm("");
+    setFreeInput(false);
+  };
+
+  const handleFreeInput = () => {
+    setFreeInput(true);
+    onSelectTextbook(null);
+    setOpen(false);
+    setSearchTerm("");
+  };
+
+  if (freeInput) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs">今日上課單元 *</Label>
+          <button
+            onClick={() => { setFreeInput(false); }}
+            className="text-[10px] text-tiffany hover:underline"
+            data-testid="button-switch-to-dropdown"
+          >
+            從教材選擇
+          </button>
+        </div>
+        <Input
+          value={value}
+          onChange={e => { onChange(e.target.value); onSelectTextbook(null); }}
+          placeholder="例：三位數加減法"
+          className="mt-1"
+          data-testid="input-lesson-unit"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <Label className="text-xs">今日上課單元 *</Label>
+        <button
+          onClick={handleFreeInput}
+          className="text-[10px] text-tiffany hover:underline"
+          data-testid="button-switch-to-free-input"
+        >
+          自由輸入
+        </button>
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="w-full mt-1 flex items-center justify-between rounded-md border border-input bg-background px-3 min-h-9 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="button-select-textbook"
+        >
+          <span className={value ? "text-foreground" : "text-muted-foreground"}>
+            {value || "選擇教材單元..."}
+          </span>
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        </button>
+
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setSearchTerm(""); }} />
+            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 flex flex-col" data-testid="panel-textbook-dropdown">
+              <div className="p-2 border-b border-gray-100">
+                <div className="flex items-center gap-2 px-2 rounded-md border border-gray-200 bg-gray-50">
+                  <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                  <input
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="搜尋教材（編號或名稱）..."
+                    className="w-full py-1.5 text-sm bg-transparent border-0 outline-none"
+                    autoFocus
+                    data-testid="input-search-textbook"
+                  />
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {filteredGrade.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-gray-50 sticky top-0">
+                      {childGrade}年級教材（學生年級）
+                    </div>
+                    {filteredGrade.map((t: any) => (
+                      <button
+                        key={t.id}
+                        onClick={() => handleSelect(t)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-tiffany/5 transition-colors flex items-center gap-2"
+                        data-testid={`textbook-option-${t.id}`}
+                      >
+                        <span className="font-mono text-xs text-muted-foreground w-10 flex-shrink-0">{t.unitCode}</span>
+                        <span className="text-foreground flex-1">{t.unitName}</span>
+                        {t.quizzes && t.quizzes.length > 0 && (
+                          <Badge variant="outline" className="text-[10px] flex-shrink-0">{t.quizzes.length}考卷</Badge>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {filteredOther.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-gray-50 sticky top-0">
+                      其他年級
+                    </div>
+                    {filteredOther.map(([grade, items]) => (
+                      <div key={grade}>
+                        <button
+                          onClick={() => setExpandedOtherGrade(expandedOtherGrade === Number(grade) ? null : Number(grade))}
+                          className="w-full text-left px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-gray-50 flex items-center justify-between"
+                          data-testid={`toggle-grade-${grade}`}
+                        >
+                          <span>{grade}年級（{items.length} 個單元）</span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedOtherGrade === Number(grade) ? "rotate-180" : ""}`} />
+                        </button>
+                        {(expandedOtherGrade === Number(grade) || searchTerm) && items.map((t: any) => (
+                          <button
+                            key={t.id}
+                            onClick={() => handleSelect(t)}
+                            className="w-full text-left px-3 py-2 pl-6 text-sm hover:bg-tiffany/5 transition-colors flex items-center gap-2"
+                            data-testid={`textbook-option-${t.id}`}
+                          >
+                            <span className="font-mono text-xs text-muted-foreground w-10 flex-shrink-0">{t.unitCode}</span>
+                            <span className="text-foreground flex-1">{t.unitName}</span>
+                            {t.quizzes && t.quizzes.length > 0 && (
+                              <Badge variant="outline" className="text-[10px] flex-shrink-0">{t.quizzes.length}考卷</Badge>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {filteredGrade.length === 0 && filteredOther.length === 0 && (
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    找不到符合的教材
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: number; onClose: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -743,6 +946,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     quizTotal: string;
     teacherRemarks: string;
     internalNotes: string;
+    selectedTextbook: any | null;
+    selectedQuizId: number | null;
   }>>({});
 
   const initStudentData = (childId: number) => {
@@ -758,6 +963,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
         quizTotal: existing.quizTotal?.toString() || "100",
         teacherRemarks: existing.teacherRemarks || "",
         internalNotes: existing.internalNotes || "",
+        selectedTextbook: null,
+        selectedQuizId: null,
       };
     }
     return {
@@ -769,6 +976,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
       quizTotal: "100",
       teacherRemarks: "",
       internalNotes: "",
+      selectedTextbook: null,
+      selectedQuizId: null,
     };
   };
 
@@ -776,7 +985,7 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     return studentData[childId] || initStudentData(childId);
   };
 
-  const updateStudentField = (childId: number, field: string, value: string) => {
+  const updateStudentField = (childId: number, field: string, value: any) => {
     setStudentData(prev => ({
       ...prev,
       [childId]: {
@@ -785,6 +994,21 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
         [field]: value,
       },
     }));
+  };
+
+  const handleSelectTextbook = (childId: number, textbook: any | null) => {
+    updateStudentField(childId, "selectedTextbook", textbook);
+    updateStudentField(childId, "selectedQuizId", null);
+  };
+
+  const handleSelectQuiz = (childId: number, quizId: number | null, quizzes: any[]) => {
+    updateStudentField(childId, "selectedQuizId", quizId);
+    if (quizId) {
+      const quiz = quizzes.find((q: any) => q.id === quizId);
+      if (quiz) {
+        updateStudentField(childId, "quizTotal", quiz.totalScore.toString());
+      }
+    }
   };
 
   const saveMutation = useMutation({
@@ -820,6 +1044,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
   const currentStudent = students[activeStudentIdx];
   const currentData = currentStudent ? getStudentFormData(currentStudent.childId) : null;
   const hasExisting = existingBooks.length > 0;
+
+  const currentQuizzes = currentData?.selectedTextbook?.quizzes?.filter((q: any) => q.isActive) || [];
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
@@ -866,16 +1092,38 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
                 <span className="text-xs text-muted-foreground">{currentStudent.childGrade}年級</span>
               </div>
 
-              <div>
-                <Label className="text-xs">今日上課單元 *</Label>
-                <Input
-                  value={currentData.lessonUnit}
-                  onChange={e => updateStudentField(currentStudent.childId, "lessonUnit", e.target.value)}
-                  placeholder="例：三位數加減法"
-                  className="mt-1"
-                  data-testid="input-lesson-unit"
-                />
-              </div>
+              <TextbookUnitSelector
+                childGrade={currentStudent.childGrade}
+                value={currentData.lessonUnit}
+                onChange={val => updateStudentField(currentStudent.childId, "lessonUnit", val)}
+                onSelectTextbook={tb => handleSelectTextbook(currentStudent.childId, tb)}
+              />
+
+              {currentQuizzes.length > 0 && (
+                <div>
+                  <Label className="text-xs">配套考卷</Label>
+                  <div className="flex gap-2 mt-1 flex-wrap">
+                    {currentQuizzes.map((q: any) => (
+                      <button
+                        key={q.id}
+                        onClick={() => handleSelectQuiz(
+                          currentStudent.childId,
+                          currentData.selectedQuizId === q.id ? null : q.id,
+                          currentQuizzes
+                        )}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                          currentData.selectedQuizId === q.id
+                            ? "bg-tiffany/10 border-tiffany/30 text-tiffany"
+                            : "bg-gray-50 border-gray-200 text-muted-foreground hover:bg-gray-100"
+                        }`}
+                        data-testid={`quiz-option-${q.id}`}
+                      >
+                        {q.quizName}（滿分 {q.totalScore}）
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label className="text-xs">教學進度</Label>

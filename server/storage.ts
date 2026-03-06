@@ -3,6 +3,7 @@ import {
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
   coachDailyRecords, classrooms, notifications,
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
+  textbooks, textbookQuizzes,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -29,6 +30,8 @@ import {
   type CreditPurchase, type InsertCreditPurchase,
   type CreditBalance, type InsertCreditBalance,
   type CreditTransaction, type InsertCreditTransaction,
+  type Textbook, type InsertTextbook,
+  type TextbookQuiz, type InsertTextbookQuiz,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
@@ -223,6 +226,17 @@ export interface IStorage {
 
   getCoachEarningsStats(coachId: number, startDate: string, endDate: string): Promise<any>;
   getFranchiseCoachEarnings(franchiseId: number, startDate: string, endDate: string): Promise<any>;
+
+  getTextbooks(): Promise<Textbook[]>;
+  getTextbooksByGrade(grade: number): Promise<Textbook[]>;
+  getTextbooksWithQuizzes(): Promise<any[]>;
+  createTextbook(data: InsertTextbook): Promise<Textbook>;
+  updateTextbook(id: number, data: Partial<InsertTextbook>): Promise<Textbook>;
+  deleteTextbook(id: number): Promise<void>;
+  getQuizzesByTextbook(textbookId: number): Promise<TextbookQuiz[]>;
+  createQuiz(data: InsertTextbookQuiz): Promise<TextbookQuiz>;
+  updateQuiz(id: number, data: Partial<InsertTextbookQuiz>): Promise<TextbookQuiz>;
+  deleteQuiz(id: number): Promise<void>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -2289,6 +2303,57 @@ export class DatabaseStorage implements IStorage {
       totalCoachPay: Math.round(totalCoachPay),
       coachStats,
     };
+  }
+
+  async getTextbooks(): Promise<Textbook[]> {
+    return db.select().from(textbooks).where(eq(textbooks.isActive, true)).orderBy(asc(textbooks.grade), asc(textbooks.sortOrder));
+  }
+
+  async getTextbooksByGrade(grade: number): Promise<Textbook[]> {
+    return db.select().from(textbooks).where(and(eq(textbooks.grade, grade), eq(textbooks.isActive, true))).orderBy(asc(textbooks.sortOrder));
+  }
+
+  async getTextbooksWithQuizzes(): Promise<any[]> {
+    const allTextbooks = await db.select().from(textbooks).where(eq(textbooks.isActive, true)).orderBy(asc(textbooks.grade), asc(textbooks.sortOrder));
+    const allQuizzes = await db.select().from(textbookQuizzes).where(eq(textbookQuizzes.isActive, true)).orderBy(asc(textbookQuizzes.sortOrder));
+    const quizMap = new Map<number, TextbookQuiz[]>();
+    for (const q of allQuizzes) {
+      if (!quizMap.has(q.textbookId)) quizMap.set(q.textbookId, []);
+      quizMap.get(q.textbookId)!.push(q);
+    }
+    return allTextbooks.map(t => ({ ...t, quizzes: quizMap.get(t.id) || [] }));
+  }
+
+  async createTextbook(data: InsertTextbook): Promise<Textbook> {
+    const [created] = await db.insert(textbooks).values(data).returning();
+    return created;
+  }
+
+  async updateTextbook(id: number, data: Partial<InsertTextbook>): Promise<Textbook> {
+    const [updated] = await db.update(textbooks).set(data).where(eq(textbooks.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTextbook(id: number): Promise<void> {
+    await db.update(textbooks).set({ isActive: false }).where(eq(textbooks.id, id));
+  }
+
+  async getQuizzesByTextbook(textbookId: number): Promise<TextbookQuiz[]> {
+    return db.select().from(textbookQuizzes).where(and(eq(textbookQuizzes.textbookId, textbookId), eq(textbookQuizzes.isActive, true))).orderBy(asc(textbookQuizzes.sortOrder));
+  }
+
+  async createQuiz(data: InsertTextbookQuiz): Promise<TextbookQuiz> {
+    const [created] = await db.insert(textbookQuizzes).values(data).returning();
+    return created;
+  }
+
+  async updateQuiz(id: number, data: Partial<InsertTextbookQuiz>): Promise<TextbookQuiz> {
+    const [updated] = await db.update(textbookQuizzes).set(data).where(eq(textbookQuizzes.id, id)).returning();
+    return updated;
+  }
+
+  async deleteQuiz(id: number): Promise<void> {
+    await db.update(textbookQuizzes).set({ isActive: false }).where(eq(textbookQuizzes.id, id));
   }
 }
 
