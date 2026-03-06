@@ -305,7 +305,7 @@ export default function FranchiseAdminDashboard() {
                         className="flex items-center gap-1 text-xs text-tiffany font-medium hover:bg-tiffany/5 rounded-md px-1.5 py-1 -ml-1.5 transition-colors w-full"
                         data-testid="button-switch-franchise"
                       >
-                        <span>{myFranchise.city} {myFranchise.district.replace("區", "")}教室</span>
+                        <span>{myFranchise.name.replace("質數教室 ", "")}</span>
                         <ChevronsUpDown className="w-3 h-3 ml-auto text-tiffany/60" />
                       </button>
                       {showFranchiseSwitcher && (
@@ -318,7 +318,7 @@ export default function FranchiseAdminDashboard() {
                               data-testid={`button-franchise-option-${f.id}`}
                             >
                               <Building2 className="w-3 h-3 shrink-0" />
-                              <span>{f.city} {f.district.replace("區", "")}教室</span>
+                              <span>{f.name.replace("質數教室 ", "")}</span>
                               {f.id === myFranchise.id && <Check className="w-3 h-3 ml-auto" />}
                             </button>
                           ))}
@@ -327,7 +327,7 @@ export default function FranchiseAdminDashboard() {
                     </div>
                   ) : (
                     <p className="text-xs text-tiffany font-medium" data-testid="sidebar-franchise-name">
-                      {myFranchise.city} {myFranchise.district.replace("區", "")}教室
+                      {myFranchise.name.replace("質數教室 ", "")}
                     </p>
                   )}
                 </div>
@@ -465,7 +465,7 @@ function OverviewTab() {
     <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-foreground mb-1">
-          {franchise ? `${franchise.city} ${franchise.district.replace("區", "")}教室` : "分校總覽"}
+          {franchise ? franchise.name.replace("質數教室 ", "") : "分校總覽"}
         </h1>
         <p className="text-sm text-muted-foreground">
           {franchise ? `${franchise.city}${franchise.district}` : "載入中..."}
