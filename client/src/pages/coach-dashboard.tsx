@@ -1399,6 +1399,8 @@ function SalaryTab({ coachId, coach }: { coachId: number; coach?: any }) {
   const compAmount = earnings?.compensationAmount ?? coach?.compensationAmount ?? 200;
   const compensationLabel = compType === "fixed"
     ? `每堂 $${compAmount}`
+    : compType === "hourly"
+    ? `每小時 $${compAmount}`
     : `課堂收入 ${compAmount}%`;
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
@@ -1423,7 +1425,7 @@ function SalaryTab({ coachId, coach }: { coachId: number; coach?: any }) {
           <div>
             <p className="text-xs text-muted-foreground">薪酬計算方式</p>
             <p className="text-sm font-semibold text-foreground" data-testid="text-compensation-type">
-              {compType === "fixed" ? "每堂固定金額" : "按比例抽成"}
+              {compType === "fixed" ? "每堂固定金額" : compType === "hourly" ? "時薪" : "按比例抽成"}
             </p>
             <p className="text-lg font-bold text-tiffany" data-testid="text-compensation-value">
               {compensationLabel}
@@ -1508,7 +1510,7 @@ function SalaryTab({ coachId, coach }: { coachId: number; coach?: any }) {
                       <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="text-muted-foreground">{day.lessons} 堂</span>
                     </div>
-                    {earnings.compensationType === "percentage" && (
+                    {(earnings.compensationType === "percentage" || earnings.compensationType === "hourly") && (
                       <div className="flex items-center gap-1 text-xs">
                         <span className="text-muted-foreground">實收 ${Math.round(day.revenue).toLocaleString()}</span>
                       </div>

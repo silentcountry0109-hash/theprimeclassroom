@@ -772,7 +772,7 @@ function OverviewTab() {
                         <td className="py-3 pr-4 font-medium text-foreground whitespace-nowrap">{coach.coachName}</td>
                         <td className="py-3 pr-4 text-center">
                           <span className="text-xs px-2 py-0.5 rounded-full bg-tiffany/10 text-tiffany">
-                            {coach.compensationType === "fixed" ? `每堂 $${coach.compensationAmount}` : `${coach.compensationAmount}%`}
+                            {coach.compensationType === "fixed" ? `每堂 $${coach.compensationAmount}` : coach.compensationType === "hourly" ? `時薪 $${coach.compensationAmount}` : `${coach.compensationAmount}%`}
                           </span>
                         </td>
                         <td className="py-3 pr-4 text-center text-muted-foreground">{coach.totalLessons}</td>
@@ -1808,6 +1808,8 @@ function CoachesTab() {
                   <Tag className="w-3 h-3" />
                   {coach.compensationType === "percentage"
                     ? `按比例抽成 ${coach.compensationAmount ?? 0}%`
+                    : coach.compensationType === "hourly"
+                    ? `時薪 $${coach.compensationAmount ?? 250}/hr`
                     : `每堂固定 $${coach.compensationAmount ?? 200}`
                   }
                 </p>
@@ -1894,18 +1896,19 @@ function CoachesTab() {
               <div className="space-y-3">
                 <div>
                   <Label>薪酬類型</Label>
-                  <Select value={formData.compensationType} onValueChange={(val) => setFormData({ ...formData, compensationType: val, compensationAmount: val === "fixed" ? 200 : 40 })} data-testid="select-coach-compensation-type">
+                  <Select value={formData.compensationType} onValueChange={(val) => setFormData({ ...formData, compensationType: val, compensationAmount: val === "fixed" ? 200 : val === "hourly" ? 250 : 40 })} data-testid="select-coach-compensation-type">
                     <SelectTrigger data-testid="select-trigger-coach-compensation-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="fixed">每堂固定金額</SelectItem>
+                      <SelectItem value="hourly">時薪</SelectItem>
                       <SelectItem value="percentage">按比例抽成</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>{formData.compensationType === "fixed" ? "每堂金額（元）" : "抽成比例（%）"}</Label>
+                  <Label>{formData.compensationType === "fixed" ? "每堂金額（元）" : formData.compensationType === "hourly" ? "時薪（元/小時）" : "抽成比例（%）"}</Label>
                   <div className="relative">
                     <Input
                       type="number"
@@ -1913,11 +1916,11 @@ function CoachesTab() {
                       max={formData.compensationType === "percentage" ? 100 : undefined}
                       value={formData.compensationAmount}
                       onChange={(e) => setFormData({ ...formData, compensationAmount: parseInt(e.target.value) || 0 })}
-                      placeholder={formData.compensationType === "fixed" ? "每堂 $___" : "____%"}
+                      placeholder={formData.compensationType === "fixed" ? "每堂 $___" : formData.compensationType === "hourly" ? "每小時 $___" : "____%"}
                       data-testid="input-coach-compensation-amount"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                      {formData.compensationType === "fixed" ? "元/堂" : "%"}
+                      {formData.compensationType === "fixed" ? "元/堂" : formData.compensationType === "hourly" ? "元/時" : "%"}
                     </span>
                   </div>
                 </div>

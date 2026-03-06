@@ -1152,7 +1152,7 @@ export async function registerRoutes(
       const { compensationType, compensationAmount, ...rest } = req.body;
       const data: any = { ...rest, franchiseId: req.franchiseId };
       if (compensationType !== undefined) {
-        if (!["fixed", "percentage"].includes(compensationType)) return res.status(400).json({ message: "薪酬類型必須是 fixed 或 percentage" });
+        if (!["fixed", "percentage", "hourly"].includes(compensationType)) return res.status(400).json({ message: "薪酬類型必須是 fixed、percentage 或 hourly" });
         data.compensationType = compensationType;
       }
       if (compensationAmount !== undefined) {
@@ -1175,7 +1175,7 @@ export async function registerRoutes(
       const { compensationType, compensationAmount, ...rest } = req.body;
       const data: any = { ...rest };
       if (compensationType !== undefined) {
-        if (!["fixed", "percentage"].includes(compensationType)) return res.status(400).json({ message: "薪酬類型必須是 fixed 或 percentage" });
+        if (!["fixed", "percentage", "hourly"].includes(compensationType)) return res.status(400).json({ message: "薪酬類型必須是 fixed、percentage 或 hourly" });
         data.compensationType = compensationType;
       }
       if (compensationAmount !== undefined) {

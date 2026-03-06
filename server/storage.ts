@@ -2202,6 +2202,7 @@ export class DatabaseStorage implements IStorage {
     let totalLessons = 0;
     let totalNetRevenue = 0;
     const dailyMap: Record<string, { lessons: number; revenue: number; earnings: number }> = {};
+    const countedSlots = new Set<string>();
 
     for (const row of netDeductions as any[]) {
       const lessons = Math.abs(row.credits);
@@ -2218,15 +2219,30 @@ export class DatabaseStorage implements IStorage {
       dailyMap[date].lessons += lessons;
       dailyMap[date].revenue += revenue;
 
-      const earning = compensationType === "fixed"
-        ? compensationAmount * lessons
-        : revenue * compensationAmount / 100;
+      let earning = 0;
+      if (compensationType === "fixed") {
+        earning = compensationAmount * lessons;
+      } else if (compensationType === "hourly") {
+        const slotKey = `${date}_${row.start_time}_${row.end_time}`;
+        if (!countedSlots.has(slotKey)) {
+          countedSlots.add(slotKey);
+          const startParts = (row.start_time || "").split(":");
+          const endParts = (row.end_time || "").split(":");
+          const startMin = (parseInt(startParts[0]) || 0) * 60 + (parseInt(startParts[1]) || 0);
+          const endMin = (parseInt(endParts[0]) || 0) * 60 + (parseInt(endParts[1]) || 0);
+          const hours = Math.max(0, (endMin - startMin) / 60);
+          earning = compensationAmount * hours;
+        }
+      } else {
+        earning = revenue * compensationAmount / 100;
+      }
       dailyMap[date].earnings += earning;
     }
 
-    const coachEarnings = compensationType === "fixed"
-      ? compensationAmount * totalLessons
-      : totalNetRevenue * compensationAmount / 100;
+    let coachEarnings = 0;
+    for (const stats of Object.values(dailyMap)) {
+      coachEarnings += stats.earnings;
+    }
 
     const dailyStats = Object.entries(dailyMap)
       .map(([date, stats]) => ({ date, ...stats }))
@@ -2250,9 +2266,31 @@ export class DatabaseStorage implements IStorage {
     const upcomingBookings = Number((projectionRows.rows[0] as any)?.upcoming_bookings || 0);
 
     const avgRevenuePerLesson = totalLessons > 0 ? totalNetRevenue / totalLessons : 0;
-    const projectedEarnings = compensationType === "fixed"
-      ? compensationAmount * upcomingBookings
-      : avgRevenuePerLesson * upcomingBookings * compensationAmount / 100;
+    let projectedEarnings = 0;
+    if (compensationType === "fixed") {
+      projectedEarnings = compensationAmount * upcomingBookings;
+    } else if (compensationType === "hourly") {
+      const upcomingHoursRows = await db.execute(sql`
+        SELECT DISTINCT ts.id, ts.start_time, ts.end_time
+        FROM time_slots ts
+        JOIN bookings b ON b.slot_id = ts.id
+        WHERE ts.coach_id = ${coachId}
+          AND ts.date >= ${monthStart}
+          AND ts.date <= ${monthEnd}
+          AND b.status IN ('confirmed', 'checked_in', 'completed')
+      `);
+      let totalUpcomingHours = 0;
+      for (const slot of upcomingHoursRows.rows as any[]) {
+        const sp = (slot.start_time || "").split(":");
+        const ep = (slot.end_time || "").split(":");
+        const sm = (parseInt(sp[0]) || 0) * 60 + (parseInt(sp[1]) || 0);
+        const em = (parseInt(ep[0]) || 0) * 60 + (parseInt(ep[1]) || 0);
+        totalUpcomingHours += Math.max(0, (em - sm) / 60);
+      }
+      projectedEarnings = compensationAmount * totalUpcomingHours;
+    } else {
+      projectedEarnings = avgRevenuePerLesson * upcomingBookings * compensationAmount / 100;
+    }
 
     return {
       compensationType,
