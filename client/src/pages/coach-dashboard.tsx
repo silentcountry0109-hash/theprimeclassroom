@@ -56,7 +56,7 @@ const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 export default function CoachDashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "salary" | "profile">("calendar");
+  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "salary" | "profile" | "manual">("calendar");
   const [showBindingSuccess, setShowBindingSuccess] = useState(false);
 
   useEffect(() => {
@@ -135,6 +135,7 @@ export default function CoachDashboard() {
     { id: "students" as const, label: "我的學生", icon: Users },
     { id: "salary" as const, label: "工作記錄", icon: ClipboardCheck },
     { id: "profile" as const, label: "個人資料", icon: User },
+    { id: "manual" as const, label: "使用手冊", icon: BookOpen },
   ];
 
   return (
@@ -255,6 +256,7 @@ export default function CoachDashboard() {
         {activeTab === "students" && <StudentsTab coachId={userData.coach?.id} />}
         {activeTab === "salary" && <SalaryTab coachId={userData.coach?.id} />}
         {activeTab === "profile" && <ProfileTab />}
+        {activeTab === "manual" && <ManualTab />}
       </div>
 
       <Dialog open={showBindingSuccess} onOpenChange={setShowBindingSuccess}>
@@ -1349,6 +1351,274 @@ function ProfileTab() {
             </Button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ManualTab() {
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  const toggleSection = (id: string) => {
+    setExpandedSection(expandedSection === id ? null : id);
+  };
+
+  const sections = [
+    {
+      id: "login",
+      title: "一、登入系統",
+      icon: LogOut,
+      content: (
+        <div className="space-y-3">
+          <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground leading-relaxed">
+            <li>開啟瀏覽器，進入質數教室的分校登入頁面</li>
+            <li>在上方切換到 <strong className="text-foreground">「老師」</strong> 分頁</li>
+            <li>輸入您的帳號（格式：<code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">姓名@prime</code>）和密碼</li>
+            <li>點擊 <strong className="text-foreground">「登入管理系統」</strong></li>
+          </ol>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+            帳號和密碼由分校主任建立並提供給您。如果忘記密碼，請聯繫分校主任重設。
+          </div>
+          <img src="/manual/step1-dashboard.png" alt="登入頁面" className="rounded-lg border border-gray-200 w-full" />
+        </div>
+      ),
+    },
+    {
+      id: "calendar",
+      title: "二、行事曆與今日排課",
+      icon: Calendar,
+      content: (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            登入後，您會看到行事曆頁面。這是老師系統的首頁。
+          </p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex gap-2"><span className="text-tiffany">•</span>上方顯示當月月曆，有排課的日期下方會有小圓點標記</li>
+            <li className="flex gap-2"><span className="text-tiffany">•</span>點擊日期後，下方會列出該天所有的時段卡片</li>
+            <li className="flex gap-2"><span className="text-tiffany">•</span>每張卡片顯示：上課時間、教室名稱、已預約人數/上限</li>
+            <li className="flex gap-2"><span className="text-tiffany">•</span>展開卡片可查看每位學生的姓名、年級、學號</li>
+          </ul>
+          <img src="/manual/step2-student-list.png" alt="行事曆與排課總覽" className="rounded-lg border border-gray-200 w-full" />
+        </div>
+      ),
+    },
+    {
+      id: "checkin",
+      title: "三、學生點名 — 標記已到",
+      icon: CheckCircle,
+      content: (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            上課前 <strong className="text-foreground">15 分鐘</strong>起，點名功能自動開放。每位學生旁會顯示「已到」和「未到」兩個按鈕。
+          </p>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>當學生到場後，點擊綠色 <strong className="text-foreground">「已到」</strong> 按鈕：</p>
+            <ul className="space-y-1 ml-4">
+              <li className="flex gap-2"><span className="text-green-500">✓</span>按鈕變成綠色「已到」標籤</li>
+              <li className="flex gap-2"><span className="text-green-500">✓</span>右下角出現「點名成功」提示</li>
+              <li className="flex gap-2"><span className="text-green-500">✓</span>點名進度自動更新</li>
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">待點名狀態：</p>
+            <img src="/manual/step5-restored.png" alt="待點名狀態" className="rounded-lg border border-gray-200 w-full" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">點名成功：</p>
+            <img src="/manual/step6-checked-in.png" alt="點名成功" className="rounded-lg border border-gray-200 w-full" />
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "absent",
+      title: "四、學生點名 — 標記未到",
+      icon: UserX,
+      content: (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            如果學生沒有到場，點擊紅色 <strong className="text-foreground">「未到」</strong> 按鈕：
+          </p>
+          <ul className="space-y-1 ml-4 text-sm text-muted-foreground">
+            <li className="flex gap-2"><span className="text-red-500">•</span>按鈕變成紅色「未到」標籤</li>
+            <li className="flex gap-2"><span className="text-red-500">•</span>右下角出現「已標記未到」提示</li>
+            <li className="flex gap-2"><span className="text-red-500">•</span>標記未到的學生 <strong className="text-foreground">不需要填寫聯絡簿</strong></li>
+          </ul>
+          <img src="/manual/step3-marked-absent.png" alt="標記未到" className="rounded-lg border border-gray-200 w-full" />
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+            不小心按錯？點擊「未到」標籤旁的 X 按鈕，確認後即可恢復為待點名狀態。
+          </div>
+          <img src="/manual/step4-unmark-dialog.png" alt="取消未到確認對話框" className="rounded-lg border border-gray-200 w-full" />
+        </div>
+      ),
+    },
+    {
+      id: "contactbook",
+      title: "五、填寫聯絡簿",
+      icon: FileText,
+      content: (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            完成點名後，請為每位 <strong className="text-foreground">已到</strong> 的學生填寫聯絡簿。
+          </p>
+          <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground">
+            <li>在時段卡片中，點擊 <strong className="text-foreground">「填寫聯絡簿」</strong> 按鈕</li>
+            <li>系統開啟聯絡簿填寫表單</li>
+            <li>依序填寫各項欄位</li>
+            <li>點擊 <strong className="text-foreground">「儲存」</strong> 按鈕</li>
+            <li>家長即可在家長端即時查看上課紀錄</li>
+          </ol>
+          <img src="/manual/step7-contact-book-form.png" alt="聯絡簿填寫表單" className="rounded-lg border border-gray-200 w-full" />
+          <img src="/manual/step8-contact-book-saved.png" alt="聯絡簿儲存成功" className="rounded-lg border border-gray-200 w-full" />
+          <div className="mt-3">
+            <p className="text-xs font-medium text-foreground mb-2">欄位說明：</p>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">欄位</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">必填</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">家長可見</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  <tr><td className="px-3 py-2">今日上課單元</td><td className="px-3 py-2 text-red-500">必填</td><td className="px-3 py-2 text-green-600">是</td></tr>
+                  <tr><td className="px-3 py-2">教學進度</td><td className="px-3 py-2 text-muted-foreground">選填</td><td className="px-3 py-2 text-green-600">是</td></tr>
+                  <tr><td className="px-3 py-2">回家作業</td><td className="px-3 py-2 text-muted-foreground">選填</td><td className="px-3 py-2 text-green-600">是</td></tr>
+                  <tr><td className="px-3 py-2">下次考試</td><td className="px-3 py-2 text-muted-foreground">選填</td><td className="px-3 py-2 text-green-600">是</td></tr>
+                  <tr><td className="px-3 py-2">小考成績 / 滿分</td><td className="px-3 py-2 text-muted-foreground">選填</td><td className="px-3 py-2 text-green-600">是</td></tr>
+                  <tr><td className="px-3 py-2">老師備註</td><td className="px-3 py-2 text-muted-foreground">選填</td><td className="px-3 py-2 text-green-600">是</td></tr>
+                  <tr className="bg-gray-50"><td className="px-3 py-2">內部筆記</td><td className="px-3 py-2 text-muted-foreground">選填</td><td className="px-3 py-2 text-red-500">否</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">「內部筆記」只有老師自己看得到，適合記錄教學觀察或下次上課提醒。</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "progress",
+      title: "六、每日工作紀錄",
+      icon: ClipboardCheck,
+      content: (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            在行事曆下方，有一個每日工作進度卡片，顯示兩個進度條：
+          </p>
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">項目</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">完成條件</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                <tr><td className="px-3 py-2 font-medium">點名進度</td><td className="px-3 py-2 text-muted-foreground">所有學生都已標記「已到」或「未到」</td></tr>
+                <tr><td className="px-3 py-2 font-medium">聯絡簿進度</td><td className="px-3 py-2 text-muted-foreground">所有「已到」的學生都已填寫聯絡簿</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <span>兩個進度都 100% → 顯示「今日工作已完成」</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <span>尚未完成 → 顯示「尚有未完成的工作」</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "statuses",
+      title: "七、預約狀態對照表",
+      icon: FileText,
+      content: (
+        <div className="space-y-3">
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">狀態</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">老師端顯示</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">家長端顯示</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                <tr><td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">已確認</Badge></td><td className="px-3 py-2 text-muted-foreground">顯示「已到」「未到」按鈕</td><td className="px-3 py-2 text-muted-foreground">已確認</td></tr>
+                <tr><td className="px-3 py-2"><Badge className="bg-green-100 text-green-700 text-[10px]">已到</Badge></td><td className="px-3 py-2 text-muted-foreground">綠色「已到」標籤</td><td className="px-3 py-2 text-muted-foreground">上課中</td></tr>
+                <tr><td className="px-3 py-2"><Badge className="bg-red-100 text-red-700 text-[10px]">未到</Badge></td><td className="px-3 py-2 text-muted-foreground">紅色「未到」標籤</td><td className="px-3 py-2 text-muted-foreground">未到</td></tr>
+                <tr><td className="px-3 py-2"><Badge className="bg-blue-100 text-blue-700 text-[10px]">已完成</Badge></td><td className="px-3 py-2 text-muted-foreground">歷史紀錄</td><td className="px-3 py-2 text-muted-foreground">已完成</td></tr>
+                <tr><td className="px-3 py-2"><Badge className="bg-gray-100 text-gray-500 text-[10px]">已取消</Badge></td><td className="px-3 py-2 text-muted-foreground">不顯示</td><td className="px-3 py-2 text-muted-foreground">已取消</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "faq",
+      title: "八、常見問題",
+      icon: AlertTriangle,
+      content: (
+        <div className="space-y-4">
+          {[
+            { q: "點名按鈕按不了，顯示灰色？", a: "點名功能會在上課前 15 分鐘自動開放。如果按鈕是灰色的，表示還沒到開放時間，請稍候。" },
+            { q: "不小心按錯「已到」或「未到」怎麼辦？", a: "點擊標籤旁邊的 X 按鈕，確認取消後即可恢復為待點名狀態，重新選擇即可。" },
+            { q: "學生沒來上課，需要填聯絡簿嗎？", a: "不需要。標記為「未到」的學生不需要填寫聯絡簿，不會影響每日工作完成度。" },
+            { q: "下課後忘記填聯絡簿怎麼辦？", a: "聯絡簿可以在課程結束後補填。但建議盡早完成，這樣家長才能即時看到上課紀錄。" },
+            { q: "忘記密碼怎麼辦？", a: "請聯繫您的分校主任，主任可以在後台為您重設密碼。" },
+            { q: "可以在手機上操作嗎？", a: "可以。老師系統支援手機瀏覽器，操作方式和電腦版相同。" },
+          ].map((item, i) => (
+            <div key={i} className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2.5">
+                <p className="text-sm font-medium text-foreground">Q: {item.q}</p>
+              </div>
+              <div className="px-4 py-2.5">
+                <p className="text-sm text-muted-foreground">{item.a}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-3" data-testid="manual-tab">
+      <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <div className="flex items-center gap-3 mb-1">
+          <BookOpen className="w-5 h-5 text-tiffany" />
+          <h2 className="font-serif text-lg tracking-wide text-foreground">老師端使用手冊</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">點擊各章節查看詳細操作說明與畫面截圖</p>
+      </div>
+
+      {sections.map((section) => (
+        <div key={section.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden" data-testid={`manual-section-${section.id}`}>
+          <button
+            onClick={() => toggleSection(section.id)}
+            className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+            data-testid={`button-manual-${section.id}`}
+          >
+            <section.icon className="w-4 h-4 text-tiffany flex-shrink-0" />
+            <span className="text-sm font-medium text-foreground flex-1">{section.title}</span>
+            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedSection === section.id ? "rotate-90" : ""}`} />
+          </button>
+          {expandedSection === section.id && (
+            <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+              {section.content}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div className="text-center py-4">
+        <p className="text-xs text-muted-foreground">最後更新：2026 年 3 月</p>
       </div>
     </div>
   );
