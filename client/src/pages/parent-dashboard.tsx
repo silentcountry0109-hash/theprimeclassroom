@@ -83,8 +83,18 @@ import {
   Heart,
   Building2,
   Hash,
+  Wallet,
+  CreditCard,
+  History,
+  Tag,
+  Timer,
+  Gift,
+  ArrowUpRight,
+  ArrowDownRight,
+  RefreshCw,
+  Info,
 } from "lucide-react";
-import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem, Notification } from "@shared/schema";
+import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem, Notification, CreditPackage, CreditBalance, CreditTransaction, Promotion } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
 import { TAIWAN_CITIES, getDistricts, getSchools } from "@shared/taiwan-schools";
@@ -202,6 +212,7 @@ const TAB_ITEMS = [
   { id: "book", label: "預約課程", icon: CalendarDays },
   { id: "children", label: "我的孩子", icon: Users },
   { id: "bookings", label: "預約紀錄", icon: CalendarCheck },
+  { id: "credits", label: "購買堂數", icon: CreditCard },
   { id: "contact-book", label: "聯絡簿", icon: BookOpen },
   { id: "shop", label: "商城", icon: ShoppingBag },
 ];
@@ -406,6 +417,7 @@ export default function ParentDashboard() {
         {activeTab === "book" && <BookingFlowTab />}
         {activeTab === "children" && <ChildrenTab />}
         {activeTab === "bookings" && <BookingsTab />}
+        {activeTab === "credits" && <CreditsTab />}
         {activeTab === "contact-book" && <ContactBookTab />}
         {activeTab === "shop" && <ShopTab />}
       </main>
@@ -671,6 +683,8 @@ function OverviewTab({
         </div>
       )}
 
+      <WalletOverviewCard onNavigate={onNavigate} />
+
       <div className="grid grid-cols-3 gap-2.5">
         <button
           onClick={() => onNavigate("book")}
@@ -704,6 +718,491 @@ function OverviewTab({
         </button>
       </div>
 
+    </div>
+  );
+}
+
+interface WalletData {
+  balance: number;
+  balances: CreditBalance[];
+  expiringBalances: { credits: number; expiresAt: string; daysLeft: number }[];
+}
+
+interface PackagesData {
+  packages: CreditPackage[];
+  promotions: Promotion[];
+}
+
+function WalletOverviewCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  const { data: wallet, isLoading } = useQuery<WalletData>({
+    queryKey: ["/api/parent/wallet"],
+  });
+
+  if (isLoading) {
+    return <Skeleton className="h-28 rounded-xl" />;
+  }
+
+  const balance = wallet?.balance || 0;
+  const expiringBalances = wallet?.expiringBalances || [];
+
+  return (
+    <button
+      onClick={() => onNavigate("credits")}
+      className="w-full bg-gradient-to-r from-tiffany/10 via-white to-tiffany/5 rounded-xl border border-tiffany/20 p-4 text-left hover:shadow-sm transition-all group"
+      data-testid="card-wallet-overview"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+            <Wallet className="w-5 h-5 text-tiffany" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">剩餘堂數</p>
+            <p className="text-2xl font-bold text-foreground" data-testid="text-wallet-balance">
+              {balance} <span className="text-sm font-normal text-muted-foreground">堂</span>
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-tiffany transition-colors">
+          <span>查看詳情</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </div>
+      </div>
+      {expiringBalances.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-tiffany/10">
+          {expiringBalances.map((eb, idx) => (
+            <div key={idx} className="flex items-center gap-1.5 text-xs text-amber-600" data-testid={`text-expiring-${idx}`}>
+              <Timer className="w-3 h-3 flex-shrink-0" />
+              <span>{eb.credits} 堂將於 {new Date(eb.expiresAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })} 到期（剩 {eb.daysLeft} 天）</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </button>
+  );
+}
+
+function CreditsTab() {
+  const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<"packages" | "transactions">("packages");
+  const [couponCode, setCouponCode] = useState("");
+  const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
+  const [couponResult, setCouponResult] = useState<{
+    valid: boolean;
+    coupon: { id: number; code: string; discountType: string; discountValue: number };
+    discount: number;
+  } | null>(null);
+
+  const { data: wallet, isLoading: walletLoading } = useQuery<WalletData>({
+    queryKey: ["/api/parent/wallet"],
+  });
+
+  const { data: packagesData, isLoading: packagesLoading } = useQuery<PackagesData>({
+    queryKey: ["/api/credit-packages"],
+  });
+
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<CreditTransaction[]>({
+    queryKey: ["/api/parent/transactions"],
+  });
+
+  const validateCouponMutation = useMutation({
+    mutationFn: async ({ code, amount }: { code: string; amount: number }) => {
+      const res = await apiRequest("POST", "/api/parent/validate-coupon", { code, amount });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setCouponResult(data);
+      toast({ title: "優惠碼有效", description: `可折抵 $${data.discount}` });
+    },
+    onError: (error: Error) => {
+      setCouponResult(null);
+      toast({ title: "優惠碼無效", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const balance = wallet?.balance || 0;
+  const expiringBalances = wallet?.expiringBalances || [];
+  const balances = wallet?.balances || [];
+  const packages = packagesData?.packages || [];
+  const promotions = packagesData?.promotions || [];
+
+  const getPromotionForPackage = (pkgId: number) => {
+    const now = new Date().toISOString().split("T")[0];
+    return promotions.find(p => {
+      if (!p.isActive) return false;
+      if (p.startDate > now || p.endDate < now) return false;
+      if (p.applicablePackageIds && p.applicablePackageIds.length > 0) {
+        return p.applicablePackageIds.includes(pkgId);
+      }
+      return true;
+    });
+  };
+
+  const getDiscountedPrice = (pkg: CreditPackage) => {
+    const promo = getPromotionForPackage(pkg.id);
+    if (!promo) return pkg.price;
+    if (promo.discountType === "percentage") {
+      return Math.round(pkg.price * (100 - promo.discountValue) / 100);
+    }
+    return Math.max(0, pkg.price - promo.discountValue);
+  };
+
+  const selectedPackage = packages.find(p => p.id === selectedPackageId);
+  const selectedDiscountedPrice = selectedPackage ? getDiscountedPrice(selectedPackage) : 0;
+  const finalPrice = selectedPackage
+    ? Math.max(0, selectedDiscountedPrice - (couponResult?.discount || 0))
+    : 0;
+
+  const handleValidateCoupon = () => {
+    if (!couponCode.trim()) return;
+    if (!selectedPackage) {
+      toast({ title: "請先選擇方案", variant: "destructive" });
+      return;
+    }
+    validateCouponMutation.mutate({ code: couponCode.trim(), amount: selectedDiscountedPrice });
+  };
+
+  const transactionTypeConfig: Record<string, { label: string; icon: typeof ArrowUpRight; colorClass: string; sign: string }> = {
+    purchase: { label: "購買堂數", icon: ArrowUpRight, colorClass: "text-green-600", sign: "+" },
+    deduct: { label: "預約扣除", icon: ArrowDownRight, colorClass: "text-red-500", sign: "-" },
+    refund: { label: "取消退回", icon: RefreshCw, colorClass: "text-blue-500", sign: "+" },
+    expire: { label: "到期失效", icon: Timer, colorClass: "text-gray-500", sign: "-" },
+    admin_adjust: { label: "手動調整", icon: Gift, colorClass: "text-purple-600", sign: "" },
+  };
+
+  const formatPrice = (amount: number) => `$${amount.toLocaleString()}`;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">堂數管理</h2>
+          <p className="text-sm text-muted-foreground">購買堂數、查看餘額與交易紀錄</p>
+        </div>
+        <div className="bg-gray-100 rounded-full p-0.5 flex">
+          <button
+            onClick={() => setViewMode("packages")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+              viewMode === "packages" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-testid="button-view-packages"
+          >
+            購買堂數
+          </button>
+          <button
+            onClick={() => setViewMode("transactions")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+              viewMode === "transactions" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-testid="button-view-transactions"
+          >
+            交易紀錄
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-tiffany/10 via-white to-tiffany/5 rounded-xl border border-tiffany/20 p-5">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+            <Wallet className="w-6 h-6 text-tiffany" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">目前剩餘堂數</p>
+            {walletLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <p className="text-3xl font-bold text-foreground" data-testid="text-credits-balance">
+                {balance} <span className="text-base font-normal text-muted-foreground">堂</span>
+              </p>
+            )}
+          </div>
+        </div>
+        {expiringBalances.length > 0 && (
+          <div className="space-y-1.5 mt-3 pt-3 border-t border-tiffany/10">
+            {expiringBalances.map((eb, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50/60 px-2.5 py-1.5 rounded-lg" data-testid={`text-credits-expiring-${idx}`}>
+                <Timer className="w-3 h-3 flex-shrink-0" />
+                <span>{eb.credits} 堂將於 {new Date(eb.expiresAt).toLocaleDateString("zh-TW", { year: "numeric", month: "short", day: "numeric" })} 到期（剩 {eb.daysLeft} 天）</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {!walletLoading && balances.filter(b => b.remainingCredits > 0).length > 0 && (
+          <div className="mt-3 pt-3 border-t border-tiffany/10">
+            <p className="text-xs text-muted-foreground mb-2">各筆餘額明細</p>
+            <div className="space-y-1">
+              {balances.filter(b => b.remainingCredits > 0).map((b) => (
+                <div key={b.id} className="flex items-center justify-between text-xs" data-testid={`balance-detail-${b.id}`}>
+                  <span className="text-muted-foreground">
+                    {b.createdAt ? new Date(b.createdAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric" }) : ""} 購入
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-foreground font-medium">{b.remainingCredits}/{b.originalCredits} 堂</span>
+                    {b.expiresAt ? (
+                      <span className="text-muted-foreground">
+                        {new Date(b.expiresAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })} 到期
+                      </span>
+                    ) : (
+                      <span className="text-tiffany">永不到期</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {viewMode === "packages" && (
+        <div className="space-y-5">
+          {promotions.filter(p => p.isActive).length > 0 && (
+            <div className="space-y-2">
+              {promotions.filter(p => p.isActive).map(promo => (
+                <div key={promo.id} className="bg-gradient-to-r from-coral/5 to-coral/10 rounded-xl border border-coral/20 p-3.5 flex items-center gap-3" data-testid={`promo-banner-${promo.id}`}>
+                  <div className="w-9 h-9 rounded-full bg-coral/10 flex items-center justify-center flex-shrink-0">
+                    <Tag className="w-4.5 h-4.5 text-coral" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{promo.name}</p>
+                    {promo.description && <p className="text-xs text-muted-foreground mt-0.5">{promo.description}</p>}
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {promo.startDate} ~ {promo.endDate}
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold text-coral flex-shrink-0">
+                    {promo.discountType === "percentage" ? `${promo.discountValue}% OFF` : `$${promo.discountValue} OFF`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+              <CreditCard className="w-4 h-4 text-tiffany" />
+              選擇堂數方案
+            </h3>
+            {packagesLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-40 rounded-xl" />
+                ))}
+              </div>
+            ) : packages.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                <Package className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">目前沒有可購買的方案</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {packages.map(pkg => {
+                  const promo = getPromotionForPackage(pkg.id);
+                  const discountedPrice = getDiscountedPrice(pkg);
+                  const isSelected = selectedPackageId === pkg.id;
+                  const perClassPrice = Math.round(discountedPrice / pkg.credits);
+
+                  return (
+                    <button
+                      key={pkg.id}
+                      onClick={() => {
+                        setSelectedPackageId(isSelected ? null : pkg.id);
+                        setCouponResult(null);
+                      }}
+                      className={`text-left rounded-xl border p-4 transition-all ${
+                        isSelected
+                          ? "border-tiffany bg-tiffany/5 shadow-sm"
+                          : "border-gray-100 bg-white hover:border-tiffany/30 hover:shadow-sm"
+                      }`}
+                      data-testid={`card-package-${pkg.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground" data-testid={`text-package-name-${pkg.id}`}>{pkg.name}</p>
+                          {pkg.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{pkg.description}</p>
+                          )}
+                        </div>
+                        {isSelected && <CheckCircle2 className="w-5 h-5 text-tiffany flex-shrink-0" />}
+                      </div>
+                      <div className="flex items-end justify-between gap-2">
+                        <div>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-2xl font-bold text-foreground" data-testid={`text-package-credits-${pkg.id}`}>
+                              {pkg.credits}
+                            </span>
+                            <span className="text-sm text-muted-foreground">堂</span>
+                          </div>
+                          {pkg.expiryDays && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              有效期 {pkg.expiryDays} 天
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          {promo ? (
+                            <>
+                              <span className="text-xs text-muted-foreground line-through">{formatPrice(pkg.price)}</span>
+                              <p className="text-lg font-bold text-coral" data-testid={`text-package-price-${pkg.id}`}>
+                                {formatPrice(discountedPrice)}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-lg font-bold text-foreground" data-testid={`text-package-price-${pkg.id}`}>
+                              {formatPrice(pkg.price)}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground">
+                            每堂 {formatPrice(perClassPrice)}
+                          </p>
+                        </div>
+                      </div>
+                      {promo && (
+                        <div className="mt-2 pt-2 border-t border-gray-100">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-coral bg-coral/10 px-2 py-0.5 rounded-full" data-testid={`badge-promo-${pkg.id}`}>
+                            <Tag className="w-2.5 h-2.5" />
+                            {promo.name}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {selectedPackageId && selectedPackage && (
+            <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <Gift className="w-4 h-4 text-tiffany" />
+                優惠碼
+              </h3>
+              <div className="flex gap-2">
+                <Input
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="輸入優惠碼"
+                  className="flex-1"
+                  data-testid="input-coupon-code"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleValidateCoupon}
+                  disabled={!couponCode.trim() || validateCouponMutation.isPending}
+                  data-testid="button-validate-coupon"
+                >
+                  {validateCouponMutation.isPending ? "驗證中..." : "套用"}
+                </Button>
+              </div>
+              {couponResult && (
+                <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg" data-testid="text-coupon-result">
+                  <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>優惠碼 {couponResult.coupon.code} 已套用，折抵 {formatPrice(couponResult.discount)}</span>
+                </div>
+              )}
+
+              <div className="border-t border-gray-100 pt-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">方案</span>
+                  <span className="text-foreground font-medium" data-testid="text-summary-package">{selectedPackage.name} ({selectedPackage.credits} 堂)</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">原價</span>
+                  <span className="text-foreground">{formatPrice(selectedPackage.price)}</span>
+                </div>
+                {getPromotionForPackage(selectedPackage.id) && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">活動折扣</span>
+                    <span className="text-coral">-{formatPrice(selectedPackage.price - selectedDiscountedPrice)}</span>
+                  </div>
+                )}
+                {couponResult && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">優惠碼折扣</span>
+                    <span className="text-coral">-{formatPrice(couponResult.discount)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-base font-bold border-t border-gray-100 pt-2">
+                  <span className="text-foreground">應付金額</span>
+                  <span className="text-tiffany" data-testid="text-final-price">{formatPrice(finalPrice)}</span>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/60 rounded-lg border border-amber-200/50 px-3 py-2">
+                <p className="text-[11px] text-amber-700 leading-relaxed flex items-start gap-1.5">
+                  <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                  <span>線上金流功能開發中，目前請聯繫總部購買堂數。完成付款後，總部將為您手動加值堂數。</span>
+                </p>
+              </div>
+
+              <Button
+                className="w-full rounded-full"
+                disabled
+                style={{ backgroundColor: "#81D8D0", color: "white", opacity: 0.6 }}
+                data-testid="button-purchase-credits"
+              >
+                請聯繫總部購買
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {viewMode === "transactions" && (
+        <div className="space-y-3">
+          {transactionsLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-xl" />
+              ))}
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
+              <History className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+              <h3 className="text-sm font-semibold text-foreground mb-1">尚無交易紀錄</h3>
+              <p className="text-xs text-muted-foreground">購買堂數或預約課程後，交易紀錄將顯示在此</p>
+            </div>
+          ) : (
+            transactions.map((tx) => {
+              const config = transactionTypeConfig[tx.type] || transactionTypeConfig.purchase;
+              const Icon = config.icon;
+              const isPositive = tx.credits > 0;
+
+              return (
+                <div
+                  key={tx.id}
+                  className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3"
+                  data-testid={`transaction-item-${tx.id}`}
+                >
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    isPositive ? "bg-green-50" : "bg-red-50"
+                  }`}>
+                    <Icon className={`w-4 h-4 ${config.colorClass}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground" data-testid={`text-tx-type-${tx.id}`}>{config.label}</p>
+                    </div>
+                    {tx.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate" data-testid={`text-tx-desc-${tx.id}`}>{tx.description}</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString("zh-TW", {
+                        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+                      }) : ""}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-sm font-bold ${isPositive ? "text-green-600" : "text-red-500"}`} data-testid={`text-tx-credits-${tx.id}`}>
+                      {isPositive ? "+" : ""}{tx.credits} 堂
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -828,6 +1327,8 @@ function BookingFlowTab() {
       toast({ title: "預約成功！", description: "您的課程已確認預約" });
       queryClient.invalidateQueries({ queryKey: ["/api/franchises", selectedFranchiseId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/transactions"] });
 
       if (localStorage.getItem("autoCalendarSync") === "true") {
         setTimeout(() => {
@@ -864,7 +1365,14 @@ function BookingFlowTab() {
       setStep("detail");
     },
     onError: (error: Error) => {
-      toast({ title: "預約失敗", description: error.message, variant: "destructive" });
+      const msg = error.message || "";
+      const isInsufficientCredits = msg.includes("堂數不足") || msg.includes("INSUFFICIENT_CREDITS");
+      toast({
+        title: isInsufficientCredits ? "堂數不足" : "預約失敗",
+        description: isInsufficientCredits ? "您的堂數餘額不足，請先購買堂數後再預約課程。" : msg,
+        variant: "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
     },
   });
 
@@ -2303,6 +2811,8 @@ function BookingsTab() {
     onSuccess: () => {
       toast({ title: "已取消預約" });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/transactions"] });
       setCancelTarget(null);
     },
     onError: (error: Error) => {

@@ -275,3 +275,104 @@ export const notifications = pgTable("notifications", {
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export const creditPackages = pgTable("credit_packages", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  credits: integer("credits").notNull(),
+  price: integer("price").notNull(),
+  expiryDays: integer("expiry_days"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditPackageSchema = createInsertSchema(creditPackages).omit({ id: true, createdAt: true });
+export type CreditPackage = typeof creditPackages.$inferSelect;
+export type InsertCreditPackage = z.infer<typeof insertCreditPackageSchema>;
+
+export const promotions = pgTable("promotions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  discountType: text("discount_type").notNull(),
+  discountValue: integer("discount_value").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  applicablePackageIds: integer("applicable_package_ids").array(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPromotionSchema = createInsertSchema(promotions).omit({ id: true, createdAt: true });
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
+
+export const couponCodes = pgTable("coupon_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  discountType: text("discount_type").notNull(),
+  discountValue: integer("discount_value").notNull(),
+  maxUses: integer("max_uses"),
+  currentUses: integer("current_uses").default(0).notNull(),
+  minPurchaseAmount: integer("min_purchase_amount"),
+  validFrom: text("valid_from"),
+  validUntil: text("valid_until"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCouponCodeSchema = createInsertSchema(couponCodes).omit({ id: true, createdAt: true });
+export type CouponCode = typeof couponCodes.$inferSelect;
+export type InsertCouponCode = z.infer<typeof insertCouponCodeSchema>;
+
+export const creditPurchases = pgTable("credit_purchases", {
+  id: serial("id").primaryKey(),
+  parentId: varchar("parent_id").references(() => users.id).notNull(),
+  packageId: integer("package_id").references(() => creditPackages.id),
+  credits: integer("credits").notNull(),
+  originalAmount: integer("original_amount").notNull(),
+  discountAmount: integer("discount_amount").default(0).notNull(),
+  finalAmount: integer("final_amount").notNull(),
+  promotionId: integer("promotion_id").references(() => promotions.id),
+  couponId: integer("coupon_id").references(() => couponCodes.id),
+  paymentMethod: text("payment_method").default("manual").notNull(),
+  paymentStatus: text("payment_status").default("pending").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditPurchaseSchema = createInsertSchema(creditPurchases).omit({ id: true, createdAt: true });
+export type CreditPurchase = typeof creditPurchases.$inferSelect;
+export type InsertCreditPurchase = z.infer<typeof insertCreditPurchaseSchema>;
+
+export const creditBalances = pgTable("credit_balances", {
+  id: serial("id").primaryKey(),
+  parentId: varchar("parent_id").references(() => users.id).notNull(),
+  purchaseId: integer("purchase_id").references(() => creditPurchases.id),
+  originalCredits: integer("original_credits").notNull(),
+  remainingCredits: integer("remaining_credits").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditBalanceSchema = createInsertSchema(creditBalances).omit({ id: true, createdAt: true });
+export type CreditBalance = typeof creditBalances.$inferSelect;
+export type InsertCreditBalance = z.infer<typeof insertCreditBalanceSchema>;
+
+export const creditTransactions = pgTable("credit_transactions", {
+  id: serial("id").primaryKey(),
+  parentId: varchar("parent_id").references(() => users.id).notNull(),
+  type: text("type").notNull(),
+  credits: integer("credits").notNull(),
+  balanceId: integer("balance_id").references(() => creditBalances.id),
+  bookingId: integer("booking_id").references(() => bookings.id),
+  purchaseId: integer("purchase_id").references(() => creditPurchases.id),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditTransactionSchema = createInsertSchema(creditTransactions).omit({ id: true, createdAt: true });
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { franchises, coaches, faqs, successStories, timeSlots } from "@shared/schema";
+import { franchises, coaches, faqs, successStories, timeSlots, creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { sql, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -12,6 +12,7 @@ export async function seedDatabase() {
 
     if (Number(existing.count) > 0) {
       await seedAccounts();
+      await seedCreditData();
       return;
     }
 
@@ -426,6 +427,7 @@ export async function seedDatabase() {
     console.log("Franchise admin accounts created");
 
     await seedAccounts();
+    await seedCreditData();
 
     console.log("Database seeded successfully!");
   } catch (error) {
@@ -454,4 +456,127 @@ async function seedAccounts() {
       console.log(`Parent account created: ${acct.username}`);
     }
   }
+}
+
+async function seedCreditData() {
+  const [existingPkg] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(creditPackages);
+
+  if (Number(existingPkg.count) > 0) {
+    return;
+  }
+
+  console.log("Seeding credit packages, promotions, and coupon codes...");
+
+  const insertedPackages = await db.insert(creditPackages).values([
+    {
+      name: "體驗方案",
+      credits: 1,
+      price: 350,
+      expiryDays: 30,
+      description: "適合初次體驗，1 堂課感受質數教室的教學品質",
+      isActive: true,
+      sortOrder: 1,
+    },
+    {
+      name: "基礎方案",
+      credits: 10,
+      price: 3000,
+      expiryDays: 180,
+      description: "入門首選，10 堂課建立穩固的數學基礎",
+      isActive: true,
+      sortOrder: 2,
+    },
+    {
+      name: "標準方案",
+      credits: 20,
+      price: 5600,
+      expiryDays: 365,
+      description: "最受歡迎方案，20 堂課系統性提升數學能力",
+      isActive: true,
+      sortOrder: 3,
+    },
+    {
+      name: "精英方案",
+      credits: 50,
+      price: 12500,
+      expiryDays: 365,
+      description: "長期學習計畫，50 堂課全面打造數學實力",
+      isActive: true,
+      sortOrder: 4,
+    },
+  ]).returning();
+
+  const today = new Date();
+  const startDate = today.toISOString().split("T")[0];
+  const endDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  await db.insert(promotions).values([
+    {
+      name: "春季優惠",
+      description: "春季限定 85 折優惠，適用於基礎方案以上",
+      discountType: "percentage",
+      discountValue: 15,
+      startDate,
+      endDate,
+      applicablePackageIds: [insertedPackages[1].id, insertedPackages[2].id, insertedPackages[3].id],
+      isActive: true,
+    },
+  ]);
+
+  await db.insert(couponCodes).values([
+    {
+      code: "WELCOME100",
+      discountType: "fixed",
+      discountValue: 100,
+      maxUses: 100,
+      currentUses: 0,
+      minPurchaseAmount: 1000,
+      validFrom: startDate,
+      validUntil: endDate,
+      isActive: true,
+    },
+  ]);
+
+  const parentUsernames = ["parent1", "parent2", "parent3"];
+  for (const username of parentUsernames) {
+    const [parentUser] = await db.select().from(users).where(eq(users.username, username));
+    if (!parentUser) continue;
+
+    const expiresAt = new Date(today.getTime() + 180 * 24 * 60 * 60 * 1000);
+
+    const [purchase] = await db.insert(creditPurchases).values({
+      parentId: parentUser.id,
+      packageId: insertedPackages[1].id,
+      credits: 10,
+      originalAmount: 3000,
+      discountAmount: 0,
+      finalAmount: 3000,
+      paymentMethod: "manual",
+      paymentStatus: "paid",
+      expiresAt,
+    }).returning();
+
+    const [balance] = await db.insert(creditBalances).values({
+      parentId: parentUser.id,
+      purchaseId: purchase.id,
+      originalCredits: 10,
+      remainingCredits: 10,
+      expiresAt,
+    }).returning();
+
+    await db.insert(creditTransactions).values({
+      parentId: parentUser.id,
+      type: "purchase",
+      credits: 10,
+      balanceId: balance.id,
+      purchaseId: purchase.id,
+      description: "基礎方案 - 手動加點（測試資料）",
+    });
+
+    console.log(`Added 10 test credits for ${username}`);
+  }
+
+  console.log("Credit system seed data created successfully!");
 }

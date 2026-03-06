@@ -2,6 +2,7 @@ import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
   coachDailyRecords, classrooms, notifications,
+  creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -22,9 +23,15 @@ import {
   type FavoriteFranchise,
   type CoachDailyRecord,
   type Classroom, type InsertClassroom,
+  type CreditPackage, type InsertCreditPackage,
+  type Promotion, type InsertPromotion,
+  type CouponCode, type InsertCouponCode,
+  type CreditPurchase, type InsertCreditPurchase,
+  type CreditBalance, type InsertCreditBalance,
+  type CreditTransaction, type InsertCreditTransaction,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql, desc, inArray, gte, lte } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
 
 export interface IStorage {
   getCoaches(): Promise<Coach[]>;
@@ -183,6 +190,35 @@ export interface IStorage {
   createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
 
   getAllFranchiseAnalytics(): Promise<any[]>;
+
+  getCreditPackages(): Promise<CreditPackage[]>;
+  getActiveCreditPackages(): Promise<CreditPackage[]>;
+  createCreditPackage(data: InsertCreditPackage): Promise<CreditPackage>;
+  updateCreditPackage(id: number, data: Partial<InsertCreditPackage>): Promise<CreditPackage>;
+
+  getPromotions(): Promise<Promotion[]>;
+  getActivePromotions(): Promise<Promotion[]>;
+  createPromotion(data: InsertPromotion): Promise<Promotion>;
+  updatePromotion(id: number, data: Partial<InsertPromotion>): Promise<Promotion>;
+
+  getCouponCodes(): Promise<CouponCode[]>;
+  getCouponByCode(code: string): Promise<CouponCode | undefined>;
+  createCouponCode(data: InsertCouponCode): Promise<CouponCode>;
+  updateCouponCode(id: number, data: Partial<InsertCouponCode>): Promise<CouponCode>;
+  incrementCouponUsage(id: number): Promise<void>;
+
+  createCreditPurchase(data: InsertCreditPurchase): Promise<CreditPurchase>;
+  updatePurchaseStatus(id: number, status: string): Promise<CreditPurchase>;
+  getPurchasesByParent(parentId: string): Promise<CreditPurchase[]>;
+
+  getParentBalance(parentId: string): Promise<number>;
+  getCreditBalances(parentId: string): Promise<CreditBalance[]>;
+  deductCredits(parentId: string, amount: number, bookingId?: number, description?: string): Promise<CreditTransaction>;
+  refundCredits(parentId: string, bookingId: number, description?: string): Promise<CreditTransaction | null>;
+  addCredits(parentId: string, purchaseId: number, credits: number, expiresAt: Date | null): Promise<CreditBalance>;
+
+  createCreditTransaction(data: InsertCreditTransaction): Promise<CreditTransaction>;
+  getTransactionsByParent(parentId: string): Promise<CreditTransaction[]>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -1820,11 +1856,17 @@ export class DatabaseStorage implements IStorage {
     for (const b of activeBookings) {
       await db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
 
+      try {
+        await this.refundCredits(b.parentId, b.id, `教室取消課程退回 1 堂（${slot.date} ${slot.startTime}）`);
+      } catch (refundErr) {
+        console.error("Refund failed for booking", b.id, refundErr);
+      }
+
       await db.insert(notifications).values({
         userId: b.parentId,
         type: "slot_cancelled",
         title: "課程已取消",
-        message: `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消。`,
+        message: `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂。`,
         isRead: false,
       });
     }
@@ -1850,6 +1892,198 @@ export class DatabaseStorage implements IStorage {
   async getUnreadNotificationCount(userId: string): Promise<number> {
     const result = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
     return Number(result[0]?.count || 0);
+  }
+  async getCreditPackages(): Promise<CreditPackage[]> {
+    return db.select().from(creditPackages).orderBy(creditPackages.sortOrder, creditPackages.id);
+  }
+
+  async getActiveCreditPackages(): Promise<CreditPackage[]> {
+    return db.select().from(creditPackages).where(eq(creditPackages.isActive, true)).orderBy(creditPackages.sortOrder, creditPackages.id);
+  }
+
+  async createCreditPackage(data: InsertCreditPackage): Promise<CreditPackage> {
+    const [created] = await db.insert(creditPackages).values(data).returning();
+    return created;
+  }
+
+  async updateCreditPackage(id: number, data: Partial<InsertCreditPackage>): Promise<CreditPackage> {
+    const [updated] = await db.update(creditPackages).set(data).where(eq(creditPackages.id, id)).returning();
+    return updated;
+  }
+
+  async getPromotions(): Promise<Promotion[]> {
+    return db.select().from(promotions).orderBy(desc(promotions.createdAt));
+  }
+
+  async getActivePromotions(): Promise<Promotion[]> {
+    const today = new Date().toISOString().split("T")[0];
+    return db.select().from(promotions).where(
+      and(eq(promotions.isActive, true), lte(promotions.startDate, today), gte(promotions.endDate, today))
+    ).orderBy(desc(promotions.createdAt));
+  }
+
+  async createPromotion(data: InsertPromotion): Promise<Promotion> {
+    const [created] = await db.insert(promotions).values(data).returning();
+    return created;
+  }
+
+  async updatePromotion(id: number, data: Partial<InsertPromotion>): Promise<Promotion> {
+    const [updated] = await db.update(promotions).set(data).where(eq(promotions.id, id)).returning();
+    return updated;
+  }
+
+  async getCouponCodes(): Promise<CouponCode[]> {
+    return db.select().from(couponCodes).orderBy(desc(couponCodes.createdAt));
+  }
+
+  async getCouponByCode(code: string): Promise<CouponCode | undefined> {
+    const [coupon] = await db.select().from(couponCodes).where(eq(couponCodes.code, code));
+    return coupon;
+  }
+
+  async createCouponCode(data: InsertCouponCode): Promise<CouponCode> {
+    const [created] = await db.insert(couponCodes).values(data).returning();
+    return created;
+  }
+
+  async updateCouponCode(id: number, data: Partial<InsertCouponCode>): Promise<CouponCode> {
+    const [updated] = await db.update(couponCodes).set(data).where(eq(couponCodes.id, id)).returning();
+    return updated;
+  }
+
+  async incrementCouponUsage(id: number): Promise<void> {
+    await db.update(couponCodes).set({ currentUses: sql`${couponCodes.currentUses} + 1` }).where(eq(couponCodes.id, id));
+  }
+
+  async createCreditPurchase(data: InsertCreditPurchase): Promise<CreditPurchase> {
+    const [created] = await db.insert(creditPurchases).values(data).returning();
+    return created;
+  }
+
+  async updatePurchaseStatus(id: number, status: string): Promise<CreditPurchase> {
+    const [updated] = await db.update(creditPurchases).set({ paymentStatus: status }).where(eq(creditPurchases.id, id)).returning();
+    return updated;
+  }
+
+  async getPurchasesByParent(parentId: string): Promise<CreditPurchase[]> {
+    return db.select().from(creditPurchases).where(eq(creditPurchases.parentId, parentId)).orderBy(desc(creditPurchases.createdAt));
+  }
+
+  async getParentBalance(parentId: string): Promise<number> {
+    const now = new Date();
+    const [result] = await db.select({ total: sql<number>`COALESCE(SUM(${creditBalances.remainingCredits}), 0)` })
+      .from(creditBalances)
+      .where(and(
+        eq(creditBalances.parentId, parentId),
+        gt(creditBalances.remainingCredits, 0),
+        sql`(${creditBalances.expiresAt} IS NULL OR ${creditBalances.expiresAt} > ${now})`
+      ));
+    return Number(result.total);
+  }
+
+  async getCreditBalances(parentId: string): Promise<CreditBalance[]> {
+    const now = new Date();
+    return db.select().from(creditBalances)
+      .where(and(
+        eq(creditBalances.parentId, parentId),
+        gt(creditBalances.remainingCredits, 0),
+        sql`(${creditBalances.expiresAt} IS NULL OR ${creditBalances.expiresAt} > ${now})`
+      ))
+      .orderBy(asc(creditBalances.expiresAt), asc(creditBalances.id));
+  }
+
+  async deductCredits(parentId: string, amount: number, bookingId?: number, description?: string): Promise<CreditTransaction> {
+    const now = new Date();
+    const balances = await db.select().from(creditBalances)
+      .where(and(
+        eq(creditBalances.parentId, parentId),
+        gt(creditBalances.remainingCredits, 0),
+        sql`(${creditBalances.expiresAt} IS NULL OR ${creditBalances.expiresAt} > ${now})`
+      ))
+      .orderBy(asc(creditBalances.expiresAt), asc(creditBalances.id));
+
+    let remaining = amount;
+    let lastBalanceId: number | null = null;
+
+    for (const bal of balances) {
+      if (remaining <= 0) break;
+      const deduct = Math.min(remaining, bal.remainingCredits);
+      await db.update(creditBalances)
+        .set({ remainingCredits: bal.remainingCredits - deduct })
+        .where(eq(creditBalances.id, bal.id));
+      remaining -= deduct;
+      lastBalanceId = bal.id;
+    }
+
+    if (remaining > 0) {
+      throw new Error("點數餘額不足");
+    }
+
+    const [tx] = await db.insert(creditTransactions).values({
+      parentId,
+      type: "deduct",
+      credits: -amount,
+      balanceId: lastBalanceId,
+      bookingId: bookingId || null,
+      description: description || "預約扣除堂數",
+    }).returning();
+    return tx;
+  }
+
+  async refundCredits(parentId: string, bookingId: number, description?: string): Promise<CreditTransaction | null> {
+    const [deductTx] = await db.select().from(creditTransactions)
+      .where(and(
+        eq(creditTransactions.parentId, parentId),
+        eq(creditTransactions.bookingId, bookingId),
+        eq(creditTransactions.type, "deduct"),
+      ))
+      .orderBy(desc(creditTransactions.createdAt))
+      .limit(1);
+
+    if (!deductTx) return null;
+
+    const refundAmount = Math.abs(deductTx.credits);
+
+    if (deductTx.balanceId) {
+      const [bal] = await db.select().from(creditBalances).where(eq(creditBalances.id, deductTx.balanceId));
+      if (bal) {
+        await db.update(creditBalances)
+          .set({ remainingCredits: bal.remainingCredits + refundAmount })
+          .where(eq(creditBalances.id, bal.id));
+      }
+    }
+
+    const [tx] = await db.insert(creditTransactions).values({
+      parentId,
+      type: "refund",
+      credits: refundAmount,
+      balanceId: deductTx.balanceId,
+      bookingId,
+      description: description || "取消預約退回堂數",
+    }).returning();
+    return tx;
+  }
+
+  async addCredits(parentId: string, purchaseId: number, credits: number, expiresAt: Date | null): Promise<CreditBalance> {
+    const [balance] = await db.insert(creditBalances).values({
+      parentId,
+      purchaseId,
+      originalCredits: credits,
+      remainingCredits: credits,
+      expiresAt,
+    }).returning();
+    return balance;
+  }
+
+  async createCreditTransaction(data: InsertCreditTransaction): Promise<CreditTransaction> {
+    const [created] = await db.insert(creditTransactions).values(data).returning();
+    return created;
+  }
+
+  async getTransactionsByParent(parentId: string): Promise<CreditTransaction[]> {
+    return db.select().from(creditTransactions)
+      .where(eq(creditTransactions.parentId, parentId))
+      .orderBy(desc(creditTransactions.createdAt));
   }
 }
 

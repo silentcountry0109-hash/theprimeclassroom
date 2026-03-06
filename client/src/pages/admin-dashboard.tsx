@@ -68,9 +68,15 @@ import {
   Globe,
   Save,
   FileText,
+  Coins,
+  Ticket,
+  Wallet,
+  Gift,
+  DollarSign,
+  TrendingUp,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem } from "@shared/schema";
+import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS } from "@shared/constants";
 
@@ -110,6 +116,7 @@ export default function AdminDashboard() {
     { id: "users", label: "帳號管理", icon: UserCog },
     { id: "announcements", label: "公告管理", icon: Megaphone },
     { id: "shop", label: "商城管理", icon: ShoppingBag },
+    { id: "credits", label: "點數管理", icon: Coins },
     { id: "site-editor", label: "官網編輯", icon: Globe },
   ];
 
@@ -179,6 +186,7 @@ export default function AdminDashboard() {
             {activeTab === "users" && <UsersTab />}
             {activeTab === "announcements" && <AnnouncementsTab />}
             {activeTab === "shop" && <ShopManagementTab />}
+            {activeTab === "credits" && <CreditsManagementTab />}
             {activeTab === "site-editor" && <SiteEditorTab />}
           </main>
         </div>
@@ -2129,6 +2137,706 @@ function OrderItemsDetail({ orderId }: { orderId: number }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+interface ParentWallet {
+  parentId: string;
+  parentName: string;
+  username: string;
+  balance: number;
+}
+
+interface CreditSalesStats {
+  totalRevenue: number;
+  totalCredits: number;
+  totalPurchases: number;
+  packageStats: { name: string; count: number; credits: number; revenue: number }[];
+  couponStats: { code: string; uses: number; maxUses: number | null }[];
+}
+
+function CreditsManagementTab() {
+  const [subTab, setSubTab] = useState<"packages" | "promotions" | "coupons" | "wallets">("packages");
+
+  const subTabs = [
+    { id: "packages" as const, label: "堂數方案", icon: Package },
+    { id: "promotions" as const, label: "優惠活動", icon: Gift },
+    { id: "coupons" as const, label: "優惠碼", icon: Ticket },
+    { id: "wallets" as const, label: "家長點數", icon: Wallet },
+  ];
+
+  const { data: salesStats, isLoading: statsLoading } = useQuery<CreditSalesStats>({
+    queryKey: ["/api/admin/credit-sales-stats"],
+  });
+
+  const statCards = [
+    { label: "總收入", value: salesStats ? `NT$ ${salesStats.totalRevenue.toLocaleString()}` : "-", icon: DollarSign, color: "bg-green-50 text-green-600" },
+    { label: "已售堂數", value: salesStats?.totalCredits ?? "-", icon: TrendingUp, color: "bg-tiffany/10 text-tiffany" },
+    { label: "購買筆數", value: salesStats?.totalPurchases ?? "-", icon: Coins, color: "bg-coral/10 text-coral" },
+  ];
+
+  return (
+    <div className="max-w-5xl">
+      <h1 className="text-xl font-semibold text-foreground mb-1" data-testid="text-credits-title">
+        點數管理
+      </h1>
+      <p className="text-sm text-muted-foreground mb-6">
+        管理堂數方案、優惠活動、優惠碼，以及為家長手動加點
+      </p>
+
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {statCards.map((card) => (
+          <div key={card.label} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`stat-credit-${card.label}`}>
+            {statsLoading ? (
+              <Skeleton className="h-14" />
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${card.color}`}>
+                  <card.icon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xl font-bold text-foreground truncate">{card.value}</p>
+                  <p className="text-[11px] text-muted-foreground">{card.label}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {subTabs.map((tab) => (
+          <Button
+            key={tab.id}
+            variant={subTab === tab.id ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSubTab(tab.id)}
+            data-testid={`button-credits-tab-${tab.id}`}
+          >
+            <tab.icon className="w-4 h-4 mr-1.5" />
+            {tab.label}
+          </Button>
+        ))}
+      </div>
+
+      {subTab === "packages" && <CreditPackagesSection />}
+      {subTab === "promotions" && <PromotionsSection />}
+      {subTab === "coupons" && <CouponsSection />}
+      {subTab === "wallets" && <ParentWalletsSection />}
+    </div>
+  );
+}
+
+function CreditPackagesSection() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<CreditPackage | null>(null);
+  const [form, setForm] = useState({ name: "", credits: 0, price: 0, expiryDays: null as number | null, description: "", isActive: true, sortOrder: 0 });
+
+  const { data: packages = [], isLoading } = useQuery<CreditPackage[]>({
+    queryKey: ["/api/admin/credit-packages"],
+  });
+
+  const resetForm = () => {
+    setForm({ name: "", credits: 0, price: 0, expiryDays: null, description: "", isActive: true, sortOrder: 0 });
+    setEditing(null);
+  };
+
+  const openAdd = () => { resetForm(); setShowDialog(true); };
+  const openEdit = (pkg: CreditPackage) => {
+    setEditing(pkg);
+    setForm({ name: pkg.name, credits: pkg.credits, price: pkg.price, expiryDays: pkg.expiryDays, description: pkg.description || "", isActive: pkg.isActive, sortOrder: pkg.sortOrder });
+    setShowDialog(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: typeof form) => {
+      if (editing) {
+        const res = await apiRequest("PATCH", `/api/admin/credit-packages/${editing.id}`, data);
+        return res.json();
+      }
+      const res = await apiRequest("POST", "/api/admin/credit-packages", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: editing ? "方案已更新" : "方案已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/credit-packages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/credit-sales-stats"] });
+      setShowDialog(false);
+      resetForm();
+    },
+  });
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        <h2 className="text-base font-semibold text-foreground" data-testid="text-packages-title">堂數方案</h2>
+        <Button onClick={openAdd} className="rounded-full" data-testid="button-add-package">
+          <Plus className="w-4 h-4 mr-1.5" />新增方案
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
+      ) : packages.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+          <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">尚無堂數方案</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {packages.map((pkg) => (
+            <div key={pkg.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`package-card-${pkg.id}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-foreground" data-testid={`text-package-name-${pkg.id}`}>{pkg.name}</p>
+                    {!pkg.isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground">停用</span>}
+                  </div>
+                  <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
+                    <span data-testid={`text-package-credits-${pkg.id}`}>{pkg.credits} 堂</span>
+                    <span data-testid={`text-package-price-${pkg.id}`}>NT$ {pkg.price.toLocaleString()}</span>
+                    <span>每堂 NT$ {Math.round(pkg.price / pkg.credits)}</span>
+                    <span>{pkg.expiryDays ? `${pkg.expiryDays} 天有效` : "永不過期"}</span>
+                  </div>
+                  {pkg.description && <p className="text-xs text-muted-foreground mt-1">{pkg.description}</p>}
+                </div>
+                <Button variant="outline" size="icon" onClick={() => openEdit(pkg)} data-testid={`button-edit-package-${pkg.id}`}>
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "編輯堂數方案" : "新增堂數方案"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>方案名稱 *</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例：基礎方案" data-testid="input-package-name" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>堂數 *</Label>
+                <Input type="number" min="1" value={form.credits || ""} onChange={(e) => setForm({ ...form, credits: parseInt(e.target.value) || 0 })} data-testid="input-package-credits" />
+              </div>
+              <div>
+                <Label>定價 (TWD) *</Label>
+                <Input type="number" min="0" value={form.price || ""} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} data-testid="input-package-price" />
+              </div>
+            </div>
+            <div>
+              <Label>有效天數（空白=永不過期）</Label>
+              <Input type="number" min="1" value={form.expiryDays ?? ""} onChange={(e) => setForm({ ...form, expiryDays: e.target.value ? parseInt(e.target.value) : null })} placeholder="例：180" data-testid="input-package-expiry" />
+            </div>
+            <div>
+              <Label>說明</Label>
+              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="方案說明" data-testid="input-package-description" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Label>啟用狀態</Label>
+              <Switch checked={form.isActive} onCheckedChange={(checked) => setForm({ ...form, isActive: checked })} data-testid="switch-package-active" />
+              <span className="text-sm text-muted-foreground">{form.isActive ? "啟用中" : "已停用"}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setShowDialog(false); }}>取消</Button>
+            <Button onClick={() => saveMutation.mutate(form)} disabled={!form.name || !form.credits || !form.price || saveMutation.isPending} data-testid="button-submit-package">
+              {saveMutation.isPending ? "儲存中..." : editing ? "更新" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PromotionsSection() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<Promotion | null>(null);
+  const [form, setForm] = useState({
+    name: "", description: "", discountType: "percentage", discountValue: 0,
+    startDate: "", endDate: "", applicablePackageIds: [] as number[], isActive: true,
+  });
+
+  const { data: promotions = [], isLoading } = useQuery<Promotion[]>({
+    queryKey: ["/api/admin/promotions"],
+  });
+
+  const { data: packages = [] } = useQuery<CreditPackage[]>({
+    queryKey: ["/api/admin/credit-packages"],
+  });
+
+  const resetForm = () => {
+    setForm({ name: "", description: "", discountType: "percentage", discountValue: 0, startDate: "", endDate: "", applicablePackageIds: [], isActive: true });
+    setEditing(null);
+  };
+
+  const openAdd = () => { resetForm(); setShowDialog(true); };
+  const openEdit = (promo: Promotion) => {
+    setEditing(promo);
+    setForm({
+      name: promo.name, description: promo.description || "", discountType: promo.discountType,
+      discountValue: promo.discountValue, startDate: promo.startDate, endDate: promo.endDate,
+      applicablePackageIds: promo.applicablePackageIds || [], isActive: promo.isActive,
+    });
+    setShowDialog(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: typeof form) => {
+      const payload = { ...data, applicablePackageIds: data.applicablePackageIds.length > 0 ? data.applicablePackageIds : null };
+      if (editing) {
+        const res = await apiRequest("PATCH", `/api/admin/promotions/${editing.id}`, payload);
+        return res.json();
+      }
+      const res = await apiRequest("POST", "/api/admin/promotions", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: editing ? "優惠活動已更新" : "優惠活動已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promotions"] });
+      setShowDialog(false);
+      resetForm();
+    },
+  });
+
+  const togglePkg = (pkgId: number) => {
+    setForm(prev => ({
+      ...prev,
+      applicablePackageIds: prev.applicablePackageIds.includes(pkgId)
+        ? prev.applicablePackageIds.filter(id => id !== pkgId)
+        : [...prev.applicablePackageIds, pkgId],
+    }));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        <h2 className="text-base font-semibold text-foreground" data-testid="text-promotions-title">優惠活動</h2>
+        <Button onClick={openAdd} className="rounded-full" data-testid="button-add-promotion">
+          <Plus className="w-4 h-4 mr-1.5" />新增活動
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
+      ) : promotions.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+          <Gift className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">尚無優惠活動</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {promotions.map((promo) => (
+            <div key={promo.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`promotion-card-${promo.id}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-foreground" data-testid={`text-promotion-name-${promo.id}`}>{promo.name}</p>
+                    {!promo.isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground">停用</span>}
+                    <span className="text-xs bg-coral/10 text-coral px-2 py-0.5 rounded-full">
+                      {promo.discountType === "percentage" ? `${promo.discountValue}% 折扣` : `減 NT$ ${promo.discountValue}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                    <span>{promo.startDate} ~ {promo.endDate}</span>
+                    {promo.applicablePackageIds && promo.applicablePackageIds.length > 0 && (
+                      <span>適用 {promo.applicablePackageIds.length} 個方案</span>
+                    )}
+                  </div>
+                  {promo.description && <p className="text-xs text-muted-foreground mt-1">{promo.description}</p>}
+                </div>
+                <Button variant="outline" size="icon" onClick={() => openEdit(promo)} data-testid={`button-edit-promotion-${promo.id}`}>
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowDialog(open); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "編輯優惠活動" : "新增優惠活動"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>活動名稱 *</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例：春季優惠" data-testid="input-promotion-name" />
+            </div>
+            <div>
+              <Label>說明</Label>
+              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="活動說明" data-testid="input-promotion-description" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>折扣類型 *</Label>
+                <Select value={form.discountType} onValueChange={(v) => setForm({ ...form, discountType: v })}>
+                  <SelectTrigger data-testid="select-promotion-discount-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">百分比折扣</SelectItem>
+                    <SelectItem value="fixed">固定金額折扣</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>折扣值 *</Label>
+                <Input type="number" min="1" value={form.discountValue || ""} onChange={(e) => setForm({ ...form, discountValue: parseInt(e.target.value) || 0 })} placeholder={form.discountType === "percentage" ? "例：15" : "例：500"} data-testid="input-promotion-discount-value" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>開始日期 *</Label>
+                <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} data-testid="input-promotion-start" />
+              </div>
+              <div>
+                <Label>結束日期 *</Label>
+                <Input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} data-testid="input-promotion-end" />
+              </div>
+            </div>
+            <div>
+              <Label>適用方案（可多選，不選=全部適用）</Label>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {packages.map((pkg) => (
+                  <Button
+                    key={pkg.id}
+                    type="button"
+                    variant={form.applicablePackageIds.includes(pkg.id) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => togglePkg(pkg.id)}
+                    data-testid={`button-toggle-pkg-${pkg.id}`}
+                  >
+                    {pkg.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Label>啟用狀態</Label>
+              <Switch checked={form.isActive} onCheckedChange={(checked) => setForm({ ...form, isActive: checked })} data-testid="switch-promotion-active" />
+              <span className="text-sm text-muted-foreground">{form.isActive ? "啟用中" : "已停用"}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setShowDialog(false); }}>取消</Button>
+            <Button onClick={() => saveMutation.mutate(form)} disabled={!form.name || !form.discountValue || !form.startDate || !form.endDate || saveMutation.isPending} data-testid="button-submit-promotion">
+              {saveMutation.isPending ? "儲存中..." : editing ? "更新" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function CouponsSection() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<CouponCode | null>(null);
+  const [form, setForm] = useState({
+    code: "", discountType: "fixed", discountValue: 0,
+    maxUses: null as number | null, minPurchaseAmount: null as number | null,
+    validFrom: "", validUntil: "", isActive: true,
+  });
+
+  const { data: coupons = [], isLoading } = useQuery<CouponCode[]>({
+    queryKey: ["/api/admin/coupon-codes"],
+  });
+
+  const resetForm = () => {
+    setForm({ code: "", discountType: "fixed", discountValue: 0, maxUses: null, minPurchaseAmount: null, validFrom: "", validUntil: "", isActive: true });
+    setEditing(null);
+  };
+
+  const openAdd = () => { resetForm(); setShowDialog(true); };
+  const openEdit = (coupon: CouponCode) => {
+    setEditing(coupon);
+    setForm({
+      code: coupon.code, discountType: coupon.discountType, discountValue: coupon.discountValue,
+      maxUses: coupon.maxUses, minPurchaseAmount: coupon.minPurchaseAmount,
+      validFrom: coupon.validFrom || "", validUntil: coupon.validUntil || "", isActive: coupon.isActive,
+    });
+    setShowDialog(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: typeof form) => {
+      const payload = { ...data, validFrom: data.validFrom || null, validUntil: data.validUntil || null };
+      if (editing) {
+        const res = await apiRequest("PATCH", `/api/admin/coupon-codes/${editing.id}`, payload);
+        return res.json();
+      }
+      const res = await apiRequest("POST", "/api/admin/coupon-codes", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: editing ? "優惠碼已更新" : "優惠碼已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coupon-codes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/credit-sales-stats"] });
+      setShowDialog(false);
+      resetForm();
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "操作失敗", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        <h2 className="text-base font-semibold text-foreground" data-testid="text-coupons-title">優惠碼</h2>
+        <Button onClick={openAdd} className="rounded-full" data-testid="button-add-coupon">
+          <Plus className="w-4 h-4 mr-1.5" />新增優惠碼
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
+      ) : coupons.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+          <Ticket className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">尚無優惠碼</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {coupons.map((coupon) => (
+            <div key={coupon.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`coupon-card-${coupon.id}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-mono font-medium text-foreground" data-testid={`text-coupon-code-${coupon.id}`}>{coupon.code}</p>
+                    {!coupon.isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground">停用</span>}
+                    <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">
+                      {coupon.discountType === "percentage" ? `${coupon.discountValue}% 折扣` : `減 NT$ ${coupon.discountValue}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                    <span data-testid={`text-coupon-usage-${coupon.id}`}>已使用 {coupon.currentUses}{coupon.maxUses ? `/${coupon.maxUses}` : ""} 次</span>
+                    {coupon.minPurchaseAmount && <span>最低消費 NT$ {coupon.minPurchaseAmount}</span>}
+                    {coupon.validFrom && coupon.validUntil && <span>{coupon.validFrom} ~ {coupon.validUntil}</span>}
+                  </div>
+                </div>
+                <Button variant="outline" size="icon" onClick={() => openEdit(coupon)} data-testid={`button-edit-coupon-${coupon.id}`}>
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowDialog(open); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "編輯優惠碼" : "新增優惠碼"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>優惠碼 *</Label>
+              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="例：WELCOME100" disabled={!!editing} data-testid="input-coupon-code" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>折扣類型 *</Label>
+                <Select value={form.discountType} onValueChange={(v) => setForm({ ...form, discountType: v })}>
+                  <SelectTrigger data-testid="select-coupon-discount-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">百分比折扣</SelectItem>
+                    <SelectItem value="fixed">固定金額折扣</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>折扣值 *</Label>
+                <Input type="number" min="1" value={form.discountValue || ""} onChange={(e) => setForm({ ...form, discountValue: parseInt(e.target.value) || 0 })} data-testid="input-coupon-discount-value" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>使用上限（空白=不限）</Label>
+                <Input type="number" min="1" value={form.maxUses ?? ""} onChange={(e) => setForm({ ...form, maxUses: e.target.value ? parseInt(e.target.value) : null })} data-testid="input-coupon-max-uses" />
+              </div>
+              <div>
+                <Label>最低消費金額</Label>
+                <Input type="number" min="0" value={form.minPurchaseAmount ?? ""} onChange={(e) => setForm({ ...form, minPurchaseAmount: e.target.value ? parseInt(e.target.value) : null })} data-testid="input-coupon-min-purchase" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>有效起始日</Label>
+                <Input type="date" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} data-testid="input-coupon-valid-from" />
+              </div>
+              <div>
+                <Label>有效結束日</Label>
+                <Input type="date" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} data-testid="input-coupon-valid-until" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Label>啟用狀態</Label>
+              <Switch checked={form.isActive} onCheckedChange={(checked) => setForm({ ...form, isActive: checked })} data-testid="switch-coupon-active" />
+              <span className="text-sm text-muted-foreground">{form.isActive ? "啟用中" : "已停用"}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setShowDialog(false); }}>取消</Button>
+            <Button onClick={() => saveMutation.mutate(form)} disabled={!form.code || !form.discountValue || saveMutation.isPending} data-testid="button-submit-coupon">
+              {saveMutation.isPending ? "儲存中..." : editing ? "更新" : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ParentWalletsSection() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [selectedParent, setSelectedParent] = useState<ParentWallet | null>(null);
+  const [adjustForm, setAdjustForm] = useState({ packageId: null as number | null, credits: 0, description: "" });
+
+  const { data: wallets = [], isLoading } = useQuery<ParentWallet[]>({
+    queryKey: ["/api/admin/parent-wallets"],
+  });
+
+  const { data: packages = [] } = useQuery<CreditPackage[]>({
+    queryKey: ["/api/admin/credit-packages"],
+  });
+
+  const openAdjust = (wallet: ParentWallet) => {
+    setSelectedParent(wallet);
+    setAdjustForm({ packageId: null, credits: 0, description: "" });
+    setShowDialog(true);
+  };
+
+  const adjustMutation = useMutation({
+    mutationFn: async (data: { parentId: string; packageId: number | null; credits: number; description: string }) => {
+      const res = await apiRequest("POST", "/api/admin/adjust-credits", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "加點成功", description: `新餘額：${data.newBalance} 堂` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/parent-wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/credit-sales-stats"] });
+      setShowDialog(false);
+      setSelectedParent(null);
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "加點失敗", variant: "destructive" });
+    },
+  });
+
+  const selectedPkg = packages.find(p => p.id === adjustForm.packageId);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        <h2 className="text-base font-semibold text-foreground" data-testid="text-wallets-title">家長點數</h2>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-md" />)}</div>
+      ) : wallets.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+          <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">尚無家長帳號</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {wallets.map((wallet) => (
+            <div key={wallet.parentId} className="bg-white rounded-md border border-gray-100 p-4 flex items-center gap-4" data-testid={`wallet-card-${wallet.parentId}`}>
+              <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-tiffany" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground" data-testid={`text-wallet-name-${wallet.parentId}`}>{wallet.parentName || wallet.username}</p>
+                <p className="text-xs text-muted-foreground">@{wallet.username}</p>
+              </div>
+              <div className="text-right mr-3">
+                <p className="text-lg font-bold text-foreground" data-testid={`text-wallet-balance-${wallet.parentId}`}>{wallet.balance}</p>
+                <p className="text-[10px] text-muted-foreground">剩餘堂數</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => openAdjust(wallet)} data-testid={`button-adjust-credits-${wallet.parentId}`}>
+                <Plus className="w-4 h-4 mr-1" />加點
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) { setSelectedParent(null); } setShowDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>手動加點 — {selectedParent?.parentName || selectedParent?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>選擇方案（或自訂堂數）</Label>
+              <Select value={adjustForm.packageId?.toString() || "custom"} onValueChange={(v) => {
+                if (v === "custom") {
+                  setAdjustForm({ ...adjustForm, packageId: null, credits: 0 });
+                } else {
+                  const pkg = packages.find(p => p.id === parseInt(v));
+                  setAdjustForm({ ...adjustForm, packageId: parseInt(v), credits: pkg?.credits || 0 });
+                }
+              }}>
+                <SelectTrigger data-testid="select-adjust-package"><SelectValue placeholder="選擇方案" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">自訂堂數</SelectItem>
+                  {packages.filter(p => p.isActive).map((pkg) => (
+                    <SelectItem key={pkg.id} value={pkg.id.toString()}>{pkg.name} ({pkg.credits} 堂 / NT$ {pkg.price.toLocaleString()})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {!adjustForm.packageId && (
+              <div>
+                <Label>自訂堂數 *</Label>
+                <Input type="number" min="1" value={adjustForm.credits || ""} onChange={(e) => setAdjustForm({ ...adjustForm, credits: parseInt(e.target.value) || 0 })} data-testid="input-adjust-credits" />
+              </div>
+            )}
+            {selectedPkg && (
+              <div className="bg-gray-50 rounded-md p-3 text-sm text-muted-foreground">
+                <p>方案：{selectedPkg.name}</p>
+                <p>堂數：{selectedPkg.credits} 堂</p>
+                <p>定價：NT$ {selectedPkg.price.toLocaleString()}</p>
+                {selectedPkg.expiryDays && <p>有效天數：{selectedPkg.expiryDays} 天</p>}
+              </div>
+            )}
+            <div>
+              <Label>備註</Label>
+              <Input value={adjustForm.description} onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })} placeholder="例：手動購買加點" data-testid="input-adjust-description" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSelectedParent(null); setShowDialog(false); }}>取消</Button>
+            <Button
+              onClick={() => {
+                if (!selectedParent) return;
+                adjustMutation.mutate({
+                  parentId: selectedParent.parentId,
+                  packageId: adjustForm.packageId,
+                  credits: adjustForm.packageId ? 0 : adjustForm.credits,
+                  description: adjustForm.description || "總部手動加點",
+                });
+              }}
+              disabled={(!adjustForm.packageId && !adjustForm.credits) || adjustMutation.isPending}
+              data-testid="button-submit-adjust"
+            >
+              {adjustMutation.isPending ? "處理中..." : "確認加點"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

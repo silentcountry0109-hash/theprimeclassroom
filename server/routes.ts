@@ -6,7 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
-import { coaches } from "@shared/schema";
+import { coaches, creditPurchases } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -419,11 +419,21 @@ export async function registerRoutes(
       if (diffDays < 3) {
         return res.status(400).json({ message: "需於 3 天前預約課程（最早可預約 3 天後的時段）" });
       }
+      const balance = await storage.getParentBalance(userId);
+      if (balance < 1) {
+        return res.status(400).json({ message: "堂數不足，請先購買堂數後再預約課程", code: "INSUFFICIENT_CREDITS" });
+      }
       const booking = await storage.createBooking({
         slotId: req.body.slotId,
         childId: req.body.childId,
         parentId: userId,
       });
+      try {
+        await storage.deductCredits(userId, 1, booking.id, "預約課程扣除 1 堂");
+      } catch (deductErr: any) {
+        await storage.cancelBooking(booking.id);
+        return res.status(400).json({ message: "堂數扣除失敗，預約已取消", code: "DEDUCT_FAILED" });
+      }
       res.json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to create booking" });
@@ -443,6 +453,10 @@ export async function registerRoutes(
       }
       const taiwanTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
       const taiwanToday = new Date(taiwanTodayStr + "T00:00:00+08:00");
+      const balance = await storage.getParentBalance(userId);
+      if (balance < slotIds.length) {
+        return res.status(400).json({ message: `堂數不足，目前剩餘 ${balance} 堂，需要 ${slotIds.length} 堂`, code: "INSUFFICIENT_CREDITS" });
+      }
       const results: { slotId: number; success: boolean; message?: string }[] = [];
       for (const slotId of slotIds) {
         try {
@@ -457,7 +471,14 @@ export async function registerRoutes(
             results.push({ slotId, success: false, message: "需於 3 天前預約課程" });
             continue;
           }
-          await storage.createBooking({ slotId, childId, parentId: userId });
+          const booking = await storage.createBooking({ slotId, childId, parentId: userId });
+          try {
+            await storage.deductCredits(userId, 1, booking.id, "預約課程扣除 1 堂");
+          } catch (deductErr: any) {
+            await storage.cancelBooking(booking.id);
+            results.push({ slotId, success: false, message: "堂數不足" });
+            continue;
+          }
           results.push({ slotId, success: true });
         } catch (err: any) {
           results.push({ slotId, success: false, message: err.message });
@@ -526,6 +547,11 @@ export async function registerRoutes(
       }
 
       await storage.cancelBooking(bookingId);
+      try {
+        await storage.refundCredits(userId, bookingId, "取消預約退回 1 堂");
+      } catch (refundErr) {
+        console.error("Credit refund failed for booking", bookingId, refundErr);
+      }
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to cancel booking" });
@@ -2031,6 +2057,267 @@ export async function registerRoutes(
 
   checkAndPromoteGrades();
   setInterval(checkAndPromoteGrades, 60 * 60 * 1000);
+
+  // ========== Credit System: Admin Routes (T003) ==========
+  app.get("/api/admin/credit-packages", isAdmin, async (_req: any, res) => {
+    try {
+      const packages = await storage.getCreditPackages();
+      res.json(packages);
+    } catch (error) {
+      res.status(500).json({ message: "取得堂數方案失敗" });
+    }
+  });
+
+  app.post("/api/admin/credit-packages", isAdmin, async (req: any, res) => {
+    try {
+      const { name, credits, price, expiryDays, description, isActive, sortOrder } = req.body;
+      if (!name || !credits || !price) return res.status(400).json({ message: "請填寫方案名稱、堂數和定價" });
+      const pkg = await storage.createCreditPackage({ name, credits, price, expiryDays: expiryDays || null, description: description || null, isActive: isActive !== false, sortOrder: sortOrder || 0 });
+      res.json(pkg);
+    } catch (error) {
+      res.status(500).json({ message: "建立堂數方案失敗" });
+    }
+  });
+
+  app.patch("/api/admin/credit-packages/:id", isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const pkg = await storage.updateCreditPackage(id, req.body);
+      res.json(pkg);
+    } catch (error) {
+      res.status(500).json({ message: "更新堂數方案失敗" });
+    }
+  });
+
+  app.get("/api/admin/promotions", isAdmin, async (_req: any, res) => {
+    try {
+      const promos = await storage.getPromotions();
+      res.json(promos);
+    } catch (error) {
+      res.status(500).json({ message: "取得優惠活動失敗" });
+    }
+  });
+
+  app.post("/api/admin/promotions", isAdmin, async (req: any, res) => {
+    try {
+      const { name, description, discountType, discountValue, startDate, endDate, applicablePackageIds, isActive } = req.body;
+      if (!name || !discountType || !discountValue || !startDate || !endDate) return res.status(400).json({ message: "請填寫所有必填欄位" });
+      const promo = await storage.createPromotion({ name, description: description || null, discountType, discountValue, startDate, endDate, applicablePackageIds: applicablePackageIds || null, isActive: isActive !== false });
+      res.json(promo);
+    } catch (error) {
+      res.status(500).json({ message: "建立優惠活動失敗" });
+    }
+  });
+
+  app.patch("/api/admin/promotions/:id", isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const promo = await storage.updatePromotion(id, req.body);
+      res.json(promo);
+    } catch (error) {
+      res.status(500).json({ message: "更新優惠活動失敗" });
+    }
+  });
+
+  app.get("/api/admin/coupon-codes", isAdmin, async (_req: any, res) => {
+    try {
+      const coupons = await storage.getCouponCodes();
+      res.json(coupons);
+    } catch (error) {
+      res.status(500).json({ message: "取得優惠碼失敗" });
+    }
+  });
+
+  app.post("/api/admin/coupon-codes", isAdmin, async (req: any, res) => {
+    try {
+      const { code, discountType, discountValue, maxUses, minPurchaseAmount, validFrom, validUntil, isActive } = req.body;
+      if (!code || !discountType || !discountValue) return res.status(400).json({ message: "請填寫優惠碼、折扣類型和折扣值" });
+      const existing = await storage.getCouponByCode(code.toUpperCase());
+      if (existing) return res.status(400).json({ message: "此優惠碼已存在" });
+      const coupon = await storage.createCouponCode({ code: code.toUpperCase(), discountType, discountValue, maxUses: maxUses || null, minPurchaseAmount: minPurchaseAmount || null, validFrom: validFrom || null, validUntil: validUntil || null, isActive: isActive !== false });
+      res.json(coupon);
+    } catch (error) {
+      res.status(500).json({ message: "建立優惠碼失敗" });
+    }
+  });
+
+  app.patch("/api/admin/coupon-codes/:id", isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const coupon = await storage.updateCouponCode(id, req.body);
+      res.json(coupon);
+    } catch (error) {
+      res.status(500).json({ message: "更新優惠碼失敗" });
+    }
+  });
+
+  app.get("/api/admin/parent-wallets", isAdmin, async (_req: any, res) => {
+    try {
+      const parents = await db.select().from(users).where(eq(users.role, "parent"));
+      const wallets = await Promise.all(parents.map(async (p) => {
+        const balance = await storage.getParentBalance(p.id);
+        return { parentId: p.id, parentName: p.firstName || p.username, username: p.username, balance };
+      }));
+      res.json(wallets);
+    } catch (error) {
+      res.status(500).json({ message: "取得家長錢包列表失敗" });
+    }
+  });
+
+  app.post("/api/admin/adjust-credits", isAdmin, async (req: any, res) => {
+    try {
+      const { parentId, packageId, credits, description } = req.body;
+      if (!parentId) return res.status(400).json({ message: "請選擇家長" });
+
+      let creditAmount = credits;
+      let expiresAt: Date | null = null;
+      let finalAmount = 0;
+      let pkgId = packageId || null;
+
+      if (packageId) {
+        const packages = await storage.getCreditPackages();
+        const pkg = packages.find(p => p.id === packageId);
+        if (!pkg) return res.status(400).json({ message: "方案不存在" });
+        creditAmount = pkg.credits;
+        finalAmount = pkg.price;
+        if (pkg.expiryDays) {
+          expiresAt = new Date(Date.now() + pkg.expiryDays * 24 * 60 * 60 * 1000);
+        }
+      }
+
+      if (!creditAmount || creditAmount <= 0) return res.status(400).json({ message: "堂數必須大於 0" });
+
+      const purchase = await storage.createCreditPurchase({
+        parentId,
+        packageId: pkgId,
+        credits: creditAmount,
+        originalAmount: finalAmount,
+        discountAmount: 0,
+        finalAmount,
+        paymentMethod: "manual",
+        paymentStatus: "paid",
+        expiresAt,
+      });
+
+      const balance = await storage.addCredits(parentId, purchase.id, creditAmount, expiresAt);
+
+      await storage.createCreditTransaction({
+        parentId,
+        type: "admin_adjust",
+        credits: creditAmount,
+        balanceId: balance.id,
+        purchaseId: purchase.id,
+        description: description || "總部手動加點",
+      });
+
+      const newBalance = await storage.getParentBalance(parentId);
+      res.json({ success: true, purchase, newBalance });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "加點失敗" });
+    }
+  });
+
+  app.get("/api/admin/credit-sales-stats", isAdmin, async (_req: any, res) => {
+    try {
+      const allPurchases = await db.select().from(creditPurchases).where(eq(creditPurchases.paymentStatus, "paid"));
+      const totalRevenue = allPurchases.reduce((sum, p) => sum + p.finalAmount, 0);
+      const totalCredits = allPurchases.reduce((sum, p) => sum + p.credits, 0);
+      const totalPurchases = allPurchases.length;
+
+      const packageStats = new Map<number, { name: string; count: number; credits: number; revenue: number }>();
+      const packages = await storage.getCreditPackages();
+      for (const pkg of packages) {
+        packageStats.set(pkg.id, { name: pkg.name, count: 0, credits: 0, revenue: 0 });
+      }
+      for (const p of allPurchases) {
+        if (p.packageId && packageStats.has(p.packageId)) {
+          const stat = packageStats.get(p.packageId)!;
+          stat.count++;
+          stat.credits += p.credits;
+          stat.revenue += p.finalAmount;
+        }
+      }
+
+      const coupons = await storage.getCouponCodes();
+      const couponStats = coupons.map(c => ({ code: c.code, uses: c.currentUses, maxUses: c.maxUses }));
+
+      res.json({ totalRevenue, totalCredits, totalPurchases, packageStats: Array.from(packageStats.values()), couponStats });
+    } catch (error) {
+      res.status(500).json({ message: "取得銷售報表失敗" });
+    }
+  });
+
+  // ========== Credit System: Parent Routes (T004) ==========
+  app.get("/api/parent/wallet", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      if (req.currentUser.role !== "parent") return res.status(403).json({ message: "僅限家長使用" });
+      const balance = await storage.getParentBalance(userId);
+      const balances = await storage.getCreditBalances(userId);
+      const now = new Date();
+      const expiringBalances = balances
+        .filter(b => b.expiresAt && b.remainingCredits > 0)
+        .filter(b => {
+          const daysLeft = Math.ceil((new Date(b.expiresAt!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          return daysLeft <= 30 && daysLeft > 0;
+        })
+        .map(b => ({
+          credits: b.remainingCredits,
+          expiresAt: b.expiresAt,
+          daysLeft: Math.ceil((new Date(b.expiresAt!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+        }));
+      res.json({ balance, balances, expiringBalances });
+    } catch (error) {
+      res.status(500).json({ message: "取得錢包資訊失敗" });
+    }
+  });
+
+  app.get("/api/parent/transactions", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      if (req.currentUser.role !== "parent") return res.status(403).json({ message: "僅限家長使用" });
+      const transactions = await storage.getTransactionsByParent(userId);
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ message: "取得交易紀錄失敗" });
+    }
+  });
+
+  app.get("/api/credit-packages", async (_req, res) => {
+    try {
+      const packages = await storage.getActiveCreditPackages();
+      const activePromotions = await storage.getActivePromotions();
+      res.json({ packages, promotions: activePromotions });
+    } catch (error) {
+      res.status(500).json({ message: "取得堂數方案失敗" });
+    }
+  });
+
+  app.post("/api/parent/validate-coupon", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      if (req.currentUser.role !== "parent") return res.status(403).json({ message: "僅限家長使用" });
+      const { code, amount } = req.body;
+      if (!code) return res.status(400).json({ message: "請輸入優惠碼" });
+      const coupon = await storage.getCouponByCode(code.toUpperCase());
+      if (!coupon) return res.status(404).json({ message: "優惠碼不存在" });
+      if (!coupon.isActive) return res.status(400).json({ message: "此優惠碼已停用" });
+      if (coupon.maxUses && coupon.currentUses >= coupon.maxUses) return res.status(400).json({ message: "此優惠碼已達使用上限" });
+      const today = new Date().toISOString().split("T")[0];
+      if (coupon.validFrom && today < coupon.validFrom) return res.status(400).json({ message: "此優惠碼尚未開始" });
+      if (coupon.validUntil && today > coupon.validUntil) return res.status(400).json({ message: "此優惠碼已過期" });
+      if (coupon.minPurchaseAmount && amount && amount < coupon.minPurchaseAmount) return res.status(400).json({ message: `最低消費金額為 $${coupon.minPurchaseAmount}` });
+
+      let discount = 0;
+      if (coupon.discountType === "fixed") {
+        discount = coupon.discountValue;
+      } else if (coupon.discountType === "percentage") {
+        discount = amount ? Math.round(amount * coupon.discountValue / 100) : 0;
+      }
+      res.json({ valid: true, coupon: { id: coupon.id, code: coupon.code, discountType: coupon.discountType, discountValue: coupon.discountValue }, discount });
+    } catch (error) {
+      res.status(500).json({ message: "驗證優惠碼失敗" });
+    }
+  });
 
   return httpServer;
 }
