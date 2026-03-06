@@ -1439,6 +1439,29 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/franchise-admin/students", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { name, grade } = req.body;
+      if (!name || typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "學生姓名為必填" });
+      const g = parseInt(grade);
+      if (isNaN(g) || g < 1 || g > 6) return res.status(400).json({ message: "年級必須是 1-6" });
+      const result = await storage.addFranchiseStudent(req.franchiseId, name.trim(), g);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to add student" });
+    }
+  });
+
+  app.delete("/api/franchise-admin/students/:childId", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const childId = parseInt(req.params.childId);
+      await storage.removeFranchiseStudent(req.franchiseId, childId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to remove student" });
+    }
+  });
+
   app.get("/api/franchise-admin/students/:childId/bookings", isFranchiseAdmin, async (req: any, res) => {
     try {
       const childId = parseInt(req.params.childId);

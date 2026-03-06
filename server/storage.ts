@@ -1,7 +1,7 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
-  coachDailyRecords, classrooms, notifications,
+  coachDailyRecords, classrooms, notifications, franchiseStudents,
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
   textbooks, textbookQuizzes,
   users,
@@ -189,6 +189,8 @@ export interface IStorage {
   getUnreadNotificationCount(userId: string): Promise<number>;
 
   getFranchiseStudents(franchiseId: number): Promise<any[]>;
+  addFranchiseStudent(franchiseId: number, name: string, grade: number): Promise<any>;
+  removeFranchiseStudent(franchiseId: number, childId: number): Promise<void>;
   getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]>;
   getFranchiseStudentContactBooks(franchiseId: number, childId: number): Promise<any[]>;
   createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
@@ -680,7 +682,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFranchiseStudents(franchiseId: number): Promise<any[]> {
-    const rows = await db
+    const bookingStudents = await db
       .selectDistinctOn([children.id], {
         id: children.id,
         name: children.name,
@@ -695,8 +697,30 @@ export class DatabaseStorage implements IStorage {
       .where(eq(timeSlots.franchiseId, franchiseId))
       .orderBy(children.id, children.name);
 
+    const linkedStudents = await db
+      .select({
+        id: children.id,
+        name: children.name,
+        grade: children.grade,
+        school: children.school,
+        studentCode: children.studentCode,
+        parentId: children.parentId,
+      })
+      .from(franchiseStudents)
+      .innerJoin(children, eq(franchiseStudents.childId, children.id))
+      .where(eq(franchiseStudents.franchiseId, franchiseId));
+
+    const seenIds = new Set<number>();
+    const allStudents = [];
+    for (const s of [...bookingStudents, ...linkedStudents]) {
+      if (!seenIds.has(s.id)) {
+        seenIds.add(s.id);
+        allStudents.push(s);
+      }
+    }
+
     const result = [];
-    for (const row of rows) {
+    for (const row of allStudents) {
       const [parent] = row.parentId
         ? await db.select({ firstName: users.firstName, lastName: users.lastName, phone: users.phone }).from(users).where(eq(users.id, row.parentId))
         : [null];
@@ -713,6 +737,30 @@ export class DatabaseStorage implements IStorage {
       });
     }
     return result;
+  }
+
+  async addFranchiseStudent(franchiseId: number, name: string, grade: number): Promise<any> {
+    const placeholderParentId = `franchise-${franchiseId}-parent-placeholder`;
+    const existingParent = await db.select().from(users).where(eq(users.id, placeholderParentId));
+    if (existingParent.length === 0) {
+      await db.insert(users).values({
+        id: placeholderParentId,
+        username: `franchise-${franchiseId}-parent`,
+        passwordHash: "nologin",
+        role: "parent",
+        firstName: "教室學生",
+        lastName: "",
+      });
+    }
+    const child = await this.createChild({ parentId: placeholderParentId, name, grade });
+    await db.insert(franchiseStudents).values({ franchiseId, childId: child.id });
+    return child;
+  }
+
+  async removeFranchiseStudent(franchiseId: number, childId: number): Promise<void> {
+    await db.delete(franchiseStudents).where(
+      and(eq(franchiseStudents.franchiseId, franchiseId), eq(franchiseStudents.childId, childId))
+    );
   }
 
   async getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]> {
@@ -797,7 +845,12 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
       .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId)))
       .limit(1);
-    if (franchiseBookings.length === 0) throw new Error("此學生非本分校學生，無法加排");
+    const linkedStudent = await db
+      .select({ id: franchiseStudents.id })
+      .from(franchiseStudents)
+      .where(and(eq(franchiseStudents.childId, childId), eq(franchiseStudents.franchiseId, franchiseId)))
+      .limit(1);
+    if (franchiseBookings.length === 0 && linkedStudent.length === 0) throw new Error("此學生非本分校學生，無法加排");
 
     const overlapping = await this.getChildOverlappingBookings(childId, slot.date, slot.startTime, slot.endTime);
     if (overlapping.length > 0) {

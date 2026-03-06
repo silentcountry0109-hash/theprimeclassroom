@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, serial, boolean, timestamp, real, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, serial, boolean, timestamp, real, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -56,6 +56,15 @@ export const children = pgTable("children", {
   studentCode: text("student_code").unique(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const franchiseStudents = pgTable("franchise_students", {
+  id: serial("id").primaryKey(),
+  franchiseId: integer("franchise_id").references(() => franchises.id).notNull(),
+  childId: integer("child_id").references(() => children.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("franchise_students_unique").on(table.franchiseId, table.childId),
+]);
 
 export const classrooms = pgTable("classrooms", {
   id: serial("id").primaryKey(),
