@@ -2265,7 +2265,10 @@ function MaterialsTab() {
   const [section, setSection] = useState<"units" | "midterm">("units");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [viewingPdf, setViewingPdf] = useState<{ title: string; url: string } | null>(null);
+  const [viewingPdf, setViewingPdf] = useState<{ title: string } | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loadingPdf, setLoadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const { data: units = [], isLoading } = useQuery<CuUnit[]>({
     queryKey: ["/api/curriculum/units"],
@@ -2279,8 +2282,35 @@ function MaterialsTab() {
     u.unitName.toLowerCase().includes(search.toLowerCase())
   );
 
-  function openPdf(title: string, url: string) {
-    setViewingPdf({ title, url });
+  function closePdf() {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    setBlobUrl(null);
+    setViewingPdf(null);
+    setPdfError(null);
+    setLoadingPdf(false);
+  }
+
+  async function openPdf(title: string, url: string) {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    setBlobUrl(null);
+    setPdfError(null);
+    setViewingPdf({ title });
+    setLoadingPdf(true);
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        setPdfError("尚未上傳此教材");
+        setLoadingPdf(false);
+        return;
+      }
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      setBlobUrl(objUrl);
+    } catch {
+      setPdfError("載入失敗，請稍後再試");
+    } finally {
+      setLoadingPdf(false);
+    }
   }
 
   return (
@@ -2288,7 +2318,7 @@ function MaterialsTab() {
       {/* Sub-tab header */}
       <div className="flex gap-1 bg-white border border-gray-100 rounded-lg p-1 w-fit">
         {(["units", "midterm"] as const).map(s => (
-          <button key={s} onClick={() => { setSection(s); setViewingPdf(null); }}
+          <button key={s} onClick={() => { setSection(s); closePdf(); }}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${section === s ? "bg-tiffany/10 text-tiffany" : "text-muted-foreground hover:bg-gray-50"}`}
             data-testid={`materials-section-${s}`}
           >
@@ -2302,17 +2332,35 @@ function MaterialsTab() {
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50">
             <span className="text-sm font-medium truncate">{viewingPdf.title}</span>
-            <button onClick={() => setViewingPdf(null)} className="text-muted-foreground hover:text-foreground p-1" data-testid="button-close-pdf">
+            <button onClick={closePdf} className="text-muted-foreground hover:text-foreground p-1" data-testid="button-close-pdf">
               <ChevronDown className="w-4 h-4" />
             </button>
           </div>
-          <iframe
-            src={viewingPdf.url}
-            className="w-full"
-            style={{ height: "70vh" }}
-            title={viewingPdf.title}
-            data-testid="iframe-pdf-viewer"
-          />
+          {loadingPdf && (
+            <div className="w-full flex items-center justify-center bg-gray-50" style={{ height: "70vh" }}>
+              <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                <div className="w-8 h-8 border-2 border-tiffany border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm">載入中...</span>
+              </div>
+            </div>
+          )}
+          {pdfError && !loadingPdf && (
+            <div className="w-full flex items-center justify-center bg-gray-50" style={{ height: "70vh" }}>
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <FileText className="w-10 h-10 text-gray-300" />
+                <span className="text-sm">{pdfError}</span>
+              </div>
+            </div>
+          )}
+          {blobUrl && !loadingPdf && !pdfError && (
+            <iframe
+              src={blobUrl}
+              className="w-full"
+              style={{ height: "70vh" }}
+              title={viewingPdf.title}
+              data-testid="iframe-pdf-viewer"
+            />
+          )}
         </div>
       )}
 
