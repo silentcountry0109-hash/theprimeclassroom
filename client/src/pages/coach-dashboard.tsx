@@ -2270,6 +2270,12 @@ function MaterialsTab() {
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
+
   const { data: units = [], isLoading } = useQuery<CuUnit[]>({
     queryKey: ["/api/curriculum/units"],
   });
