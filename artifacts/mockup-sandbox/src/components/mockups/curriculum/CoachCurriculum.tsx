@@ -178,7 +178,7 @@ export function CoachCurriculum() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">教材</span>
-                          <h4 className="font-bold text-slate-800">F02公倍數（詳解）</h4>
+                          <h4 className="font-bold text-slate-800">F02公倍數(詳解).pdf</h4>
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
                           <span>單元: 公倍數</span>
@@ -303,10 +303,10 @@ export function CoachCurriculum() {
                     
                     <div className="space-y-1">
                       {[
-                        { num: 1, label: '第1張', title: 'F02公倍數A', date: '2026/03/17' },
-                        { num: 2, label: '第2張', title: 'F02公倍數B', date: '2026/03/17' },
-                        { num: 3, label: '第3張', title: 'F02公倍數C', date: '2026/03/17' },
-                        { num: 4, label: '第4張', title: 'F02公倍數D', date: '2026/03/17' },
+                        { num: 1, label: '第1張', title: 'F02公倍數A.pdf', date: '2026/03/17' },
+                        { num: 2, label: '第2張', title: 'F02公倍數B.pdf', date: '2026/03/17' },
+                        { num: 3, label: '第3張', title: 'F02公倍數C.pdf', date: '2026/03/17' },
+                        { num: 4, label: '第4張', title: 'F02公倍數D.pdf', date: '2026/03/17' },
                       ].map((quiz) => (
                         <div key={quiz.num} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group relative z-10 bg-white">
                           <div className="flex items-center gap-4">
