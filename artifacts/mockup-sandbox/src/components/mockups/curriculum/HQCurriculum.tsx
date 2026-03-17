@@ -95,16 +95,19 @@ export function HQCurriculum() {
             {/* Units List */}
             <div className="space-y-6">
               
-              {/* Unit Card: 分數與小數 */}
+              {/* Unit Card: F02 公倍數 */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between cursor-pointer group">
                   <div className="flex items-center gap-3">
                     <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
-                    <h3 className="text-lg font-bold text-slate-800">單元一：分數與小數</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#92D7D0]/15 text-[#5fada6]">F02</span>
+                      <h3 className="text-lg font-bold text-slate-800">公倍數</h3>
+                    </div>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-slate-500">
                     <span className="flex items-center gap-1"><FileText className="w-4 h-4 text-slate-400"/> 教材: 1</span>
-                    <span className="flex items-center gap-1"><ClipboardList className="w-4 h-4 text-slate-400"/> 考卷: 4/4</span>
+                    <span className="flex items-center gap-1 text-emerald-600"><ClipboardList className="w-4 h-4 text-emerald-500"/> 考卷: 4/4</span>
                   </div>
                 </div>
                 
@@ -123,8 +126,8 @@ export function HQCurriculum() {
                             <FileText className="w-5 h-5 text-red-400" />
                           </div>
                           <div>
-                            <p className="font-medium text-slate-700">分數基礎概念.pdf</p>
-                            <p className="text-xs text-slate-400">更新 2026/03/15</p>
+                            <p className="font-medium text-slate-700">F02公倍數(詳解).pdf</p>
+                            <p className="text-xs text-slate-400">更新 2026/03/17</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -151,15 +154,15 @@ export function HQCurriculum() {
                         <ClipboardList className="w-5 h-5 text-[#FFB7B2]" />
                         <h4 className="font-bold text-slate-700">📝 配套考卷</h4>
                       </div>
-                      <span className="text-xs font-medium px-2 py-1 bg-[#FFB7B2]/20 text-red-600 rounded-full">4張考卷</span>
+                      <span className="text-xs font-medium px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full">4/4 完整</span>
                     </div>
 
                     <div className="space-y-3">
                       {[
-                        { num: 1, name: "分數概念測驗A.pdf" },
-                        { num: 2, name: "分數概念測驗B.pdf" },
-                        { num: 3, name: "帶分數練習卷.pdf" },
-                        { num: 4, name: "綜合練習卷.pdf" },
+                        { num: 1, name: "F02公倍數A.pdf", date: "2026/03/17" },
+                        { num: 2, name: "F02公倍數B.pdf", date: "2026/03/17" },
+                        { num: 3, name: "F02公倍數C.pdf", date: "2026/03/17" },
+                        { num: 4, name: "F02公倍數D.pdf", date: "2026/03/17" },
                       ].map((quiz) => (
                         <div key={quiz.num} className="group flex items-center gap-3 p-2.5 rounded-lg border border-slate-100 hover:border-[#FFB7B2] hover:shadow-sm bg-white transition-all">
                           <div className="w-12 text-center text-xs font-bold text-slate-400">
@@ -167,7 +170,10 @@ export function HQCurriculum() {
                           </div>
                           <div className="flex-1 flex items-center gap-2">
                             <FileText className="w-4 h-4 text-red-400" />
-                            <span className="font-medium text-sm text-slate-700">{quiz.name}</span>
+                            <div>
+                              <span className="font-medium text-sm text-slate-700">{quiz.name}</span>
+                              <p className="text-xs text-slate-400">更新 {quiz.date}</p>
+                            </div>
                           </div>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pr-2">
                             <button className="p-1.5 text-slate-400 hover:text-[#92D7D0] hover:bg-[#92D7D0]/10 rounded" title="取代">

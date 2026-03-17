@@ -16,7 +16,7 @@ import {
 
 export function CoachCurriculum() {
   const [activeTab, setActiveTab] = useState<'materials' | 'midterm'>('materials');
-  const [activeFilter, setActiveFilter] = useState('分數與小數');
+  const [activeFilter, setActiveFilter] = useState('公倍數');
   const [isPdfOpen, setIsPdfOpen] = useState(true);
 
   return (
@@ -123,15 +123,15 @@ export function CoachCurriculum() {
                 全部
               </button>
               <button
-                onClick={() => setActiveFilter('分數與小數')}
+                onClick={() => setActiveFilter('公倍數')}
                 className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                  activeFilter === '分數與小數'
+                  activeFilter === '公倍數'
                     ? 'bg-[#92D7D0] text-white shadow-sm'
                     : 'bg-white border border-slate-200 text-slate-600 hover:border-[#92D7D0] hover:text-[#92D7D0]'
                 }`}
               >
-                {activeFilter === '分數與小數' && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
-                分數與小數
+                {activeFilter === '公倍數' && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                公倍數
               </button>
               <button
                 onClick={() => setActiveFilter('幾何圖形')}
@@ -158,9 +158,12 @@ export function CoachCurriculum() {
             {/* Content Cards */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                <div>
-                  <h3 className="font-['Shippori_Mincho'] font-bold text-lg text-slate-800">單元：分數與小數</h3>
-                  <p className="text-sm text-slate-500 mt-1">包含 1 份教材與 4 份配套考卷</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#92D7D0]/15 text-[#5fada6]">F02</span>
+                  <div>
+                    <h3 className="font-['Shippori_Mincho'] font-bold text-lg text-slate-800">公倍數</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">包含 1 份教材（詳解）與 4 份配套考卷</p>
+                  </div>
                 </div>
               </div>
 
@@ -175,12 +178,12 @@ export function CoachCurriculum() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">教材</span>
-                          <h4 className="font-bold text-slate-800">分數基礎概念</h4>
+                          <h4 className="font-bold text-slate-800">F02公倍數（詳解）</h4>
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                          <span>單元: 分數與小數</span>
+                          <span>單元: 公倍數</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                          <span>更新 2026/03/15</span>
+                          <span>更新 2026/03/17</span>
                         </div>
                       </div>
                     </div>
@@ -203,14 +206,14 @@ export function CoachCurriculum() {
                       <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <FileText className="w-4 h-4 text-slate-400" />
-                          <span className="font-medium text-sm">分數基礎概念.pdf</span>
+                          <span className="font-medium text-sm">F02公倍數(詳解).pdf</span>
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2 text-sm text-slate-300">
                             <button className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors">
                               <ChevronLeft className="w-4 h-4" />
                             </button>
-                            <span>第 1 頁 / 共 6 頁</span>
+                            <span>第 1 頁 / 共 7 頁</span>
                             <button className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors">
                               <ChevronRight className="w-4 h-4" />
                             </button>
@@ -227,38 +230,56 @@ export function CoachCurriculum() {
                       
                       {/* Reader Content Area */}
                       <div className="p-8 flex justify-center bg-slate-200/50">
-                        <div className="bg-white w-full max-w-2xl min-h-[500px] shadow-sm rounded border border-slate-200 p-12">
-                          <h2 className="text-3xl font-['Shippori_Mincho'] font-bold text-center mb-12 text-slate-800">分數基礎概念</h2>
+                        <div className="bg-white w-full max-w-2xl min-h-[500px] shadow-sm rounded border border-slate-200 p-10">
+                          <div className="text-center mb-2 text-xs text-slate-400 tracking-widest uppercase">數學大師 國小資優數學系列</div>
+                          <h2 className="text-3xl font-['Shippori_Mincho'] font-bold text-center mb-8 text-slate-800">f 02 　公倍數</h2>
                           
-                          <div className="space-y-8">
+                          <div className="space-y-7 text-sm text-slate-700 leading-relaxed">
                             <section>
-                              <h3 className="text-xl font-bold mb-4 text-[#92D7D0]">1. 認識分數</h3>
-                              <p className="text-slate-600 leading-relaxed mb-4">
-                                分數是用來表示「整體中的一部分」的數字表示方法。在分數中，橫線下方的數字稱為「分母」，表示把一個整體平分成幾份；橫線上方的數字稱為「分子」，表示我們取了其中的幾份。
-                              </p>
-                              <div className="bg-[#FAF9F6] p-6 rounded-xl border border-[#92D7D0]/20 flex items-center justify-center gap-8 my-6">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-slate-800 border-b-2 border-slate-800 pb-1 px-4">1</div>
-                                  <div className="text-2xl font-bold text-slate-800 pt-1 px-4">2</div>
-                                </div>
-                                <div className="text-slate-400 text-xl">+</div>
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-slate-800 border-b-2 border-slate-800 pb-1 px-4">1</div>
-                                  <div className="text-2xl font-bold text-slate-800 pt-1 px-4">4</div>
-                                </div>
-                                <div className="text-slate-400 text-xl">=</div>
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-[#FFB7B2] border-b-2 border-[#FFB7B2] pb-1 px-4">3</div>
-                                  <div className="text-2xl font-bold text-[#FFB7B2] pt-1 px-4">4</div>
-                                </div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="w-6 h-6 rounded bg-slate-800 text-white text-xs font-bold flex items-center justify-center">焦</span>
+                                <h3 className="font-bold text-slate-800">焦點 1　最小公倍數</h3>
+                              </div>
+                              <p className="mb-2"><span className="font-bold">公倍數：</span>2 個或 2 個以上的整數中，共同的倍數。</p>
+                              <div className="bg-[#FAF9F6] p-4 rounded-lg border border-slate-200 space-y-1 text-xs">
+                                <p>例：2 的倍數：2、4、<span className="font-bold text-[#92D7D0]">6</span>、8、10、<span className="font-bold text-[#92D7D0]">12</span>、14、16、<span className="font-bold text-[#92D7D0]">18</span>、20</p>
+                                <p>　　3 的倍數：3、<span className="font-bold text-[#92D7D0]">6</span>、9、<span className="font-bold text-[#92D7D0]">12</span>、15、<span className="font-bold text-[#92D7D0]">18</span></p>
+                                <p>　　2 和 3 的公倍數：<span className="font-bold text-[#92D7D0]">6、12、18</span></p>
                               </div>
                             </section>
 
                             <section>
-                              <h3 className="text-xl font-bold mb-4 text-[#92D7D0]">2. 等值分數</h3>
-                              <p className="text-slate-600 leading-relaxed">
-                                當兩個分數代表相同的大小，我們稱它們為等值分數。例如：½ 和 ²/₄ 是等值分數。將分子和分母同乘以一個不為零的整數，就可以得到等值分數，這個過程稱為擴分。
-                              </p>
+                              <p className="mb-3"><span className="font-bold">最小公倍數：</span>一組數的公倍數中，最小的那個數。若要找最小公倍數，一般可用：</p>
+                              <div className="flex gap-3 text-xs mb-4">
+                                <span className="px-3 py-1 rounded-full bg-[#92D7D0]/10 text-[#5fada6] font-bold">① 列舉法</span>
+                                <span className="px-3 py-1 rounded-full bg-[#92D7D0]/10 text-[#5fada6] font-bold">② 質因數分解法</span>
+                                <span className="px-3 py-1 rounded-full bg-[#92D7D0]/10 text-[#5fada6] font-bold">③ 短除法</span>
+                              </div>
+
+                              <div className="bg-[#FAF9F6] p-4 rounded-lg border border-slate-200 text-xs space-y-3">
+                                <div>
+                                  <p className="font-bold mb-1">例 1（列舉法）：求 4 和 6 的最小公倍數</p>
+                                  <p>4 的倍數：4、8、<span className="font-bold text-[#FFB7B2]">12</span>、16……</p>
+                                  <p>6 的倍數：6、<span className="font-bold text-[#FFB7B2]">12</span>、18……</p>
+                                  <p>∴ [4, 6] = <span className="font-bold text-[#FFB7B2]">12</span></p>
+                                </div>
+                                <div>
+                                  <p className="font-bold mb-1">例 2（質因數分解法）：求 24 和 30 的最小公倍數</p>
+                                  <p>30 = 2×3×5　　24 = 2×2×2×3</p>
+                                  <p>∴ [24, 30] = 2×2×2×3×5 = <span className="font-bold text-[#FFB7B2]">120</span></p>
+                                </div>
+                                <div>
+                                  <p className="font-bold mb-1">例 3（短除法）：求 108 和 72 的最小公倍數</p>
+                                  <div className="font-mono text-xs bg-white rounded border border-slate-100 p-3 inline-block">
+                                    <p>2 | 108　72</p>
+                                    <p>2 |　54　36</p>
+                                    <p>3 |　27　18</p>
+                                    <p>3 |　　9　　6</p>
+                                    <p>　 |　　3　　2　← 互質即停</p>
+                                  </div>
+                                  <p className="mt-2">∴ [108, 72] = 2×2×3×3×3×2 = <span className="font-bold text-[#FFB7B2]">216</span></p>
+                                </div>
+                              </div>
                             </section>
                           </div>
                         </div>
@@ -281,89 +302,32 @@ export function CoachCurriculum() {
                     </h4>
                     
                     <div className="space-y-1">
-                      {/* Quiz 1 */}
-                      <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group relative z-10 bg-white">
-                        <div className="flex items-center gap-4">
-                          <div className="w-8 h-8 rounded bg-[#FFB7B2]/10 flex items-center justify-center text-[#FFB7B2]">
-                            <ClipboardList className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFB7B2]/20 text-[#E08A84]">第1張</span>
-                              <h4 className="font-medium text-slate-700 group-hover:text-[#FFB7B2] transition-colors">考卷：分數概念測驗A</h4>
+                      {[
+                        { num: 1, label: '第1張', title: 'F02公倍數A', date: '2026/03/17' },
+                        { num: 2, label: '第2張', title: 'F02公倍數B', date: '2026/03/17' },
+                        { num: 3, label: '第3張', title: 'F02公倍數C', date: '2026/03/17' },
+                        { num: 4, label: '第4張', title: 'F02公倍數D', date: '2026/03/17' },
+                      ].map((quiz) => (
+                        <div key={quiz.num} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group relative z-10 bg-white">
+                          <div className="flex items-center gap-4">
+                            <div className="w-8 h-8 rounded bg-[#FFB7B2]/10 flex items-center justify-center text-[#FFB7B2]">
+                              <ClipboardList className="w-4 h-4" />
                             </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                              <span>更新 2026/03/15</span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFB7B2]/20 text-[#E08A84]">{quiz.label}</span>
+                                <h4 className="font-medium text-slate-700 group-hover:text-[#FFB7B2] transition-colors">考卷：{quiz.title}</h4>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                                <span>更新 {quiz.date}</span>
+                              </div>
                             </div>
                           </div>
+                          <button className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:border-[#FFB7B2] hover:text-[#FFB7B2] hover:bg-[#FFB7B2]/5 transition-colors">
+                            開啟閱讀
+                          </button>
                         </div>
-                        <button className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:border-[#FFB7B2] hover:text-[#FFB7B2] hover:bg-[#FFB7B2]/5 transition-colors">
-                          開啟閱讀
-                        </button>
-                      </div>
-
-                      {/* Quiz 2 */}
-                      <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group relative z-10 bg-white">
-                        <div className="flex items-center gap-4">
-                          <div className="w-8 h-8 rounded bg-[#FFB7B2]/10 flex items-center justify-center text-[#FFB7B2]">
-                            <ClipboardList className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFB7B2]/20 text-[#E08A84]">第2張</span>
-                              <h4 className="font-medium text-slate-700 group-hover:text-[#FFB7B2] transition-colors">考卷：分數概念測驗B</h4>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                              <span>更新 2026/03/14</span>
-                            </div>
-                          </div>
-                        </div>
-                        <button className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:border-[#FFB7B2] hover:text-[#FFB7B2] hover:bg-[#FFB7B2]/5 transition-colors">
-                          開啟閱讀
-                        </button>
-                      </div>
-
-                      {/* Quiz 3 */}
-                      <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group relative z-10 bg-white">
-                        <div className="flex items-center gap-4">
-                          <div className="w-8 h-8 rounded bg-[#FFB7B2]/10 flex items-center justify-center text-[#FFB7B2]">
-                            <ClipboardList className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFB7B2]/20 text-[#E08A84]">第3張</span>
-                              <h4 className="font-medium text-slate-700 group-hover:text-[#FFB7B2] transition-colors">考卷：帶分數練習卷</h4>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                              <span>更新 2026/03/10</span>
-                            </div>
-                          </div>
-                        </div>
-                        <button className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:border-[#FFB7B2] hover:text-[#FFB7B2] hover:bg-[#FFB7B2]/5 transition-colors">
-                          開啟閱讀
-                        </button>
-                      </div>
-
-                      {/* Quiz 4 */}
-                      <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group relative z-10 bg-white">
-                        <div className="flex items-center gap-4">
-                          <div className="w-8 h-8 rounded bg-[#FFB7B2]/10 flex items-center justify-center text-[#FFB7B2]">
-                            <ClipboardList className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFB7B2]/20 text-[#E08A84]">第4張</span>
-                              <h4 className="font-medium text-slate-700 group-hover:text-[#FFB7B2] transition-colors">考卷：綜合練習卷</h4>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                              <span>更新 2026/03/08</span>
-                            </div>
-                          </div>
-                        </div>
-                        <button className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:border-[#FFB7B2] hover:text-[#FFB7B2] hover:bg-[#FFB7B2]/5 transition-colors">
-                          開啟閱讀
-                        </button>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
