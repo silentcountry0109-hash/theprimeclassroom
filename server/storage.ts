@@ -4,6 +4,7 @@ import {
   coachDailyRecords, classrooms, notifications, franchiseStudents,
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
   textbooks, textbookQuizzes,
+  curriculumUnits, curriculumFiles, curriculumMidtermExams,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -32,6 +33,9 @@ import {
   type CreditTransaction, type InsertCreditTransaction,
   type Textbook, type InsertTextbook,
   type TextbookQuiz, type InsertTextbookQuiz,
+  type CurriculumUnit, type InsertCurriculumUnit,
+  type CurriculumFile, type InsertCurriculumFile,
+  type CurriculumMidtermExam, type InsertCurriculumMidtermExam,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
@@ -239,6 +243,19 @@ export interface IStorage {
   createQuiz(data: InsertTextbookQuiz): Promise<TextbookQuiz>;
   updateQuiz(id: number, data: Partial<InsertTextbookQuiz>): Promise<TextbookQuiz>;
   deleteQuiz(id: number): Promise<void>;
+
+  getCurriculumUnitsWithFiles(): Promise<any[]>;
+  getCurriculumUnit(id: number): Promise<CurriculumUnit | undefined>;
+  createCurriculumUnit(data: InsertCurriculumUnit): Promise<CurriculumUnit>;
+  updateCurriculumUnit(id: number, data: Partial<InsertCurriculumUnit>): Promise<CurriculumUnit>;
+  deleteCurriculumUnit(id: number): Promise<void>;
+  getCurriculumFile(unitId: number, fileType: string): Promise<CurriculumFile | undefined>;
+  upsertCurriculumFile(data: InsertCurriculumFile): Promise<CurriculumFile>;
+  deleteCurriculumFile(unitId: number, fileType: string): Promise<void>;
+  getCurriculumMidtermExams(): Promise<CurriculumMidtermExam[]>;
+  getCurriculumMidtermExam(id: number): Promise<CurriculumMidtermExam | undefined>;
+  createCurriculumMidtermExam(data: InsertCurriculumMidtermExam): Promise<CurriculumMidtermExam>;
+  deleteCurriculumMidtermExam(id: number): Promise<void>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -2445,6 +2462,69 @@ export class DatabaseStorage implements IStorage {
 
   async deleteQuiz(id: number): Promise<void> {
     await db.update(textbookQuizzes).set({ isActive: false }).where(eq(textbookQuizzes.id, id));
+  }
+
+  async getCurriculumUnitsWithFiles(): Promise<any[]> {
+    const units = await db.select().from(curriculumUnits).where(eq(curriculumUnits.isActive, true)).orderBy(asc(curriculumUnits.sortOrder), asc(curriculumUnits.id));
+    const files = await db.select().from(curriculumFiles).orderBy(asc(curriculumFiles.fileType));
+    return units.map(u => ({ ...u, files: files.filter(f => f.unitId === u.id) }));
+  }
+
+  async getCurriculumUnit(id: number): Promise<CurriculumUnit | undefined> {
+    const [unit] = await db.select().from(curriculumUnits).where(eq(curriculumUnits.id, id));
+    return unit;
+  }
+
+  async createCurriculumUnit(data: InsertCurriculumUnit): Promise<CurriculumUnit> {
+    const [unit] = await db.insert(curriculumUnits).values(data).returning();
+    return unit;
+  }
+
+  async updateCurriculumUnit(id: number, data: Partial<InsertCurriculumUnit>): Promise<CurriculumUnit> {
+    const [unit] = await db.update(curriculumUnits).set(data).where(eq(curriculumUnits.id, id)).returning();
+    return unit;
+  }
+
+  async deleteCurriculumUnit(id: number): Promise<void> {
+    await db.delete(curriculumFiles).where(eq(curriculumFiles.unitId, id));
+    await db.delete(curriculumUnits).where(eq(curriculumUnits.id, id));
+  }
+
+  async getCurriculumFile(unitId: number, fileType: string): Promise<CurriculumFile | undefined> {
+    const [file] = await db.select().from(curriculumFiles).where(and(eq(curriculumFiles.unitId, unitId), eq(curriculumFiles.fileType, fileType)));
+    return file;
+  }
+
+  async upsertCurriculumFile(data: InsertCurriculumFile): Promise<CurriculumFile> {
+    const existing = await this.getCurriculumFile(data.unitId, data.fileType);
+    if (existing) {
+      const [file] = await db.update(curriculumFiles).set({ ...data, updatedAt: new Date() }).where(eq(curriculumFiles.id, existing.id)).returning();
+      return file;
+    }
+    const [file] = await db.insert(curriculumFiles).values(data).returning();
+    return file;
+  }
+
+  async deleteCurriculumFile(unitId: number, fileType: string): Promise<void> {
+    await db.delete(curriculumFiles).where(and(eq(curriculumFiles.unitId, unitId), eq(curriculumFiles.fileType, fileType)));
+  }
+
+  async getCurriculumMidtermExams(): Promise<CurriculumMidtermExam[]> {
+    return db.select().from(curriculumMidtermExams).orderBy(desc(curriculumMidtermExams.createdAt));
+  }
+
+  async getCurriculumMidtermExam(id: number): Promise<CurriculumMidtermExam | undefined> {
+    const [exam] = await db.select().from(curriculumMidtermExams).where(eq(curriculumMidtermExams.id, id));
+    return exam;
+  }
+
+  async createCurriculumMidtermExam(data: InsertCurriculumMidtermExam): Promise<CurriculumMidtermExam> {
+    const [exam] = await db.insert(curriculumMidtermExams).values(data).returning();
+    return exam;
+  }
+
+  async deleteCurriculumMidtermExam(id: number): Promise<void> {
+    await db.delete(curriculumMidtermExams).where(eq(curriculumMidtermExams.id, id));
   }
 }
 

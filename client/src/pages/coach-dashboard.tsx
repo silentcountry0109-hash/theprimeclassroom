@@ -55,6 +55,8 @@ import {
   DollarSign,
   TrendingUp,
   Wallet,
+  Library,
+  CheckCircle2,
 } from "lucide-react";
 import type { Notification } from "@shared/schema";
 
@@ -63,7 +65,7 @@ const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 export default function CoachDashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "salary" | "profile" | "manual">("calendar");
+  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "salary" | "profile" | "manual" | "materials">("calendar");
   const [showBindingSuccess, setShowBindingSuccess] = useState(false);
 
   useEffect(() => {
@@ -140,6 +142,7 @@ export default function CoachDashboard() {
   const TABS = [
     { id: "calendar" as const, label: "行事曆", icon: Calendar },
     { id: "students" as const, label: "我的學生", icon: Users },
+    { id: "materials" as const, label: "教材庫", icon: Library },
     { id: "salary" as const, label: "收入總覽", icon: DollarSign },
     { id: "profile" as const, label: "個人資料", icon: User },
     { id: "manual" as const, label: "使用手冊", icon: BookOpen },
@@ -261,6 +264,7 @@ export default function CoachDashboard() {
 
         {activeTab === "calendar" && <CalendarTab coachId={userData.coach?.id} />}
         {activeTab === "students" && <StudentsTab coachId={userData.coach?.id} />}
+        {activeTab === "materials" && <MaterialsTab />}
         {activeTab === "salary" && <SalaryTab coachId={userData.coach?.id} coach={userData.coach} />}
         {activeTab === "profile" && <ProfileTab />}
         {activeTab === "manual" && <ManualTab />}
@@ -2236,6 +2240,164 @@ function ManualTab() {
       <div className="text-center py-4">
         <p className="text-xs text-muted-foreground">最後更新：2026 年 3 月</p>
       </div>
+    </div>
+  );
+}
+
+// ─── Materials Tab ────────────────────────────────────────────────────────────
+interface CuUnit {
+  id: number; courseCode: string; unitName: string; sortOrder: number;
+  files: { id: number; fileType: string; originalName: string }[];
+}
+interface CuMidterm {
+  id: number; title: string; semester: string | null; grade: number | null; originalName: string; createdAt: string;
+}
+
+const MATERIAL_SLOTS = [
+  { key: "material", label: "教材（詳解）" },
+  { key: "quiz_1",   label: "考卷 A" },
+  { key: "quiz_2",   label: "考卷 B" },
+  { key: "quiz_3",   label: "考卷 C" },
+  { key: "quiz_4",   label: "考卷 D" },
+] as const;
+
+function MaterialsTab() {
+  const [section, setSection] = useState<"units" | "midterm">("units");
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [viewingPdf, setViewingPdf] = useState<{ title: string; url: string } | null>(null);
+
+  const { data: units = [], isLoading } = useQuery<CuUnit[]>({
+    queryKey: ["/api/curriculum/units"],
+  });
+  const { data: midterms = [] } = useQuery<CuMidterm[]>({
+    queryKey: ["/api/curriculum/midterm-exams"],
+  });
+
+  const filtered = units.filter(u =>
+    u.courseCode.toLowerCase().includes(search.toLowerCase()) ||
+    u.unitName.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function openPdf(title: string, url: string) {
+    setViewingPdf({ title, url });
+  }
+
+  return (
+    <div className="space-y-4" data-testid="materials-tab">
+      {/* Sub-tab header */}
+      <div className="flex gap-1 bg-white border border-gray-100 rounded-lg p-1 w-fit">
+        {(["units", "midterm"] as const).map(s => (
+          <button key={s} onClick={() => { setSection(s); setViewingPdf(null); }}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${section === s ? "bg-tiffany/10 text-tiffany" : "text-muted-foreground hover:bg-gray-50"}`}
+            data-testid={`materials-section-${s}`}
+          >
+            {s === "units" ? "📁 教材庫" : "📋 期中考歸檔"}
+          </button>
+        ))}
+      </div>
+
+      {/* PDF Viewer */}
+      {viewingPdf && (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50">
+            <span className="text-sm font-medium truncate">{viewingPdf.title}</span>
+            <button onClick={() => setViewingPdf(null)} className="text-muted-foreground hover:text-foreground p-1" data-testid="button-close-pdf">
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+          <iframe
+            src={viewingPdf.url}
+            className="w-full"
+            style={{ height: "70vh" }}
+            title={viewingPdf.title}
+            data-testid="iframe-pdf-viewer"
+          />
+        </div>
+      )}
+
+      {/* ── 教材庫 ── */}
+      {section === "units" && !viewingPdf && (
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜尋課號或名稱..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-tiffany/30 bg-white"
+              data-testid="input-materials-search"
+            />
+          </div>
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground">載入中...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-12">尚無教材單元</div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map(unit => {
+                const fileMap = Object.fromEntries(unit.files.map(f => [f.fileType, f]));
+                const count = unit.files.length;
+                const isExpanded = expandedId === unit.id;
+                return (
+                  <div key={unit.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid={`materials-unit-${unit.id}`}>
+                    <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50"
+                      onClick={() => setExpandedId(isExpanded ? null : unit.id)}>
+                      <span className="text-xs font-mono bg-tiffany/10 text-tiffany px-2 py-0.5 rounded font-bold">{unit.courseCode}</span>
+                      <span className="text-sm font-medium flex-1">{unit.unitName}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${count >= 5 ? "bg-green-100 text-green-700" : count > 0 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+                        {count >= 5 ? <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />完整</span> : `${count}/5`}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                    </div>
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 px-4 py-3 space-y-2">
+                        {MATERIAL_SLOTS.map(slot => {
+                          const f = fileMap[slot.key];
+                          return (
+                            <div key={slot.key} className="flex items-center gap-3 py-1.5" data-testid={`material-slot-${unit.id}-${slot.key}`}>
+                              <span className="text-xs text-muted-foreground w-24 shrink-0">{slot.label}</span>
+                              {f ? (
+                                <button onClick={() => openPdf(`${unit.courseCode} ${unit.unitName}・${slot.label}`, `/api/curriculum/units/${unit.id}/files/${slot.key}/view`)}
+                                  className="flex-1 text-left text-xs text-tiffany hover:underline truncate flex items-center gap-1"
+                                  data-testid={`button-open-pdf-${unit.id}-${slot.key}`}>
+                                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                                  {f.originalName}
+                                </button>
+                              ) : (
+                                <span className="flex-1 text-xs text-muted-foreground italic">尚未上傳</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 期中考歸檔 ── */}
+      {section === "midterm" && !viewingPdf && (
+        <div className="space-y-2">
+          {midterms.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-12">尚無期中考歸檔</div>
+          ) : midterms.map((exam: CuMidterm) => (
+            <button key={exam.id} onClick={() => openPdf(exam.title, `/api/curriculum/midterm-exams/${exam.id}/view`)}
+              className="w-full bg-white border border-gray-200 rounded-lg flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
+              data-testid={`midterm-item-${exam.id}`}>
+              <FileText className="w-5 h-5 text-tiffany shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{exam.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {exam.semester && `${exam.semester}・`}{exam.grade && `${exam.grade}年級・`}{exam.originalName}
+                </p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90 shrink-0" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -416,3 +416,45 @@ export const textbookQuizzes = pgTable("textbook_quizzes", {
 export const insertTextbookQuizSchema = createInsertSchema(textbookQuizzes).omit({ id: true, createdAt: true });
 export type TextbookQuiz = typeof textbookQuizzes.$inferSelect;
 export type InsertTextbookQuiz = z.infer<typeof insertTextbookQuizSchema>;
+
+export const curriculumUnits = pgTable("curriculum_units", {
+  id: serial("id").primaryKey(),
+  courseCode: text("course_code").notNull(),
+  unitName: text("unit_name").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const curriculumFiles = pgTable("curriculum_files", {
+  id: serial("id").primaryKey(),
+  unitId: integer("unit_id").references(() => curriculumUnits.id).notNull(),
+  fileType: text("file_type").notNull(),
+  originalName: text("original_name").notNull(),
+  storedPath: text("stored_path").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const curriculumMidtermExams = pgTable("curriculum_midterm_exams", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  semester: text("semester"),
+  grade: integer("grade"),
+  originalName: text("original_name").notNull(),
+  storedPath: text("stored_path").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCurriculumUnitSchema = createInsertSchema(curriculumUnits).omit({ id: true, createdAt: true });
+export const insertCurriculumFileSchema = createInsertSchema(curriculumFiles).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCurriculumMidtermExamSchema = createInsertSchema(curriculumMidtermExams).omit({ id: true, createdAt: true });
+
+export type CurriculumUnit = typeof curriculumUnits.$inferSelect;
+export type InsertCurriculumUnit = z.infer<typeof insertCurriculumUnitSchema>;
+export type CurriculumFile = typeof curriculumFiles.$inferSelect;
+export type InsertCurriculumFile = z.infer<typeof insertCurriculumFileSchema>;
+export type CurriculumMidtermExam = typeof curriculumMidtermExams.$inferSelect;
+export type InsertCurriculumMidtermExam = z.infer<typeof insertCurriculumMidtermExamSchema>;

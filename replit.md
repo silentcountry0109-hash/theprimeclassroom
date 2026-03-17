@@ -37,11 +37,12 @@ The design is Japanese minimalist, featuring a grid paper background.
 
 - **Simulation Data**: `server/simulate-data.ts` generates realistic monthly operational data for 大安分校 (franchise 9). Creates simulated parents (`sim-parent-*`), children, time slots, completed bookings, and credit transactions for February 2026. Idempotent — safe to re-run (cleans up previous simulation data first). Uses `payment_method='simulation'` and `sim-parent-*` prefix for isolation. Run with `npx tsx server/simulate-data.ts`.
 - **Textbook/Curriculum Management System**: HQ admin can manage textbook units (教材) organized by grade (1-6). Each unit has a code (e.g., A_01), name, and associated quizzes (考卷). 127 units seeded across 6 grades with 2 default quizzes each (小考A, 小考B, totalScore: 100). Tables: `textbooks`, `textbook_quizzes`. API: `GET /api/textbooks?grade=N`, `POST/PATCH/DELETE /api/admin/textbooks`, `POST/PATCH/DELETE /api/admin/quizzes`. Coach contact book has a searchable textbook unit selector (grouped by student grade) with quiz auto-fill. Student learning history is shown in franchise admin (progress bar + quiz scores) and parent dashboard (summary stats).
+- **Curriculum PDF Management System**: Full PDF-based curriculum material system. HQ admin can manage curriculum units (課程單元) with course code + name, upload up to 5 PDFs per unit (1 教材詳解 + 4 考卷 A/B/C/D), and maintain a midterm exam archive (期中考歸檔). Tables: `curriculum_units`, `curriculum_files`, `curriculum_midterm_exams`. PDF files stored in `uploads/curriculum/`, served inline (no download) via authenticated API. HQ admin has a "課程教材" sidebar tab in admin-dashboard.tsx. Coaches access materials via a "教材庫" tab in coach-dashboard.tsx with inline PDF viewer (iframe). API: `GET /api/curriculum/units`, `POST/DELETE /api/curriculum/units`, `POST/DELETE /api/curriculum/units/:id/files/:type`, `GET /api/curriculum/units/:id/files/:type/view`, `GET/POST/DELETE /api/curriculum/midterm-exams`, `GET /api/curriculum/midterm-exams/:id/view`. PDF multer instance: 20MB limit, `.pdf` only, stored in `uploads/curriculum/`.
 
 ## External Dependencies
 - **Replit Auth**: OpenID Connect for user authentication.
 - **PostgreSQL**: Primary relational database.
-- **Multer**: Handles file uploads for images.
+- **Multer**: Handles file uploads for images and PDFs (curriculum).
 - **Framer Motion**: Frontend animation library.
 - **Tailwind CSS**: Utility-first CSS framework.
 - **Shadcn/UI**: Component library for UI elements.

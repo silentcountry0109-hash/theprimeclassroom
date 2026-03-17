@@ -17,6 +17,9 @@ import express from "express";
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
+const curriculumDir = path.join(uploadsDir, "curriculum");
+if (!fs.existsSync(curriculumDir)) fs.mkdirSync(curriculumDir, { recursive: true });
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadsDir),
@@ -30,6 +33,21 @@ const upload = multer({
     const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
     if (allowed.test(path.extname(file.originalname))) cb(null, true);
     else cb(new Error("只允許上傳圖片檔案"));
+  },
+});
+
+const pdfUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, curriculumDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() === ".pdf") cb(null, true);
+    else cb(new Error("只允許上傳 PDF 檔案"));
   },
 });
 
@@ -2470,6 +2488,197 @@ export async function registerRoutes(
       res.json({ valid: true, coupon: { id: coupon.id, code: coupon.code, discountType: coupon.discountType, discountValue: coupon.discountValue }, discount });
     } catch (error) {
       res.status(500).json({ message: "驗證優惠碼失敗" });
+    }
+  });
+
+  // ─── Curriculum Management ──────────────────────────────────────
+  // GET units (admin + authenticated coaches/franchise)
+  app.get("/api/curriculum/units", isCredentialOrAuth, async (_req, res) => {
+    try {
+      const units = await storage.getCurriculumUnitsWithFiles();
+      res.json(units);
+    } catch {
+      res.status(500).json({ message: "無法載入課程單元" });
+    }
+  });
+
+  // POST create unit (admin only)
+  app.post("/api/curriculum/units", isAdmin, async (req, res) => {
+    try {
+      const { courseCode, unitName, sortOrder } = req.body;
+      if (!courseCode || !unitName) return res.status(400).json({ message: "課號和單元名稱為必填" });
+      const unit = await storage.createCurriculumUnit({ courseCode, unitName, sortOrder: sortOrder ?? 0, isActive: true });
+      res.json(unit);
+    } catch {
+      res.status(500).json({ message: "建立單元失敗" });
+    }
+  });
+
+  // PATCH update unit (admin only)
+  app.patch("/api/curriculum/units/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { courseCode, unitName, sortOrder } = req.body;
+      const unit = await storage.updateCurriculumUnit(id, { courseCode, unitName, sortOrder });
+      res.json(unit);
+    } catch {
+      res.status(500).json({ message: "更新單元失敗" });
+    }
+  });
+
+  // DELETE unit (admin only) — also deletes its files
+  app.delete("/api/curriculum/units/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const units = await storage.getCurriculumUnitsWithFiles();
+      const unit = units.find(u => u.id === id);
+      if (unit) {
+        for (const f of unit.files) {
+          const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(f.storedPath));
+          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        }
+      }
+      await storage.deleteCurriculumUnit(id);
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "刪除單元失敗" });
+    }
+  });
+
+  // POST upload file for unit (admin only)
+  // fileType: material | quiz_1 | quiz_2 | quiz_3 | quiz_4
+  app.post("/api/curriculum/units/:id/files/:fileType", isAdmin, (req, res, next) => {
+    pdfUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message || "上傳失敗" });
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      const unitId = parseInt(req.params.id);
+      const fileType = req.params.fileType;
+      const validTypes = ["material", "quiz_1", "quiz_2", "quiz_3", "quiz_4"];
+      if (!validTypes.includes(fileType)) return res.status(400).json({ message: "無效的檔案類型" });
+      if (!req.file) return res.status(400).json({ message: "請選擇 PDF 檔案" });
+
+      const unit = await storage.getCurriculumUnit(unitId);
+      if (!unit) return res.status(404).json({ message: "單元不存在" });
+
+      const existing = await storage.getCurriculumFile(unitId, fileType);
+      if (existing) {
+        const oldPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+
+      const storedPath = `/uploads/curriculum/${req.file.filename}`;
+      const file = await storage.upsertCurriculumFile({
+        unitId,
+        fileType,
+        originalName: req.file.originalname,
+        storedPath,
+        uploadedBy: req.currentUser?.id ?? null,
+      });
+      res.json(file);
+    } catch {
+      res.status(500).json({ message: "上傳失敗" });
+    }
+  });
+
+  // DELETE file from unit (admin only)
+  app.delete("/api/curriculum/units/:id/files/:fileType", isAdmin, async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.id);
+      const fileType = req.params.fileType;
+      const existing = await storage.getCurriculumFile(unitId, fileType);
+      if (existing) {
+        const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        await storage.deleteCurriculumFile(unitId, fileType);
+      }
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "刪除失敗" });
+    }
+  });
+
+  // GET serve PDF file inline (no download, any authenticated user)
+  app.get("/api/curriculum/units/:id/files/:fileType/view", isCredentialOrAuth, async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.id);
+      const fileType = req.params.fileType;
+      const file = await storage.getCurriculumFile(unitId, fileType);
+      if (!file) return res.status(404).json({ message: "檔案不存在" });
+      const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(file.storedPath));
+      if (!fs.existsSync(fullPath)) return res.status(404).json({ message: "檔案已遺失" });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file.originalName)}"`);
+      fs.createReadStream(fullPath).pipe(res);
+    } catch {
+      res.status(500).json({ message: "無法開啟檔案" });
+    }
+  });
+
+  // ─── Midterm Exams ───────────────────────────────────────────────
+  app.get("/api/curriculum/midterm-exams", isCredentialOrAuth, async (_req, res) => {
+    try {
+      const exams = await storage.getCurriculumMidtermExams();
+      res.json(exams);
+    } catch {
+      res.status(500).json({ message: "無法載入期中考" });
+    }
+  });
+
+  app.post("/api/curriculum/midterm-exams", isAdmin, (req, res, next) => {
+    pdfUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message || "上傳失敗" });
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "請選擇 PDF 檔案" });
+      const { title, semester, grade } = req.body;
+      if (!title) return res.status(400).json({ message: "請輸入標題" });
+      const storedPath = `/uploads/curriculum/${req.file.filename}`;
+      const exam = await storage.createCurriculumMidtermExam({
+        title,
+        semester: semester || null,
+        grade: grade ? parseInt(grade) : null,
+        originalName: req.file.originalname,
+        storedPath,
+        uploadedBy: req.currentUser?.id ?? null,
+      });
+      res.json(exam);
+    } catch {
+      res.status(500).json({ message: "上傳失敗" });
+    }
+  });
+
+  app.delete("/api/curriculum/midterm-exams/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const exam = await storage.getCurriculumMidtermExam(id);
+      if (exam) {
+        const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(exam.storedPath));
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        await storage.deleteCurriculumMidtermExam(id);
+      }
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "刪除失敗" });
+    }
+  });
+
+  app.get("/api/curriculum/midterm-exams/:id/view", isCredentialOrAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const exam = await storage.getCurriculumMidtermExam(id);
+      if (!exam) return res.status(404).json({ message: "找不到此考卷" });
+      const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(exam.storedPath));
+      if (!fs.existsSync(fullPath)) return res.status(404).json({ message: "檔案已遺失" });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(exam.originalName)}"`);
+      fs.createReadStream(fullPath).pipe(res);
+    } catch {
+      res.status(500).json({ message: "無法開啟檔案" });
     }
   });
 
