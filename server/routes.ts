@@ -2627,7 +2627,7 @@ export async function registerRoutes(
       const file = await storage.upsertCurriculumFile({
         unitId,
         fileType,
-        originalName: req.file.originalname,
+        originalName: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
         storedPath,
         uploadedBy: req.currentUser?.id ?? null,
       });
@@ -2696,7 +2696,7 @@ export async function registerRoutes(
         title,
         semester: semester || null,
         grade: grade ? parseInt(grade) : null,
-        originalName: req.file.originalname,
+        originalName: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
         storedPath,
         uploadedBy: req.currentUser?.id ?? null,
       });
