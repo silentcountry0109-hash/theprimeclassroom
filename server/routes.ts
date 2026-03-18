@@ -293,6 +293,28 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/franchises/:franchiseId/reset-director-password", isAdmin, async (req: any, res) => {
+    try {
+      const franchiseId = parseInt(req.params.franchiseId);
+      const { password } = req.body;
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+      }
+      const director = await db.select().from(users)
+        .where(and(eq(users.franchiseId, franchiseId), eq(users.role, "franchise_admin")))
+        .limit(1);
+      if (!director.length) {
+        return res.status(404).json({ message: "此分校尚未設定主任帳號" });
+      }
+      const hash = await bcrypt.hash(password, 10);
+      await db.update(users).set({ passwordHash: hash, mustChangePassword: true, updatedAt: new Date() })
+        .where(eq(users.id, director[0].id));
+      res.json({ success: true, username: director[0].username });
+    } catch (error) {
+      res.status(500).json({ message: "重置密碼失敗" });
+    }
+  });
+
   app.get("/api/coaches", async (_req, res) => {
     try {
       const coaches = await storage.getCoaches();

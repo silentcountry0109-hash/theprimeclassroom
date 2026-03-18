@@ -672,6 +672,9 @@ function FranchisesTab() {
   const [dirUsername, setDirUsername] = useState("");
   const [dirPassword, setDirPassword] = useState("");
   const [dirFirstName, setDirFirstName] = useState("");
+  const [showResetPwDialog, setShowResetPwDialog] = useState(false);
+  const [resetPwFranchise, setResetPwFranchise] = useState<Franchise | null>(null);
+  const [resetPwValue, setResetPwValue] = useState("");
   const [editingFranchise, setEditingFranchise] = useState<Franchise | null>(null);
   const [formData, setFormData] = useState({
     name: "", city: "", district: "", address: "", phone: "", description: "",
@@ -713,6 +716,22 @@ function FranchisesTab() {
     },
     onError: (err: any) => {
       toast({ title: err.message || "建立帳號失敗", variant: "destructive" });
+    },
+  });
+
+  const resetPwMutation = useMutation({
+    mutationFn: async ({ franchiseId, password }: { franchiseId: number; password: string }) => {
+      const res = await apiRequest("POST", `/api/admin/franchises/${franchiseId}/reset-director-password`, { password });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: `密碼已重置`, description: `帳號 ${data.username} 的密碼已更新，下次登入時須重新設定密碼。` });
+      setShowResetPwDialog(false);
+      setResetPwFranchise(null);
+      setResetPwValue("");
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "重置密碼失敗", variant: "destructive" });
     },
   });
 
@@ -858,6 +877,11 @@ function FranchisesTab() {
                     onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: f.id, isActive: checked })}
                     data-testid={`switch-franchise-active-${f.id}`}
                   />
+                  {getDirector(f.id) && (
+                    <Button variant="outline" size="icon" title="重置主任密碼" onClick={() => { setResetPwFranchise(f); setResetPwValue(""); setShowResetPwDialog(true); }} data-testid={`button-reset-password-${f.id}`}>
+                      <KeyRound className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button variant="outline" size="icon" onClick={() => openEdit(f)} data-testid={`button-edit-franchise-${f.id}`}>
                     <Edit className="w-4 h-4" />
                   </Button>
@@ -1023,6 +1047,51 @@ function FranchisesTab() {
               data-testid="button-submit-director"
             >
               {createDirectorMutation.isPending ? "建立中..." : "建立帳號"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResetPwDialog} onOpenChange={(open) => { if (!open) { setResetPwFranchise(null); setResetPwValue(""); } setShowResetPwDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重置主任登入密碼</DialogTitle>
+          </DialogHeader>
+          {resetPwFranchise && (() => {
+            const director = getDirector(resetPwFranchise.id);
+            return (
+              <div className="space-y-4 py-4">
+                <div className="bg-amber-50 rounded-md p-3 border border-amber-200">
+                  <p className="text-sm font-medium text-foreground">{resetPwFranchise.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">主任帳號：<span className="font-mono font-medium">{director?.username}</span></p>
+                </div>
+                <div>
+                  <Label>新密碼 *</Label>
+                  <Input
+                    type="password"
+                    value={resetPwValue}
+                    onChange={(e) => setResetPwValue(e.target.value)}
+                    placeholder="設定新密碼（至少 6 個字元）"
+                    className="mt-1.5"
+                    data-testid="input-reset-password"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">密碼重置後，主任下次登入時將被要求重新設定密碼。</p>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetPwDialog(false)}>取消</Button>
+            <Button
+              onClick={() => {
+                if (resetPwFranchise && resetPwValue.length >= 6) {
+                  resetPwMutation.mutate({ franchiseId: resetPwFranchise.id, password: resetPwValue });
+                }
+              }}
+              disabled={resetPwMutation.isPending || resetPwValue.length < 6}
+              data-testid="button-submit-reset-password"
+            >
+              {resetPwMutation.isPending ? "重置中..." : "確認重置"}
             </Button>
           </DialogFooter>
         </DialogContent>
