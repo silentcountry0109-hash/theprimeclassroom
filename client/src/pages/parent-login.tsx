@@ -109,6 +109,9 @@ export default function ParentLogin() {
         setLoading(false);
         return;
       }
+      if (data.isNewUser) {
+        localStorage.setItem("newlyRegistered", "true");
+      }
       setShowSuccess(true);
       setTimeout(() => {
         navigate("/dashboard");

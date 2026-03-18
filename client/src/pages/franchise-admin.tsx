@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, getActiveFranchiseId } from "@/lib/queryClient";
@@ -72,6 +72,7 @@ import {
   BookOpen,
   ClipboardList,
   ChevronsUpDown,
+  Bell,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -248,6 +249,27 @@ export default function FranchiseAdminDashboard() {
   const { user, isLoading: authLoading, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [showFranchiseSwitcher, setShowFranchiseSwitcher] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const { data: notifList = [] } = useQuery<{ id: number; type: string; title: string; message: string; isRead: boolean; createdAt: string }[]>({
+    queryKey: ["/api/notifications"],
+    enabled: !!user && user.role === "franchise_admin",
+    refetchInterval: 30000,
+  });
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    enabled: !!user && user.role === "franchise_admin",
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadData?.count || 0;
+  const markReadMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("PATCH", `/api/notifications/${id}/read`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }); queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] }); },
+  });
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => { await apiRequest("PATCH", "/api/notifications/read-all"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }); queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] }); },
+  });
 
   const { data: managedFranchises } = useQuery<{ id: number; name: string; city: string; district: string }[]>({
     queryKey: ["/api/franchise-admin/managed-franchises"],
@@ -366,9 +388,54 @@ export default function FranchiseAdminDashboard() {
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center gap-4 p-4 border-b border-gray-100 bg-white">
             <SidebarTrigger data-testid="franchise-sidebar-toggle" />
-            <h2 className="text-sm font-medium text-foreground">
+            <h2 className="text-sm font-medium text-foreground flex-1">
               {menuItems.find((m) => m.id === activeTab)?.label}
             </h2>
+            <div className="relative">
+              <button
+                onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications && unreadCount > 0) markAllReadMutation.mutate(); }}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1.5 relative"
+                data-testid="franchise-button-notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1" data-testid="franchise-badge-unread">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+              {showNotifications && (
+                <div className="absolute right-0 top-10 w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-50 max-h-96 overflow-y-auto" data-testid="franchise-notifications-panel">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <span className="text-sm font-semibold text-foreground">通知</span>
+                    <button onClick={() => setShowNotifications(false)} className="text-xs text-muted-foreground hover:text-foreground">關閉</button>
+                  </div>
+                  {notifList.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">目前沒有通知</div>
+                  ) : (
+                    notifList.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.isRead ? "bg-tiffany/5" : ""}`}
+                        onClick={() => !n.isRead && markReadMutation.mutate(n.id)}
+                        data-testid={`franchise-notification-${n.id}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {n.type === "new_booking" && <span className="mt-0.5 text-tiffany">📋</span>}
+                          {n.type !== "new_booking" && <span className="mt-0.5 text-muted-foreground">🔔</span>}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-1">{new Date(n.createdAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                          </div>
+                          {!n.isRead && <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 mt-1" />}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </header>
           <main className="flex-1 overflow-auto p-6">
             {activeTab === "overview" && <OverviewTab />}

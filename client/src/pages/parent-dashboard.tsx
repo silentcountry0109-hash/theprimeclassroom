@@ -221,10 +221,23 @@ export default function ParentDashboard() {
   const { user: replitUser, isLoading: replitLoading, logout: replitLogout } = useAuth();
   const { user: credUser, isLoading: credLoading, logout: credLogout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   const isLoading = replitLoading || credLoading;
   const user = credUser || replitUser;
   const isCredentialUser = !!credUser;
+
+  useEffect(() => {
+    if (!isLoading && user && localStorage.getItem("newlyRegistered") === "true") {
+      localStorage.removeItem("newlyRegistered");
+      setShowWelcomeModal(true);
+    }
+  }, [isLoading, user]);
+
+  const { data: welcomeChildren = [] } = useQuery<any[]>({
+    queryKey: ["/api/children"],
+    enabled: showWelcomeModal,
+  });
 
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -287,6 +300,67 @@ export default function ParentDashboard() {
 
   return (
     <div className="min-h-screen bg-washi">
+      <Dialog open={showWelcomeModal} onOpenChange={setShowWelcomeModal}>
+        <DialogContent className="max-w-sm rounded-2xl text-center px-6 py-8" data-testid="dialog-welcome">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-tiffany/10 flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-tiffany" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-foreground mb-1">
+                歡迎加入質數教室！
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {typedUser?.firstName} 家長，很高興認識您 🎉
+              </p>
+            </div>
+            <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-left">
+              <p className="text-sm font-semibold text-amber-800 mb-0.5">🎁 已獲贈 2 堂免費體驗課</p>
+              <p className="text-xs text-amber-700">堂數已存入您的帳戶，立即可用於預約試聽！</p>
+            </div>
+            <div className="w-full text-left">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">接下來的步驟：</p>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-xs text-foreground">
+                  <span className="w-5 h-5 rounded-full bg-tiffany text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">1</span>
+                  新增孩子資料（年級、學校）
+                </div>
+                <div className="flex items-center gap-2 text-xs text-foreground">
+                  <span className="w-5 h-5 rounded-full bg-coral text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">2</span>
+                  選擇教室，預約免費體驗課
+                </div>
+              </div>
+            </div>
+            {welcomeChildren.length === 0 ? (
+              <Button
+                className="w-full bg-tiffany hover:bg-tiffany/90 text-white rounded-xl"
+                onClick={() => { setShowWelcomeModal(false); setActiveTab("children"); }}
+                data-testid="button-welcome-add-child"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                新增孩子資料
+              </Button>
+            ) : (
+              <Button
+                className="w-full bg-tiffany hover:bg-tiffany/90 text-white rounded-xl"
+                onClick={() => { setShowWelcomeModal(false); setActiveTab("book"); }}
+                data-testid="button-welcome-book"
+              >
+                <CalendarPlus className="w-4 h-4 mr-2" />
+                立即預約體驗課
+              </Button>
+            )}
+            <button
+              onClick={() => setShowWelcomeModal(false)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+              data-testid="button-welcome-later"
+            >
+              稍後再說
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-4">
           <div className="flex items-center justify-between h-14">

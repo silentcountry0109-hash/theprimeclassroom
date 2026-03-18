@@ -6,7 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
-import { coaches, creditPurchases, insertTextbookSchema, insertTextbookQuizSchema } from "@shared/schema";
+import { coaches, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -225,10 +225,26 @@ export async function registerRoutes(
         referralSource: referralSource && referralSource.length > 0 ? referralSource : null,
         role: "parent",
       }).returning();
+      const [freePurchase] = await db.insert(creditPurchases).values({
+        parentId: newUser.id,
+        credits: 2,
+        originalAmount: 0,
+        discountAmount: 0,
+        finalAmount: 0,
+        paymentMethod: "free_trial",
+        paymentStatus: "completed",
+      }).returning();
+      await db.insert(creditBalances).values({
+        parentId: newUser.id,
+        purchaseId: freePurchase.id,
+        originalCredits: 2,
+        remainingCredits: 2,
+        expiresAt: null,
+      });
       req.session.credentialUserId = newUser.id;
       req.session.save(() => {
         const { passwordHash: _, ...safeUser } = newUser;
-        res.json(safeUser);
+        res.json({ ...safeUser, isNewUser: true });
       });
     } catch (error) {
       res.status(500).json({ message: "註冊失敗，請稍後再試" });
@@ -474,6 +490,22 @@ export async function registerRoutes(
         await storage.cancelBooking(booking.id);
         return res.status(400).json({ message: "堂數扣除失敗，預約已取消", code: "DEDUCT_FAILED" });
       }
+      try {
+        const child = kids.find((k: any) => k.id === req.body.childId);
+        const childName = child?.name || "新學生";
+        const slotDate = slot.date;
+        const slotTime = `${slot.startTime}–${slot.endTime}`;
+        const [directorUser] = await db.select().from(users).where(and(eq(users.franchiseId, slot.franchiseId), eq(users.role, "franchise_admin")));
+        if (directorUser) {
+          await storage.createNotification({ userId: directorUser.id, type: "new_booking", title: "新生預約通知", message: `${childName} 已預約 ${slotDate} ${slotTime} 的課程，請確認安排。` });
+        }
+        if (slot.coachId) {
+          const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, slot.coachId));
+          if (coachRec?.userId) {
+            await storage.createNotification({ userId: coachRec.userId, type: "new_booking", title: "新課程預約", message: `新學生 ${childName} 將在 ${slotDate} ${slotTime} 出席您的課程。` });
+          }
+        }
+      } catch (_) {}
       res.json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to create booking" });
