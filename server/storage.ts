@@ -2453,7 +2453,10 @@ export class DatabaseStorage implements IStorage {
   async deleteTextbook(id: number): Promise<void> {
     const filesToDelete = await db.select().from(textbookFiles).where(eq(textbookFiles.textbookId, id));
     for (const f of filesToDelete) {
-      try { fs.unlinkSync(path.resolve(f.storedPath)); } catch { }
+      try {
+        const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(f.storedPath));
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+      } catch { }
     }
     await db.delete(textbookFiles).where(eq(textbookFiles.textbookId, id));
     await db.update(textbooks).set({ isActive: false }).where(eq(textbooks.id, id));
