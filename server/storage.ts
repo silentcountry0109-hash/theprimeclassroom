@@ -3,7 +3,7 @@ import {
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
   coachDailyRecords, classrooms, notifications, franchiseStudents,
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
-  textbooks, textbookQuizzes,
+  textbooks, textbookQuizzes, textbookFiles,
   curriculumUnits, curriculumFiles, curriculumMidtermExams,
   users,
   type Franchise, type InsertFranchise,
@@ -33,6 +33,7 @@ import {
   type CreditTransaction, type InsertCreditTransaction,
   type Textbook, type InsertTextbook,
   type TextbookQuiz, type InsertTextbookQuiz,
+  type TextbookFile, type InsertTextbookFile,
   type CurriculumUnit, type InsertCurriculumUnit,
   type CurriculumFile, type InsertCurriculumFile,
   type CurriculumMidtermExam, type InsertCurriculumMidtermExam,
@@ -236,6 +237,7 @@ export interface IStorage {
   getTextbooks(): Promise<Textbook[]>;
   getTextbooksByGrade(grade: number): Promise<Textbook[]>;
   getTextbooksWithQuizzes(): Promise<any[]>;
+  getTextbooksWithFiles(): Promise<any[]>;
   createTextbook(data: InsertTextbook): Promise<Textbook>;
   updateTextbook(id: number, data: Partial<InsertTextbook>): Promise<Textbook>;
   deleteTextbook(id: number): Promise<void>;
@@ -243,6 +245,10 @@ export interface IStorage {
   createQuiz(data: InsertTextbookQuiz): Promise<TextbookQuiz>;
   updateQuiz(id: number, data: Partial<InsertTextbookQuiz>): Promise<TextbookQuiz>;
   deleteQuiz(id: number): Promise<void>;
+  getTextbookFile(textbookId: number, fileType: string): Promise<TextbookFile | undefined>;
+  upsertTextbookFile(data: InsertTextbookFile): Promise<TextbookFile>;
+  deleteTextbookFile(textbookId: number, fileType: string): Promise<void>;
+  getTextbookFiles(textbookId: number): Promise<TextbookFile[]>;
 
   getCurriculumUnitsWithFiles(): Promise<any[]>;
   getCurriculumUnit(id: number): Promise<CurriculumUnit | undefined>;
@@ -2462,6 +2468,35 @@ export class DatabaseStorage implements IStorage {
 
   async deleteQuiz(id: number): Promise<void> {
     await db.update(textbookQuizzes).set({ isActive: false }).where(eq(textbookQuizzes.id, id));
+  }
+
+  async getTextbooksWithFiles(): Promise<any[]> {
+    const allTextbooks = await db.select().from(textbooks).where(eq(textbooks.isActive, true)).orderBy(asc(textbooks.grade), asc(textbooks.sortOrder));
+    const allFiles = await db.select().from(textbookFiles).orderBy(asc(textbookFiles.fileType));
+    return allTextbooks.map(t => ({ ...t, files: allFiles.filter(f => f.textbookId === t.id) }));
+  }
+
+  async getTextbookFile(textbookId: number, fileType: string): Promise<TextbookFile | undefined> {
+    const [file] = await db.select().from(textbookFiles).where(and(eq(textbookFiles.textbookId, textbookId), eq(textbookFiles.fileType, fileType)));
+    return file;
+  }
+
+  async upsertTextbookFile(data: InsertTextbookFile): Promise<TextbookFile> {
+    const existing = await this.getTextbookFile(data.textbookId, data.fileType);
+    if (existing) {
+      const [file] = await db.update(textbookFiles).set({ ...data, updatedAt: new Date() }).where(eq(textbookFiles.id, existing.id)).returning();
+      return file;
+    }
+    const [file] = await db.insert(textbookFiles).values(data).returning();
+    return file;
+  }
+
+  async deleteTextbookFile(textbookId: number, fileType: string): Promise<void> {
+    await db.delete(textbookFiles).where(and(eq(textbookFiles.textbookId, textbookId), eq(textbookFiles.fileType, fileType)));
+  }
+
+  async getTextbookFiles(textbookId: number): Promise<TextbookFile[]> {
+    return db.select().from(textbookFiles).where(eq(textbookFiles.textbookId, textbookId)).orderBy(asc(textbookFiles.fileType));
   }
 
   async getCurriculumUnitsWithFiles(): Promise<any[]> {

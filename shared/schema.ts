@@ -417,6 +417,21 @@ export const insertTextbookQuizSchema = createInsertSchema(textbookQuizzes).omit
 export type TextbookQuiz = typeof textbookQuizzes.$inferSelect;
 export type InsertTextbookQuiz = z.infer<typeof insertTextbookQuizSchema>;
 
+export const textbookFiles = pgTable("textbook_files", {
+  id: serial("id").primaryKey(),
+  textbookId: integer("textbook_id").references(() => textbooks.id).notNull(),
+  fileType: text("file_type").notNull(),
+  originalName: text("original_name").notNull(),
+  storedPath: text("stored_path").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTextbookFileSchema = createInsertSchema(textbookFiles).omit({ id: true, createdAt: true, updatedAt: true });
+export type TextbookFile = typeof textbookFiles.$inferSelect;
+export type InsertTextbookFile = z.infer<typeof insertTextbookFileSchema>;
+
 export const curriculumUnits = pgTable("curriculum_units", {
   id: serial("id").primaryKey(),
   courseCode: text("course_code").notNull(),

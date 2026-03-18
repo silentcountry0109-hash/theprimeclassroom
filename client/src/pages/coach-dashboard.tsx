@@ -2245,9 +2245,12 @@ function ManualTab() {
 }
 
 // ─── Materials Tab ────────────────────────────────────────────────────────────
-interface CuUnit {
-  id: number; courseCode: string; unitName: string; sortOrder: number;
-  files: { id: number; fileType: string; originalName: string }[];
+interface TbFileCoach {
+  id: number; textbookId: number; fileType: string; originalName: string;
+}
+interface TextbookWithFilesCoach {
+  id: number; grade: number; unitCode: string; unitName: string; sortOrder: number;
+  files: TbFileCoach[];
 }
 interface CuMidterm {
   id: number; title: string; semester: string | null; grade: number | null; originalName: string; createdAt: string;
@@ -2255,15 +2258,20 @@ interface CuMidterm {
 
 const MATERIAL_SLOTS = [
   { key: "material", label: "教材（詳解）" },
-  { key: "quiz_1",   label: "考卷 A" },
-  { key: "quiz_2",   label: "考卷 B" },
-  { key: "quiz_3",   label: "考卷 C" },
-  { key: "quiz_4",   label: "考卷 D" },
+  { key: "quiz_1",   label: "考卷 1" },
+  { key: "quiz_2",   label: "考卷 2" },
+  { key: "quiz_3",   label: "考卷 3" },
+  { key: "quiz_4",   label: "考卷 4" },
 ] as const;
+
+const GRADE_LABELS_COACH: Record<number, string> = {
+  1: "一年級", 2: "二年級", 3: "三年級", 4: "四年級", 5: "五年級", 6: "六年級",
+};
 
 function MaterialsTab() {
   const [section, setSection] = useState<"units" | "midterm">("units");
   const [search, setSearch] = useState("");
+  const [gradeFilter, setGradeFilter] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [viewingPdf, setViewingPdf] = useState<{ title: string } | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -2276,17 +2284,21 @@ function MaterialsTab() {
     };
   }, [blobUrl]);
 
-  const { data: units = [], isLoading } = useQuery<CuUnit[]>({
-    queryKey: ["/api/curriculum/units"],
+  const { data: textbooks = [], isLoading } = useQuery<TextbookWithFilesCoach[]>({
+    queryKey: ["/api/textbooks"],
   });
   const { data: midterms = [] } = useQuery<CuMidterm[]>({
     queryKey: ["/api/curriculum/midterm-exams"],
   });
 
-  const filtered = units.filter(u =>
-    u.courseCode.toLowerCase().includes(search.toLowerCase()) ||
-    u.unitName.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = textbooks.filter(u => {
+    if (gradeFilter !== null && u.grade !== gradeFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return u.unitCode.toLowerCase().includes(q) || u.unitName.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   function closePdf() {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -2373,9 +2385,21 @@ function MaterialsTab() {
       {/* ── 教材庫 ── */}
       {section === "units" && !viewingPdf && (
         <div className="space-y-3">
+          {/* 年級篩選 */}
+          <div className="flex gap-1 flex-wrap">
+            {[null, 1, 2, 3, 4, 5, 6].map(g => (
+              <button key={g ?? "all"}
+                onClick={() => setGradeFilter(g)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${gradeFilter === g ? "bg-tiffany text-white border-tiffany" : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany/50"}`}
+                data-testid={`button-grade-filter-coach-${g ?? "all"}`}
+              >
+                {g === null ? "全部" : `${g}年級`}
+              </button>
+            ))}
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜尋課號或名稱..."
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜尋編號或名稱..."
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-tiffany/30 bg-white"
               data-testid="input-materials-search"
             />
@@ -2394,12 +2418,13 @@ function MaterialsTab() {
                   <div key={unit.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid={`materials-unit-${unit.id}`}>
                     <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50"
                       onClick={() => setExpandedId(isExpanded ? null : unit.id)}>
-                      <span className="text-xs font-mono bg-tiffany/10 text-tiffany px-2 py-0.5 rounded font-bold">{unit.courseCode}</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-tiffany/10 text-tiffany shrink-0">{GRADE_LABELS_COACH[unit.grade] || `${unit.grade}年`}</span>
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">{unit.unitCode}</span>
                       <span className="text-sm font-medium flex-1">{unit.unitName}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${count >= 5 ? "bg-green-100 text-green-700" : count > 0 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${count >= 5 ? "bg-green-100 text-green-700" : count > 0 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
                         {count >= 5 ? <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />完整</span> : `${count}/5`}
                       </span>
-                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} />
                     </div>
                     {isExpanded && (
                       <div className="border-t border-gray-100 px-4 py-3 space-y-2">
@@ -2409,7 +2434,7 @@ function MaterialsTab() {
                             <div key={slot.key} className="flex items-center gap-3 py-1.5" data-testid={`material-slot-${unit.id}-${slot.key}`}>
                               <span className="text-xs text-muted-foreground w-24 shrink-0">{slot.label}</span>
                               {f ? (
-                                <button onClick={() => openPdf(`${unit.courseCode} ${unit.unitName}・${slot.label}`, `/api/curriculum/units/${unit.id}/files/${slot.key}/view`)}
+                                <button onClick={() => openPdf(`${unit.unitCode} ${unit.unitName}・${slot.label}`, `/api/textbooks/${unit.id}/files/${slot.key}/view`)}
                                   className="flex-1 text-left text-xs text-tiffany hover:underline truncate flex items-center gap-1"
                                   data-testid={`button-open-pdf-${unit.id}-${slot.key}`}>
                                   <FileText className="w-3.5 h-3.5 shrink-0" />

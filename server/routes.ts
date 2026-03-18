@@ -2393,19 +2393,79 @@ export async function registerRoutes(
   // ========== Textbook / Curriculum Management ==========
   app.get("/api/textbooks", async (req: any, res) => {
     try {
-      const grade = req.query.grade ? parseInt(req.query.grade) : null;
-      if (grade) {
-        const items = await storage.getTextbooksByGrade(grade);
-        const quizzesMap: Record<number, any[]> = {};
-        for (const t of items) {
-          quizzesMap[t.id] = await storage.getQuizzesByTextbook(t.id);
-        }
-        return res.json(items.map(t => ({ ...t, quizzes: quizzesMap[t.id] || [] })));
-      }
-      const items = await storage.getTextbooksWithQuizzes();
+      const items = await storage.getTextbooksWithFiles();
       res.json(items);
     } catch (error) {
       res.status(500).json({ message: "取得教材失敗" });
+    }
+  });
+
+  // POST upload PDF for textbook (admin only)
+  // fileType: material | quiz_1 | quiz_2 | quiz_3 | quiz_4
+  app.post("/api/admin/textbooks/:id/files/:fileType", isAdmin, (req, res, next) => {
+    pdfUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message || "上傳失敗" });
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      const textbookId = parseInt(req.params.id);
+      const fileType = req.params.fileType;
+      const validTypes = ["material", "quiz_1", "quiz_2", "quiz_3", "quiz_4"];
+      if (!validTypes.includes(fileType)) return res.status(400).json({ message: "無效的檔案類型" });
+      if (!req.file) return res.status(400).json({ message: "請選擇 PDF 檔案" });
+
+      const existing = await storage.getTextbookFile(textbookId, fileType);
+      if (existing) {
+        const oldPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+
+      const storedPath = `/uploads/curriculum/${req.file.filename}`;
+      const file = await storage.upsertTextbookFile({
+        textbookId,
+        fileType,
+        originalName: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
+        storedPath,
+        uploadedBy: req.currentUser?.id ?? null,
+      });
+      res.json(file);
+    } catch {
+      res.status(500).json({ message: "上傳失敗" });
+    }
+  });
+
+  // DELETE PDF file from textbook (admin only)
+  app.delete("/api/admin/textbooks/:id/files/:fileType", isAdmin, async (req, res) => {
+    try {
+      const textbookId = parseInt(req.params.id);
+      const fileType = req.params.fileType;
+      const existing = await storage.getTextbookFile(textbookId, fileType);
+      if (existing) {
+        const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        await storage.deleteTextbookFile(textbookId, fileType);
+      }
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "刪除失敗" });
+    }
+  });
+
+  // GET serve textbook PDF file inline (authenticated users)
+  app.get("/api/textbooks/:id/files/:fileType/view", isCredentialOrAuth, async (req, res) => {
+    try {
+      const textbookId = parseInt(req.params.id);
+      const fileType = req.params.fileType;
+      const file = await storage.getTextbookFile(textbookId, fileType);
+      if (!file) return res.status(404).json({ message: "檔案不存在" });
+      const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(file.storedPath));
+      if (!fs.existsSync(fullPath)) return res.status(404).json({ message: "檔案已遺失" });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file.originalName)}"`);
+      fs.createReadStream(fullPath).pipe(res);
+    } catch {
+      res.status(500).json({ message: "無法開啟檔案" });
     }
   });
 

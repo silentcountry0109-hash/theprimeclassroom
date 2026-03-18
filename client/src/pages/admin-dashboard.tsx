@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -122,7 +122,6 @@ export default function AdminDashboard() {
     { id: "announcements", label: "公告管理", icon: Megaphone },
     { id: "shop", label: "商城管理", icon: ShoppingBag },
     { id: "textbooks", label: "教材管理", icon: BookOpen },
-    { id: "curriculum", label: "課程教材", icon: FolderOpen },
     { id: "credits", label: "點數管理", icon: Coins },
     { id: "site-editor", label: "官網編輯", icon: Globe },
   ];
@@ -194,7 +193,6 @@ export default function AdminDashboard() {
             {activeTab === "announcements" && <AnnouncementsTab />}
             {activeTab === "shop" && <ShopManagementTab />}
             {activeTab === "textbooks" && <TextbooksTab />}
-            {activeTab === "curriculum" && <CurriculumTab />}
             {activeTab === "credits" && <CreditsManagementTab />}
             {activeTab === "site-editor" && <SiteEditorTab />}
           </main>
@@ -3296,9 +3294,20 @@ function SiteEditorTab() {
   );
 }
 
-interface TextbookWithQuizzes extends Textbook {
-  quizzes: TextbookQuiz[];
+interface TbFile {
+  id: number; textbookId: number; fileType: string; originalName: string; storedPath: string;
 }
+interface TextbookWithFiles extends Textbook {
+  files: TbFile[];
+}
+
+const TB_FILE_SLOTS = [
+  { key: "material", label: "教材（詳解）" },
+  { key: "quiz_1",   label: "考卷 1" },
+  { key: "quiz_2",   label: "考卷 2" },
+  { key: "quiz_3",   label: "考卷 3" },
+  { key: "quiz_4",   label: "考卷 4" },
+] as const;
 
 const GRADE_LABELS: Record<number, string> = {
   1: "一年級",
@@ -3315,11 +3324,8 @@ function TextbooksTab() {
   const [searchText, setSearchText] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [editingTextbook, setEditingTextbook] = useState<TextbookWithQuizzes | null>(null);
+  const [editingTextbook, setEditingTextbook] = useState<TextbookWithFiles | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showQuizDialog, setShowQuizDialog] = useState(false);
-  const [editingQuiz, setEditingQuiz] = useState<TextbookQuiz | null>(null);
-  const [quizTextbookId, setQuizTextbookId] = useState<number | null>(null);
 
   const [addGrade, setAddGrade] = useState("1");
   const [addUnitCode, setAddUnitCode] = useState("");
@@ -3333,11 +3339,20 @@ function TextbooksTab() {
   const [editUnitName, setEditUnitName] = useState("");
   const [editSortOrder, setEditSortOrder] = useState("0");
 
-  const [quizName, setQuizName] = useState("");
-  const [quizTotalScore, setQuizTotalScore] = useState("100");
-  const [quizSortOrder, setQuizSortOrder] = useState("0");
+  const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingUpload, setPendingUpload] = useState<{ textbookId: number; fileType: string } | null>(null);
 
-  const { data: textbooks = [], isLoading } = useQuery<TextbookWithQuizzes[]>({
+  const [viewingPdf, setViewingPdf] = useState<{ title: string } | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loadingPdf, setLoadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [blobUrl]);
+
+  const { data: textbooks = [], isLoading } = useQuery<TextbookWithFiles[]>({
     queryKey: ["/api/textbooks"],
   });
 
@@ -3422,42 +3437,62 @@ function TextbooksTab() {
     },
   });
 
-  const createQuizMutation = useMutation({
-    mutationFn: async ({ textbookId, data }: { textbookId: number; data: { quizName: string; totalScore: number; sortOrder: number } }) => {
-      const res = await apiRequest("POST", `/api/admin/textbooks/${textbookId}/quizzes`, data);
-      return res.json();
+  const deleteFileMutation = useMutation({
+    mutationFn: async ({ textbookId, fileType }: { textbookId: number; fileType: string }) => {
+      await apiRequest("DELETE", `/api/admin/textbooks/${textbookId}/files/${fileType}`);
     },
     onSuccess: () => {
-      toast({ title: editingQuiz ? "考卷已更新" : "考卷已新增" });
+      toast({ title: "檔案已刪除" });
       queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
-      setShowQuizDialog(false);
-      setEditingQuiz(null);
-      setQuizTextbookId(null);
     },
+    onError: () => toast({ title: "刪除失敗", variant: "destructive" }),
   });
 
-  const updateQuizMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { quizName?: string; totalScore?: number; sortOrder?: number } }) => {
-      const res = await apiRequest("PATCH", `/api/admin/quizzes/${id}`, data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "考卷已更新" });
-      queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
-      setShowQuizDialog(false);
-      setEditingQuiz(null);
-    },
-  });
+  function triggerFileUpload(textbookId: number, fileType: string) {
+    setPendingUpload({ textbookId, fileType });
+    if (fileInputRef.current) { fileInputRef.current.value = ""; fileInputRef.current.click(); }
+  }
 
-  const deleteQuizMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/admin/quizzes/${id}`);
-    },
-    onSuccess: () => {
-      toast({ title: "考卷已刪除" });
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!pendingUpload || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    const slotKey = `${pendingUpload.textbookId}-${pendingUpload.fileType}`;
+    setUploadingSlot(slotKey);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`/api/admin/textbooks/${pendingUpload.textbookId}/files/${pendingUpload.fileType}`, {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      toast({ title: "上傳成功" });
       queryClient.invalidateQueries({ queryKey: ["/api/textbooks"] });
-    },
-  });
+    } catch (err: any) {
+      toast({ title: "上傳失敗", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingSlot(null);
+      setPendingUpload(null);
+    }
+  }
+
+  function closePdf() {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    setBlobUrl(null); setViewingPdf(null); setPdfError(null); setLoadingPdf(false);
+  }
+
+  async function openPdf(title: string, url: string) {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    setBlobUrl(null); setPdfError(null); setViewingPdf({ title }); setLoadingPdf(true);
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) { setPdfError("尚未上傳此教材"); setLoadingPdf(false); return; }
+      const blob = await res.blob();
+      setBlobUrl(URL.createObjectURL(blob));
+    } catch { setPdfError("載入失敗，請稍後再試"); }
+    finally { setLoadingPdf(false); }
+  }
 
   const openAddDialog = () => {
     setAddGrade("1");
@@ -3469,31 +3504,13 @@ function TextbooksTab() {
     setShowAddDialog(true);
   };
 
-  const openEditDialog = (tb: TextbookWithQuizzes) => {
+  const openEditDialog = (tb: TextbookWithFiles) => {
     setEditingTextbook(tb);
     setEditGrade(tb.grade.toString());
     setEditUnitCode(tb.unitCode);
     setEditUnitName(tb.unitName);
     setEditSortOrder(tb.sortOrder.toString());
     setShowEditDialog(true);
-  };
-
-  const openAddQuizDialog = (textbookId: number) => {
-    setEditingQuiz(null);
-    setQuizTextbookId(textbookId);
-    setQuizName("");
-    setQuizTotalScore("100");
-    setQuizSortOrder("0");
-    setShowQuizDialog(true);
-  };
-
-  const openEditQuizDialog = (quiz: TextbookQuiz) => {
-    setEditingQuiz(quiz);
-    setQuizTextbookId(quiz.textbookId);
-    setQuizName(quiz.quizName);
-    setQuizTotalScore(quiz.totalScore.toString());
-    setQuizSortOrder(quiz.sortOrder.toString());
-    setShowQuizDialog(true);
   };
 
   const handleAddSubmit = () => {
@@ -3540,29 +3557,6 @@ function TextbooksTab() {
     });
   };
 
-  const handleQuizSubmit = () => {
-    if (!quizName) return;
-    if (editingQuiz) {
-      updateQuizMutation.mutate({
-        id: editingQuiz.id,
-        data: {
-          quizName,
-          totalScore: parseInt(quizTotalScore) || 100,
-          sortOrder: parseInt(quizSortOrder) || 0,
-        },
-      });
-    } else if (quizTextbookId) {
-      createQuizMutation.mutate({
-        textbookId: quizTextbookId,
-        data: {
-          quizName,
-          totalScore: parseInt(quizTotalScore) || 100,
-          sortOrder: parseInt(quizSortOrder) || 0,
-        },
-      });
-    }
-  };
-
   const gradeFilterTabs = [
     { value: "all", label: "全部" },
     { value: "1", label: "一年級" },
@@ -3584,10 +3578,44 @@ function TextbooksTab() {
 
   return (
     <div className="max-w-4xl">
+      {/* Hidden PDF file input */}
+      <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleFileChange} />
+
+      {/* PDF Viewer */}
+      {viewingPdf && (
+        <div className="mb-4 bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50">
+            <span className="text-sm font-medium truncate">{viewingPdf.title}</span>
+            <button onClick={closePdf} className="text-muted-foreground hover:text-foreground p-1" data-testid="button-close-tbpdf">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {loadingPdf && (
+            <div className="w-full flex items-center justify-center bg-gray-50" style={{ height: "70vh" }}>
+              <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                <div className="w-8 h-8 border-2 border-tiffany border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm">載入中...</span>
+              </div>
+            </div>
+          )}
+          {pdfError && !loadingPdf && (
+            <div className="w-full flex items-center justify-center bg-gray-50" style={{ height: "70vh" }}>
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <FileText className="w-10 h-10 text-gray-300" />
+                <span className="text-sm">{pdfError}</span>
+              </div>
+            </div>
+          )}
+          {blobUrl && !loadingPdf && !pdfError && (
+            <iframe src={blobUrl} className="w-full" style={{ height: "70vh" }} title={viewingPdf.title} data-testid="iframe-tbpdf-viewer" />
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-foreground" data-testid="text-textbooks-title">教材管理</h1>
-          <p className="text-sm text-muted-foreground">管理教材單元和配套考卷</p>
+          <p className="text-sm text-muted-foreground">管理教材單元與 PDF 教材、考卷</p>
         </div>
         <Button onClick={openAddDialog} className="rounded-full" data-testid="button-add-textbook">
           <Plus className="w-4 h-4 mr-1.5" />新增教材
@@ -3653,8 +3681,8 @@ function TextbooksTab() {
                   </span>
                   <span className="text-sm font-mono text-muted-foreground" data-testid={`text-unit-code-${tb.id}`}>{tb.unitCode}</span>
                   <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate" data-testid={`text-unit-name-${tb.id}`}>{tb.unitName}</span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0" data-testid={`text-quiz-count-${tb.id}`}>
-                    {tb.quizzes?.length || 0} 張考卷
+                  <span className="text-xs text-muted-foreground flex-shrink-0" data-testid={`text-file-count-${tb.id}`}>
+                    {tb.files?.length || 0}/5 份檔案
                   </span>
                   <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Button variant="outline" size="icon" onClick={() => openEditDialog(tb)} data-testid={`button-edit-textbook-${tb.id}`}>
@@ -3664,7 +3692,7 @@ function TextbooksTab() {
                       variant="outline"
                       size="icon"
                       onClick={() => {
-                        if (confirm(`確定刪除教材「${tb.unitCode} ${tb.unitName}」？相關考卷也會一併刪除。`)) {
+                        if (confirm(`確定刪除教材「${tb.unitCode} ${tb.unitName}」？相關檔案也會一併刪除。`)) {
                           deleteTextbookMutation.mutate(tb.id);
                         }
                       }}
@@ -3676,54 +3704,53 @@ function TextbooksTab() {
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t border-gray-100 bg-gray-50/50 p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-muted-foreground">配套考卷</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openAddQuizDialog(tb.id)}
-                        data-testid={`button-add-quiz-${tb.id}`}
-                      >
-                        <Plus className="w-3 h-3 mr-1" />新增考卷
-                      </Button>
-                    </div>
-                    {(!tb.quizzes || tb.quizzes.length === 0) ? (
-                      <p className="text-xs text-muted-foreground py-2" data-testid={`text-no-quizzes-${tb.id}`}>尚無考卷</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {tb.quizzes.map((quiz) => (
-                          <div
-                            key={quiz.id}
-                            className="flex items-center justify-between gap-3 bg-white rounded border border-gray-100 px-3 py-2"
-                            data-testid={`quiz-row-${quiz.id}`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                              <span className="text-sm text-foreground" data-testid={`text-quiz-name-${quiz.id}`}>{quiz.quizName}</span>
-                              <span className="text-xs text-muted-foreground" data-testid={`text-quiz-score-${quiz.id}`}>滿分 {quiz.totalScore}</span>
-                            </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <Button variant="outline" size="icon" onClick={() => openEditQuizDialog(quiz)} data-testid={`button-edit-quiz-${quiz.id}`}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => {
-                                  if (confirm(`確定刪除考卷「${quiz.quizName}」？`)) {
-                                    deleteQuizMutation.mutate(quiz.id);
-                                  }
-                                }}
-                                data-testid={`button-delete-quiz-${quiz.id}`}
+                  <div className="border-t border-gray-100 bg-gray-50/50 px-3 py-3 space-y-2">
+                    <span className="text-xs font-medium text-muted-foreground block mb-1">PDF 檔案</span>
+                    {TB_FILE_SLOTS.map(slot => {
+                      const f = (tb.files || []).find(x => x.fileType === slot.key);
+                      const slotKey = `${tb.id}-${slot.key}`;
+                      const isUploading = uploadingSlot === slotKey;
+                      return (
+                        <div key={slot.key} className="flex items-center gap-2 py-1" data-testid={`tb-file-slot-${tb.id}-${slot.key}`}>
+                          <span className="text-xs text-muted-foreground w-24 shrink-0">{slot.label}</span>
+                          {f ? (
+                            <>
+                              <button
+                                onClick={() => openPdf(`${tb.unitCode} ${tb.unitName}・${slot.label}`, `/api/textbooks/${tb.id}/files/${slot.key}/view`)}
+                                className="flex-1 text-left text-xs text-tiffany hover:underline truncate flex items-center gap-1"
+                                data-testid={`button-view-tbfile-${tb.id}-${slot.key}`}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <FileText className="w-3.5 h-3.5 shrink-0" />{f.originalName}
+                              </button>
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs shrink-0"
+                                onClick={() => triggerFileUpload(tb.id, slot.key)}
+                                disabled={isUploading}
+                                data-testid={`button-replace-tbfile-${tb.id}-${slot.key}`}
+                              >
+                                {isUploading ? "上傳中..." : "替換"}
                               </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                              <Button variant="outline" size="icon" className="h-7 w-7 shrink-0"
+                                onClick={() => { if (confirm("確定刪除此檔案？")) deleteFileMutation.mutate({ textbookId: tb.id, fileType: slot.key }); }}
+                                data-testid={`button-delete-tbfile-${tb.id}-${slot.key}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-xs text-muted-foreground italic">尚未上傳</span>
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs shrink-0"
+                                onClick={() => triggerFileUpload(tb.id, slot.key)}
+                                disabled={isUploading}
+                                data-testid={`button-upload-tbfile-${tb.id}-${slot.key}`}
+                              >
+                                {isUploading ? "上傳中..." : "上傳"}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -3885,52 +3912,6 @@ function TextbooksTab() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showQuizDialog} onOpenChange={(open) => { if (!open) { setEditingQuiz(null); setQuizTextbookId(null); } setShowQuizDialog(open); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingQuiz ? "編輯考卷" : "新增考卷"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>考卷名稱</Label>
-              <Input
-                value={quizName}
-                onChange={(e) => setQuizName(e.target.value)}
-                placeholder="例如：小考A"
-                data-testid="input-quiz-name"
-              />
-            </div>
-            <div>
-              <Label>滿分分數</Label>
-              <Input
-                type="number"
-                value={quizTotalScore}
-                onChange={(e) => setQuizTotalScore(e.target.value)}
-                data-testid="input-quiz-total-score"
-              />
-            </div>
-            <div>
-              <Label>排序</Label>
-              <Input
-                type="number"
-                value={quizSortOrder}
-                onChange={(e) => setQuizSortOrder(e.target.value)}
-                data-testid="input-quiz-sort-order"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowQuizDialog(false)}>取消</Button>
-            <Button
-              onClick={handleQuizSubmit}
-              disabled={!quizName || createQuizMutation.isPending || updateQuizMutation.isPending}
-              data-testid="button-submit-quiz"
-            >
-              {(createQuizMutation.isPending || updateQuizMutation.isPending) ? "儲存中..." : editingQuiz ? "更新" : "新增"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
