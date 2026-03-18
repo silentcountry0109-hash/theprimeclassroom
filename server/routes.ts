@@ -2391,7 +2391,7 @@ export async function registerRoutes(
   });
 
   // ========== Textbook / Curriculum Management ==========
-  app.get("/api/textbooks", async (req: any, res) => {
+  app.get("/api/textbooks", isCredentialOrAuth, async (req: any, res) => {
     try {
       const items = await storage.getTextbooksWithFiles();
       res.json(items);

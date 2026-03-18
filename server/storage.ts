@@ -2483,7 +2483,12 @@ export class DatabaseStorage implements IStorage {
   async getTextbooksWithFiles(): Promise<any[]> {
     const allTextbooks = await db.select().from(textbooks).where(eq(textbooks.isActive, true)).orderBy(asc(textbooks.grade), asc(textbooks.sortOrder));
     const allFiles = await db.select().from(textbookFiles).orderBy(asc(textbookFiles.fileType));
-    return allTextbooks.map(t => ({ ...t, files: allFiles.filter(f => f.textbookId === t.id) }));
+    const allQuizzes = await db.select().from(textbookQuizzes).where(eq(textbookQuizzes.isActive, true)).orderBy(asc(textbookQuizzes.sortOrder));
+    return allTextbooks.map(t => ({
+      ...t,
+      files: allFiles.filter(f => f.textbookId === t.id).map(({ storedPath: _sp, uploadedBy: _ub, ...safe }) => safe),
+      quizzes: allQuizzes.filter(q => q.textbookId === t.id),
+    }));
   }
 
   async getTextbookFile(textbookId: number, fileType: string): Promise<TextbookFile | undefined> {
