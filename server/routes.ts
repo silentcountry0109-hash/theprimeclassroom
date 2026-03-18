@@ -7,7 +7,7 @@ import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
 import { coaches, creditPurchases, insertTextbookSchema, insertTextbookQuizSchema } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
 import path from "path";
