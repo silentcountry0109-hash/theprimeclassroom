@@ -2463,7 +2463,10 @@ export async function registerRoutes(
   app.get("/api/textbooks/:id/files/:fileType/view", isCredentialOrAuth, async (req, res) => {
     try {
       const textbookId = parseInt(req.params.id);
+      if (isNaN(textbookId)) return res.status(400).json({ message: "無效的教材 ID" });
       const fileType = req.params.fileType;
+      const validTypes = ["material", "quiz_1", "quiz_2", "quiz_3", "quiz_4"];
+      if (!validTypes.includes(fileType)) return res.status(400).json({ message: "無效的檔案類型" });
       const file = await storage.getTextbookFile(textbookId, fileType);
       if (!file) return res.status(404).json({ message: "檔案不存在" });
       const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(file.storedPath));
