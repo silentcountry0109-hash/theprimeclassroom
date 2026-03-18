@@ -675,6 +675,7 @@ function FranchisesTab() {
   const [showResetPwDialog, setShowResetPwDialog] = useState(false);
   const [resetPwFranchise, setResetPwFranchise] = useState<Franchise | null>(null);
   const [resetPwValue, setResetPwValue] = useState("");
+  const [showResetPwText, setShowResetPwText] = useState(false);
   const [editingFranchise, setEditingFranchise] = useState<Franchise | null>(null);
   const [formData, setFormData] = useState({
     name: "", city: "", district: "", address: "", phone: "", description: "",
@@ -1052,7 +1053,7 @@ function FranchisesTab() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showResetPwDialog} onOpenChange={(open) => { if (!open) { setResetPwFranchise(null); setResetPwValue(""); } setShowResetPwDialog(open); }}>
+      <Dialog open={showResetPwDialog} onOpenChange={(open) => { if (!open) { setResetPwFranchise(null); setResetPwValue(""); setShowResetPwText(false); } setShowResetPwDialog(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>重置主任登入密碼</DialogTitle>
@@ -1067,14 +1068,24 @@ function FranchisesTab() {
                 </div>
                 <div>
                   <Label>新密碼 *</Label>
-                  <Input
-                    type="password"
-                    value={resetPwValue}
-                    onChange={(e) => setResetPwValue(e.target.value)}
-                    placeholder="設定新密碼（至少 6 個字元）"
-                    className="mt-1.5"
-                    data-testid="input-reset-password"
-                  />
+                  <div className="relative mt-1.5">
+                    <Input
+                      type={showResetPwText ? "text" : "password"}
+                      value={resetPwValue}
+                      onChange={(e) => setResetPwValue(e.target.value)}
+                      placeholder="設定新密碼（至少 6 個字元）"
+                      className="pr-10"
+                      data-testid="input-reset-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPwText(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      data-testid="button-toggle-reset-pw-visibility"
+                    >
+                      {showResetPwText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">密碼重置後，主任下次登入時將被要求重新設定密碼。</p>
               </div>
