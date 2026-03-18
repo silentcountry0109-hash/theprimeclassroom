@@ -40,6 +40,8 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
 
 export interface IStorage {
   getCoaches(): Promise<Coach[]>;
@@ -2449,6 +2451,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTextbook(id: number): Promise<void> {
+    const filesToDelete = await db.select().from(textbookFiles).where(eq(textbookFiles.textbookId, id));
+    for (const f of filesToDelete) {
+      try { fs.unlinkSync(path.resolve(f.storedPath)); } catch { }
+    }
+    await db.delete(textbookFiles).where(eq(textbookFiles.textbookId, id));
     await db.update(textbooks).set({ isActive: false }).where(eq(textbooks.id, id));
   }
 

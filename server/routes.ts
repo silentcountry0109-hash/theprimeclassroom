@@ -2410,10 +2410,14 @@ export async function registerRoutes(
   }, async (req: any, res) => {
     try {
       const textbookId = parseInt(req.params.id);
+      if (isNaN(textbookId)) return res.status(400).json({ message: "無效的教材 ID" });
       const fileType = req.params.fileType;
       const validTypes = ["material", "quiz_1", "quiz_2", "quiz_3", "quiz_4"];
       if (!validTypes.includes(fileType)) return res.status(400).json({ message: "無效的檔案類型" });
       if (!req.file) return res.status(400).json({ message: "請選擇 PDF 檔案" });
+
+      const allTextbooks = await storage.getTextbooksWithFiles();
+      if (!allTextbooks.find(t => t.id === textbookId)) return res.status(404).json({ message: "教材單元不存在" });
 
       const existing = await storage.getTextbookFile(textbookId, fileType);
       if (existing) {
@@ -2439,7 +2443,10 @@ export async function registerRoutes(
   app.delete("/api/admin/textbooks/:id/files/:fileType", isAdmin, async (req, res) => {
     try {
       const textbookId = parseInt(req.params.id);
+      if (isNaN(textbookId)) return res.status(400).json({ message: "無效的教材 ID" });
       const fileType = req.params.fileType;
+      const validTypes = ["material", "quiz_1", "quiz_2", "quiz_3", "quiz_4"];
+      if (!validTypes.includes(fileType)) return res.status(400).json({ message: "無效的檔案類型" });
       const existing = await storage.getTextbookFile(textbookId, fileType);
       if (existing) {
         const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
