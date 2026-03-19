@@ -1796,7 +1796,11 @@ function CoachesTab() {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "帳號建立成功", description: `帳號：${data.accountUsername}，密碼為手機末六碼` });
+      if (data.linked) {
+        toast({ title: "已串聯至既有帳號", description: `此老師已自動串聯至帳號：${data.accountUsername}，登入後即可查看所有分校課表` });
+      } else {
+        toast({ title: "帳號建立成功", description: `帳號：${data.accountUsername}，密碼為手機末六碼` });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
     },
     onError: (error: Error) => {

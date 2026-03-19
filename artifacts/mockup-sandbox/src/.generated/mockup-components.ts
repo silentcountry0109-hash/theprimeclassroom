@@ -6,7 +6,7 @@ export const modules: ModuleMap = {
   "./components/mockups/coach-nav/TabBar.tsx": () => import("../components/mockups/coach-nav/TabBar.tsx"),
   "./components/mockups/curriculum/CoachCurriculum.tsx": () => import("../components/mockups/curriculum/CoachCurriculum.tsx"),
   "./components/mockups/curriculum/HQCurriculum.tsx": () => import("../components/mockups/curriculum/HQCurriculum.tsx"),
-  "./components/mockups/schedule-picker/SchedulePicker.tsx": () => import("../components/mockups/schedule-picker/SchedulePicker.tsx"),
   "./components/mockups/materials/CoachLibrary.tsx": () => import("../components/mockups/materials/CoachLibrary.tsx"),
-  "./components/mockups/materials/HQUpload.tsx": () => import("../components/mockups/materials/HQUpload.tsx")
+  "./components/mockups/materials/HQUpload.tsx": () => import("../components/mockups/materials/HQUpload.tsx"),
+  "./components/mockups/schedule-picker/SchedulePicker.tsx": () => import("../components/mockups/schedule-picker/SchedulePicker.tsx")
 };

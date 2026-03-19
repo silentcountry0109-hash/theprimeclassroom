@@ -1269,6 +1269,15 @@ function StudentsTab({ coachId }: { coachId: number }) {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-foreground">{s.name}</p>
             <p className="text-xs text-muted-foreground">{s.grade}年級 · {s.bookingCount} 堂課</p>
+            {s.franchiseNames && s.franchiseNames.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {s.franchiseNames.map((fname: string) => (
+                  <Badge key={fname} variant="outline" className="text-[10px] px-1.5 py-0" data-testid={`badge-franchise-${s.id}`}>
+                    {fname}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
         </button>

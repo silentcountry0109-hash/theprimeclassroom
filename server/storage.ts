@@ -48,6 +48,7 @@ export interface IStorage {
   getAllCoaches(): Promise<Coach[]>;
   getCoach(id: number): Promise<Coach | undefined>;
   getCoachesByFranchise(franchiseId: number): Promise<Coach[]>;
+  getCoachesByUserId(userId: string): Promise<Coach[]>;
   createCoach(coach: InsertCoach): Promise<Coach>;
   updateCoach(id: number, data: Partial<InsertCoach>): Promise<Coach>;
   deleteCoach(id: number): Promise<void>;
@@ -163,7 +164,12 @@ export interface IStorage {
   getContactBooksByChild(childId: number): Promise<any[]>;
   getContactBooksByParent(parentId: string): Promise<any[]>;
   getCoachStudents(coachId: number): Promise<any[]>;
+  getCoachStudentsByUserId(userId: string): Promise<any[]>;
+  getCoachSlotsByUserId(userId: string, year: number, month: number): Promise<any[]>;
   getStudentContactBookHistory(coachId: number, childId: number): Promise<any[]>;
+  getStudentContactBookHistoryByCoachIds(coachIds: number[], childId: number): Promise<any[]>;
+  getCoachDailyRecordByCoachIds(coachIds: number[], date: string): Promise<any>;
+  getCoachMonthlyRecordsByCoachIds(coachIds: number[], year: number, month: number): Promise<any[]>;
 
   getAllSiteContent(): Promise<SiteContent[]>;
   getSiteContent(sectionKey: string): Promise<SiteContent | undefined>;
@@ -234,6 +240,7 @@ export interface IStorage {
   getTransactionsByParent(parentId: string): Promise<CreditTransaction[]>;
 
   getCoachEarningsStats(coachId: number, startDate: string, endDate: string): Promise<any>;
+  getCoachEarningsStatsByCoachIds(coachIds: number[], startDate: string, endDate: string): Promise<any>;
   getFranchiseCoachEarnings(franchiseId: number, startDate: string, endDate: string): Promise<any>;
 
   getTextbooks(): Promise<Textbook[]>;
@@ -1537,6 +1544,97 @@ export class DatabaseStorage implements IStorage {
     return coach;
   }
 
+  async getCoachesByUserId(userId: string): Promise<Coach[]> {
+    return db.select().from(coaches).where(eq(coaches.userId, userId));
+  }
+
+  async getCoachSlotsByUserId(userId: string, year: number, month: number): Promise<any[]> {
+    const allCoaches = await this.getCoachesByUserId(userId);
+    if (allCoaches.length === 0) return [];
+    const coachIds = allCoaches.map(c => c.id);
+
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endYear = month === 12 ? year + 1 : year;
+    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+
+    const slots = await db.select({
+      slot: timeSlots,
+      franchise: franchises,
+    })
+      .from(timeSlots)
+      .leftJoin(franchises, eq(timeSlots.franchiseId, franchises.id))
+      .where(
+        and(
+          inArray(timeSlots.coachId, coachIds),
+          gte(timeSlots.date, startDate),
+          sql`${timeSlots.date} < ${endDate}`
+        )
+      )
+      .orderBy(timeSlots.date, timeSlots.startTime);
+
+    return slots.map(s => ({
+      ...s.slot,
+      franchiseName: s.franchise?.name,
+    }));
+  }
+
+  async getCoachStudentsByUserId(userId: string): Promise<any[]> {
+    const allCoaches = await this.getCoachesByUserId(userId);
+    if (allCoaches.length === 0) return [];
+    const coachIds = allCoaches.map(c => c.id);
+
+    const coachSlots = await db.select({
+      id: timeSlots.id,
+      coachId: timeSlots.coachId,
+      franchiseId: timeSlots.franchiseId,
+    }).from(timeSlots).where(inArray(timeSlots.coachId, coachIds));
+    if (coachSlots.length === 0) return [];
+
+    const slotIds = coachSlots.map(s => s.id);
+    const coachSlotMap = new Map(coachSlots.map(s => [s.id, s]));
+
+    const franchiseIds = [...new Set(coachSlots.map(s => s.franchiseId))];
+    const franchiseRows = franchiseIds.length > 0
+      ? await db.select({ id: franchises.id, name: franchises.name }).from(franchises).where(inArray(franchises.id, franchiseIds))
+      : [];
+    const franchiseMap = new Map(franchiseRows.map(f => [f.id, f.name]));
+
+    const bookingRows = await db.select({
+      child: children,
+      booking: bookings,
+    })
+      .from(bookings)
+      .innerJoin(children, eq(bookings.childId, children.id))
+      .where(
+        and(
+          inArray(bookings.slotId, slotIds),
+          eq(bookings.status, "confirmed")
+        )
+      );
+
+    const childMap = new Map<number, { child: any; bookingCount: number; franchiseNames: Set<string> }>();
+    for (const row of bookingRows) {
+      const slot = coachSlotMap.get(row.booking.slotId);
+      const franchiseName = slot ? (franchiseMap.get(slot.franchiseId) || "") : "";
+      const existing = childMap.get(row.child.id);
+      if (existing) {
+        existing.bookingCount++;
+        if (franchiseName) existing.franchiseNames.add(franchiseName);
+      } else {
+        const names = new Set<string>();
+        if (franchiseName) names.add(franchiseName);
+        childMap.set(row.child.id, { child: row.child, bookingCount: 1, franchiseNames: names });
+      }
+    }
+
+    return Array.from(childMap.values()).map(({ child, bookingCount, franchiseNames }) => ({
+      ...child,
+      bookingCount,
+      franchiseNames: Array.from(franchiseNames),
+    }));
+  }
+
   async getCoachSlots(coachId: number, year: number, month: number): Promise<any[]> {
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
     const endMonth = month === 12 ? 1 : month + 1;
@@ -1884,6 +1982,56 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(contactBooks.createdAt));
+  }
+
+  async getStudentContactBookHistoryByCoachIds(coachIds: number[], childId: number): Promise<any[]> {
+    if (coachIds.length === 0) return [];
+    return db.select()
+      .from(contactBooks)
+      .where(
+        and(
+          inArray(contactBooks.coachId, coachIds),
+          eq(contactBooks.childId, childId)
+        )
+      )
+      .orderBy(desc(contactBooks.createdAt));
+  }
+
+  async getCoachDailyRecordByCoachIds(coachIds: number[], date: string): Promise<any> {
+    if (coachIds.length === 0) return { totalSlots: 0, checkedInSlots: 0, contactBookSlots: 0, isComplete: true, date };
+    const perCoach = await Promise.all(coachIds.map(id => this.getCoachDailyRecord(id, date)));
+    const totalSlots = perCoach.reduce((s, r) => s + r.totalSlots, 0);
+    const checkedInSlots = perCoach.reduce((s, r) => s + r.checkedInSlots, 0);
+    const contactBookSlots = perCoach.reduce((s, r) => s + r.contactBookSlots, 0);
+    const isComplete = totalSlots > 0 && checkedInSlots === totalSlots && contactBookSlots === totalSlots;
+    return { totalSlots, checkedInSlots, contactBookSlots, isComplete, date };
+  }
+
+  async getCoachMonthlyRecordsByCoachIds(coachIds: number[], year: number, month: number): Promise<any[]> {
+    if (coachIds.length === 0) return [];
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endYear = month === 12 ? year + 1 : year;
+    const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+    const allRecords = await db.select().from(coachDailyRecords)
+      .where(and(
+        inArray(coachDailyRecords.coachId, coachIds),
+        gte(coachDailyRecords.date, startDate),
+        sql`${coachDailyRecords.date} < ${endDate}`,
+      ));
+    const byDate = new Map<string, any>();
+    for (const r of allRecords) {
+      const existing = byDate.get(r.date);
+      if (!existing) {
+        byDate.set(r.date, { ...r });
+      } else {
+        existing.totalSlots += r.totalSlots;
+        existing.checkedInSlots += r.checkedInSlots;
+        existing.contactBookSlots += r.contactBookSlots;
+        existing.isComplete = existing.totalSlots > 0 && existing.checkedInSlots === existing.totalSlots && existing.contactBookSlots === existing.totalSlots;
+      }
+    }
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 
   async getFavoriteFranchises(userId: string): Promise<number[]> {
@@ -2382,6 +2530,80 @@ export class DatabaseStorage implements IStorage {
         projectedEarnings: Math.round(projectedEarnings),
         month: `${currentYear}-${String(currentMonth).padStart(2, '0')}`,
       },
+    };
+  }
+
+  async getCoachEarningsStatsByCoachIds(coachIds: number[], startDate: string, endDate: string): Promise<any> {
+    if (coachIds.length === 0) {
+      return {
+        compensationType: "fixed",
+        compensationAmount: 0,
+        totalLessons: 0,
+        totalNetRevenue: 0,
+        coachEarnings: 0,
+        dailyStats: [],
+        monthlyProjection: { totalSlots: 0, projectedEarnings: 0, month: "" },
+        perCoach: [],
+      };
+    }
+    const perCoach = [];
+    let totalLessons = 0;
+    let totalNetRevenue = 0;
+    let totalEarnings = 0;
+    const mergedDailyMap: Record<string, { lessons: number; revenue: number; earnings: number }> = {};
+    let primaryCompensationType = "fixed";
+    let primaryCompensationAmount = 0;
+    let mergedProjectionSlots = 0;
+    let mergedProjectedEarnings = 0;
+    let mergedProjectionMonth = "";
+
+    for (const coachId of coachIds) {
+      const coach = await db.select().from(coaches).where(eq(coaches.id, coachId)).then(r => r[0]);
+      if (!coach) continue;
+      const franchise = coach.franchiseId ? await db.select().from(franchises).where(eq(franchises.id, coach.franchiseId)).then(r => r[0]) : null;
+      let stats: any;
+      try {
+        stats = await this.getCoachEarningsStats(coachId, startDate, endDate);
+      } catch (err) {
+        console.error(`Failed to fetch earnings for coachId ${coachId}:`, err);
+        continue;
+      }
+      totalLessons += stats.totalLessons;
+      totalNetRevenue += stats.totalNetRevenue;
+      totalEarnings += stats.coachEarnings;
+      primaryCompensationType = stats.compensationType;
+      primaryCompensationAmount = stats.compensationAmount;
+      mergedProjectionSlots += stats.monthlyProjection?.totalSlots || 0;
+      mergedProjectedEarnings += stats.monthlyProjection?.projectedEarnings || 0;
+      mergedProjectionMonth = stats.monthlyProjection?.month || "";
+      for (const day of stats.dailyStats || []) {
+        if (!mergedDailyMap[day.date]) {
+          mergedDailyMap[day.date] = { lessons: 0, revenue: 0, earnings: 0 };
+        }
+        mergedDailyMap[day.date].lessons += day.lessons;
+        mergedDailyMap[day.date].revenue += day.revenue;
+        mergedDailyMap[day.date].earnings += day.earnings;
+      }
+      perCoach.push({ coachId, franchiseName: franchise?.name || null, ...stats });
+    }
+
+    const dailyStats = Object.entries(mergedDailyMap)
+      .map(([date, stats]) => ({ date, ...stats }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      compensationType: primaryCompensationType,
+      compensationAmount: primaryCompensationAmount,
+      totalLessons,
+      totalNetRevenue: Math.round(totalNetRevenue),
+      coachEarnings: Math.round(totalEarnings),
+      dailyStats,
+      monthlyProjection: {
+        totalSlots: mergedProjectionSlots,
+        projectedEarnings: Math.round(mergedProjectedEarnings),
+        month: mergedProjectionMonth,
+      },
+      perCoach,
     };
   }
 

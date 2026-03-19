@@ -102,8 +102,10 @@ const isCoach: RequestHandler = async (req: any, res, next) => {
   if (!user || user.role !== "coach") return res.status(403).json({ message: "Forbidden" });
   const coach = await storage.getCoachByUserId(userId);
   if (!coach) return res.status(403).json({ message: "找不到老師資料" });
+  const allCoaches = await storage.getCoachesByUserId(userId);
   req.currentUser = user;
   req.coach = coach;
+  req.coachIds = allCoaches.map((c: any) => c.id);
   next();
 };
 
@@ -1577,6 +1579,19 @@ export async function registerRoutes(
       if (coach.userId) return res.status(400).json({ message: "此老師已有帳號" });
       if (!coach.phone || coach.phone.length < 6) return res.status(400).json({ message: "請先填寫老師手機號碼（至少 6 位）" });
 
+      const existingCoachWithPhone = await db.select().from(coaches)
+        .where(and(eq(coaches.phone, coach.phone), eq(coaches.isActive, true)))
+        .then(rows => rows.find(c => c.id !== coachId && c.userId != null));
+
+      if (existingCoachWithPhone && existingCoachWithPhone.userId) {
+        const linkedUserId = existingCoachWithPhone.userId;
+        const [linkedUser] = await db.select().from(users).where(eq(users.id, linkedUserId));
+        if (linkedUser) {
+          const updated = await storage.createCoachAccount(coachId, linkedUserId);
+          return res.json({ ...updated, accountUsername: linkedUser.username, linked: true });
+        }
+      }
+
       let username = `${coach.name}@prime`;
       let suffix = 1;
       while (true) {
@@ -1600,7 +1615,7 @@ export async function registerRoutes(
       });
 
       const updated = await storage.createCoachAccount(coachId, userId);
-      res.json({ ...updated, accountUsername: username });
+      res.json({ ...updated, accountUsername: username, linked: false });
     } catch (error) {
       res.status(500).json({ message: "建立帳號失敗" });
     }
@@ -1645,7 +1660,8 @@ export async function registerRoutes(
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
-      const slots = await storage.getCoachSlots(req.coach.id, year, month);
+      const userId = req.currentUser.id;
+      const slots = await storage.getCoachSlotsByUserId(userId, year, month);
       res.json(slots);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch calendar" });
@@ -1656,7 +1672,7 @@ export async function registerRoutes(
     try {
       const slotId = parseInt(req.params.slotId);
       const slot = await storage.getTimeSlot(slotId);
-      if (!slot || slot.coachId !== req.coach.id) {
+      if (!slot || !req.coachIds.includes(slot.coachId)) {
         return res.status(403).json({ message: "此時段不屬於您" });
       }
       const students = await storage.getSlotStudents(slotId);
@@ -1669,13 +1685,12 @@ export async function registerRoutes(
   app.patch("/api/coach/bookings/:id/check-in", isCoach, async (req: any, res) => {
     try {
       const bookingId = parseInt(req.params.id);
-      await storage.checkInBooking(bookingId, req.coach.id);
       const booking = await storage.getBooking(bookingId);
-      if (booking) {
-        const slot = await storage.getTimeSlot(booking.slotId);
-        if (slot) {
-          await storage.updateCoachDailyRecord(req.coach.id, slot.date);
-        }
+      const slot = booking ? await storage.getTimeSlot(booking.slotId) : null;
+      const effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
+      await storage.checkInBooking(bookingId, effectiveCoachId);
+      if (slot) {
+        await storage.updateCoachDailyRecord(effectiveCoachId, slot.date);
       }
       res.json({ success: true });
     } catch (error: any) {
@@ -1686,13 +1701,12 @@ export async function registerRoutes(
   app.patch("/api/coach/bookings/:id/absent", isCoach, async (req: any, res) => {
     try {
       const bookingId = parseInt(req.params.id);
-      await storage.markAbsentBooking(bookingId, req.coach.id);
       const booking = await storage.getBooking(bookingId);
-      if (booking) {
-        const slot = await storage.getTimeSlot(booking.slotId);
-        if (slot) {
-          await storage.updateCoachDailyRecord(req.coach.id, slot.date);
-        }
+      const slot = booking ? await storage.getTimeSlot(booking.slotId) : null;
+      const effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
+      await storage.markAbsentBooking(bookingId, effectiveCoachId);
+      if (slot) {
+        await storage.updateCoachDailyRecord(effectiveCoachId, slot.date);
       }
       res.json({ success: true });
     } catch (error: any) {
@@ -1703,13 +1717,12 @@ export async function registerRoutes(
   app.patch("/api/coach/bookings/:id/uncheck-in", isCoach, async (req: any, res) => {
     try {
       const bookingId = parseInt(req.params.id);
-      await storage.uncheckInBooking(bookingId, req.coach.id);
       const booking = await storage.getBooking(bookingId);
-      if (booking) {
-        const slot = await storage.getTimeSlot(booking.slotId);
-        if (slot) {
-          await storage.updateCoachDailyRecord(req.coach.id, slot.date);
-        }
+      const slot = booking ? await storage.getTimeSlot(booking.slotId) : null;
+      const effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
+      await storage.uncheckInBooking(bookingId, effectiveCoachId);
+      if (slot) {
+        await storage.updateCoachDailyRecord(effectiveCoachId, slot.date);
       }
       res.json({ success: true });
     } catch (error: any) {
@@ -1719,7 +1732,7 @@ export async function registerRoutes(
 
   app.get("/api/coach/daily-record/:date", isCoach, async (req: any, res) => {
     try {
-      const record = await storage.getCoachDailyRecord(req.coach.id, req.params.date);
+      const record = await storage.getCoachDailyRecordByCoachIds(req.coachIds, req.params.date);
       res.json(record);
     } catch (error) {
       res.status(500).json({ message: "取得每日記錄失敗" });
@@ -1730,7 +1743,7 @@ export async function registerRoutes(
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
-      const records = await storage.getCoachMonthlyRecords(req.coach.id, year, month);
+      const records = await storage.getCoachMonthlyRecordsByCoachIds(req.coachIds, year, month);
       res.json(records);
     } catch (error) {
       res.status(500).json({ message: "取得月度記錄失敗" });
@@ -1739,7 +1752,8 @@ export async function registerRoutes(
 
   app.get("/api/coach/students", isCoach, async (req: any, res) => {
     try {
-      const students = await storage.getCoachStudents(req.coach.id);
+      const userId = req.currentUser.id;
+      const students = await storage.getCoachStudentsByUserId(userId);
       res.json(students);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch students" });
@@ -1749,7 +1763,7 @@ export async function registerRoutes(
   app.get("/api/coach/students/:childId/history", isCoach, async (req: any, res) => {
     try {
       const childId = parseInt(req.params.childId);
-      const history = await storage.getStudentContactBookHistory(req.coach.id, childId);
+      const history = await storage.getStudentContactBookHistoryByCoachIds(req.coachIds, childId);
       res.json(history);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch history" });
@@ -1761,7 +1775,7 @@ export async function registerRoutes(
     try {
       const { startDate, endDate } = req.query;
       if (!startDate || !endDate) return res.status(400).json({ message: "請提供日期範圍" });
-      const stats = await storage.getCoachEarningsStats(req.coach.id, startDate as string, endDate as string);
+      const stats = await storage.getCoachEarningsStatsByCoachIds(req.coachIds, startDate as string, endDate as string);
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "取得收入統計失敗" });
@@ -1778,24 +1792,32 @@ export async function registerRoutes(
       const results = [];
       const slotsToUpdate = new Set<string>();
       for (const entry of entries) {
+        let effectiveCoachId = req.coach.id;
         if (entry.bookingId) {
           const booking = await storage.getBooking(entry.bookingId);
           if (booking) {
             const slot = await storage.getTimeSlot(booking.slotId);
-            if (!slot || slot.coachId !== req.coach.id) {
+            if (!slot || !req.coachIds.includes(slot.coachId)) {
               return res.status(403).json({ message: "此預約不屬於您的時段" });
             }
-            if (slot.date) slotsToUpdate.add(slot.date);
+            if (slot.coachId && req.coachIds.includes(slot.coachId)) {
+              effectiveCoachId = slot.coachId;
+            }
+            if (slot.date) {
+              slotsToUpdate.add(`${slot.date}:${effectiveCoachId}`);
+            }
           }
         }
         const created = await storage.createContactBook({
           ...entry,
-          coachId: req.coach.id,
+          coachId: effectiveCoachId,
         });
         results.push(created);
       }
-      for (const date of slotsToUpdate) {
-        await storage.updateCoachDailyRecord(req.coach.id, date);
+      for (const key of slotsToUpdate) {
+        const [date, coachIdStr] = key.split(":");
+        const effectiveCoachId = parseInt(coachIdStr) || req.coach.id;
+        await storage.updateCoachDailyRecord(effectiveCoachId, date);
       }
       res.json(results);
     } catch (error) {
@@ -1807,7 +1829,7 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id);
       const existing = await storage.getContactBook(id);
-      if (!existing || existing.coachId !== req.coach.id) {
+      if (!existing || !req.coachIds.includes(existing.coachId)) {
         return res.status(403).json({ message: "此聯絡簿不屬於您" });
       }
       const updated = await storage.updateContactBook(id, req.body);
@@ -1820,7 +1842,9 @@ export async function registerRoutes(
   app.get("/api/coach/contact-books/slot/:slotId", isCoach, async (req: any, res) => {
     try {
       const slotId = parseInt(req.params.slotId);
-      const books = await storage.getContactBooksBySlot(slotId, req.coach.id);
+      const slot = await storage.getTimeSlot(slotId);
+      const effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
+      const books = await storage.getContactBooksBySlot(slotId, effectiveCoachId);
       res.json(books);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch contact books" });
