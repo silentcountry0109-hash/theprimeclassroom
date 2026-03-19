@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { PdfViewer } from "@/components/PdfViewer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -2380,13 +2381,7 @@ function MaterialsTab() {
             </div>
           )}
           {blobUrl && !loadingPdf && !pdfError && (
-            <iframe
-              src={blobUrl}
-              className="w-full"
-              style={{ height: "70vh" }}
-              title={viewingPdf.title}
-              data-testid="iframe-pdf-viewer"
-            />
+            <PdfViewer url={blobUrl} />
           )}
         </div>
       )}
