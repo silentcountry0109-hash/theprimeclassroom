@@ -770,6 +770,9 @@ function FranchisesTab() {
       setShowDialog(false);
       resetForm();
     },
+    onError: (err: any) => {
+      toast({ title: err.message || "儲存失敗", variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -902,7 +905,10 @@ function FranchisesTab() {
           <div className="space-y-4 py-4">
             <div>
               <Label>分校名稱 *</Label>
-              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="例：大安旗艦校" data-testid="input-franchise-name" />
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="例：質數教室 大安教室" data-testid="input-franchise-name" />
+              {formData.name && !/^質數教室\s\S+教室$/.test(formData.name) && (
+                <p className="text-xs text-red-500 mt-1">格式需為：質數教室 XX教室（例：質數教室 大安教室）</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -994,7 +1000,7 @@ function FranchisesTab() {
             <Button variant="outline" onClick={() => { resetForm(); setShowDialog(false); }}>取消</Button>
             <Button
               onClick={() => saveMutation.mutate(formData)}
-              disabled={!formData.name || !formData.city || !formData.district || !formData.address || saveMutation.isPending}
+              disabled={!formData.name || !formData.city || !formData.district || !formData.address || saveMutation.isPending || !/^質數教室\s\S+教室$/.test(formData.name)}
               data-testid="button-submit-franchise"
             >
               {saveMutation.isPending ? "儲存中..." : editingFranchise ? "更新" : "新增"}

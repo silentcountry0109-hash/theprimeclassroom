@@ -6,7 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
-import { coaches, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema } from "@shared/schema";
+import { coaches, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -834,7 +834,12 @@ export async function registerRoutes(
 
   app.post("/api/admin/franchises", isAdmin, async (req, res) => {
     try {
-      const franchise = await storage.createFranchise(req.body);
+      const parsed = insertFranchiseSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const nameError = parsed.error.issues.find((i) => i.path.includes("name"));
+        return res.status(400).json({ message: nameError?.message || "表單資料格式錯誤" });
+      }
+      const franchise = await storage.createFranchise(parsed.data);
       res.json(franchise);
     } catch (error) {
       res.status(500).json({ message: "Failed to create franchise" });
@@ -843,6 +848,12 @@ export async function registerRoutes(
 
   app.patch("/api/admin/franchises/:id", isAdmin, async (req, res) => {
     try {
+      if (req.body.name !== undefined) {
+        const nameCheck = insertFranchiseSchema.shape.name.safeParse(req.body.name);
+        if (!nameCheck.success) {
+          return res.status(400).json({ message: nameCheck.error.issues[0]?.message || "分校名稱格式錯誤" });
+        }
+      }
       const franchise = await storage.updateFranchise(parseInt(req.params.id), req.body);
       res.json(franchise);
     } catch (error) {

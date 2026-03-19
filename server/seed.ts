@@ -11,6 +11,7 @@ export async function seedDatabase() {
       .from(franchises);
 
     if (Number(existing.count) > 0) {
+      await runDataMigrations();
       await seedAccounts();
       await seedCreditData();
       await seedTextbooks();
@@ -777,4 +778,11 @@ async function seedTextbooks() {
 
   const totalUnits = curriculum.reduce((sum, g) => sum + g.units.length, 0);
   console.log(`Seeded ${totalUnits} textbook units with ${totalUnits * 2} quizzes`);
+}
+
+async function runDataMigrations() {
+  await db
+    .update(franchises)
+    .set({ name: "質數教室 文元教室" })
+    .where(eq(franchises.name, "文元分校"));
 }

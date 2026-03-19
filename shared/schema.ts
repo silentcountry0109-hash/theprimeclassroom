@@ -168,7 +168,9 @@ export const orderItems = pgTable("order_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertFranchiseSchema = createInsertSchema(franchises).omit({ id: true, createdAt: true });
+export const insertFranchiseSchema = createInsertSchema(franchises).omit({ id: true, createdAt: true }).extend({
+  name: z.string().regex(/^質數教室\s\S+教室$/, "分校名稱格式錯誤，需符合「質數教室 XX教室」格式（例：質數教室 大安教室）"),
+});
 export const insertCoachSchema = createInsertSchema(coaches).omit({ id: true, createdAt: true });
 export const insertChildSchema = createInsertSchema(children).omit({ id: true, createdAt: true, studentCode: true });
 export const insertClassroomSchema = createInsertSchema(classrooms).omit({ id: true, createdAt: true });
