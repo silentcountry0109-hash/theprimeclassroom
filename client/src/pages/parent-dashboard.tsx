@@ -1326,12 +1326,16 @@ function triggerCalendarDownload() {
   document.body.removeChild(link);
 }
 
-function parseAddressToLocation(address: string): { city: string; district: string } | null {
+function parseAddressToLocation(
+  address: string,
+  cities: string[] = CITIES,
+  districtMap: Record<string, string[]> = TAIWAN_DISTRICTS,
+): { city: string; district: string } | null {
   if (!address) return null;
-  for (const c of CITIES) {
+  for (const c of cities) {
     if (address.startsWith(c)) {
       const rest = address.slice(c.length);
-      const dists = TAIWAN_DISTRICTS[c] || [];
+      const dists = districtMap[c] || [];
       for (const d of dists) {
         if (rest.startsWith(d)) {
           return { city: c, district: d };
