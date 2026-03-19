@@ -442,9 +442,9 @@ export async function seedDatabase() {
 
 async function seedAccounts() {
   const parentAccounts = [
-    { username: "parent1", firstName: "王小明", email: "parent1@primemath.tw" },
-    { username: "parent2", firstName: "李美華", email: "parent2@primemath.tw" },
-    { username: "parent3", firstName: "張大偉", email: "parent3@primemath.tw" },
+    { username: "parent1", firstName: "王小明", email: "parent1@primemath.tw", address: "台北市大安區忠孝東路四段100號" },
+    { username: "parent2", firstName: "李美華", email: "parent2@primemath.tw", address: "台中市西屯區台灣大道三段200號" },
+    { username: "parent3", firstName: "張大偉", email: "parent3@primemath.tw", address: "高雄市前鎮區中山二路50號" },
   ];
   for (const acct of parentAccounts) {
     const [existing] = await db.select().from(users).where(eq(users.username, acct.username));
@@ -457,6 +457,7 @@ async function seedAccounts() {
         role: "parent",
         username: acct.username,
         passwordHash: hash,
+        address: acct.address,
       });
       console.log(`Parent account created: ${acct.username}`);
     }

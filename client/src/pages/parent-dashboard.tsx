@@ -1326,11 +1326,31 @@ function triggerCalendarDownload() {
   document.body.removeChild(link);
 }
 
+function parseAddressToLocation(address: string): { city: string; district: string } | null {
+  if (!address) return null;
+  for (const c of CITIES) {
+    if (address.startsWith(c)) {
+      const rest = address.slice(c.length);
+      const dists = TAIWAN_DISTRICTS[c] || [];
+      for (const d of dists) {
+        if (rest.startsWith(d)) {
+          return { city: c, district: d };
+        }
+      }
+      return { city: c, district: "" };
+    }
+  }
+  return null;
+}
+
 function BookingFlowTab() {
   const { toast } = useToast();
+  const { user: credUser } = useCredentialAuth();
+
   const [step, setStep] = useState<"search" | "detail" | "confirm">("search");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [selectedFranchiseId, setSelectedFranchiseId] = useState<number | null>(null);
   const [bookingSlot, setBookingSlot] = useState<SlotWithCoach | null>(null);
   const [selectedChild, setSelectedChild] = useState("");
@@ -1342,6 +1362,16 @@ function BookingFlowTab() {
   const [recurringSlots, setRecurringSlots] = useState<RecurringSlotInfo[]>([]);
   const [selectedRecurringSlots, setSelectedRecurringSlots] = useState<Set<number>>(new Set());
   const [recurringLoading, setRecurringLoading] = useState(false);
+
+  useEffect(() => {
+    const addr = credUser?.address || "";
+    const parsed = parseAddressToLocation(addr);
+    if (parsed && parsed.city) {
+      setCity(parsed.city);
+      setDistrict(parsed.district);
+      setIsAutoFilled(true);
+    }
+  }, []);
 
   const districts = city ? TAIWAN_DISTRICTS[city] || [] : [];
 
@@ -2175,11 +2205,20 @@ function BookingFlowTab() {
         <p className="text-sm text-muted-foreground">選擇地區，找到離你最近的教室</p>
       </div>
 
+      {isAutoFilled && (
+        <div className="flex items-center gap-1.5 px-1" data-testid="badge-address-recommendation">
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }}>
+            <MapPin className="w-3 h-3" />
+            根據您的地址推薦
+          </span>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-100 p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Label className="text-xs text-muted-foreground mb-1.5 block">縣市</Label>
-            <Select value={city} onValueChange={(val) => { setCity(val); setDistrict(""); }}>
+            <Select value={city} onValueChange={(val) => { setCity(val); setDistrict(""); setIsAutoFilled(false); }}>
               <SelectTrigger className="text-sm" data-testid="filter-city">
                 <SelectValue placeholder="選擇縣市" />
               </SelectTrigger>
@@ -2192,7 +2231,7 @@ function BookingFlowTab() {
           </div>
           <div className="flex-1">
             <Label className="text-xs text-muted-foreground mb-1.5 block">區/鄉鎮</Label>
-            <Select value={district} onValueChange={setDistrict} disabled={!city}>
+            <Select value={district} onValueChange={(val) => { setDistrict(val); setIsAutoFilled(false); }} disabled={!city}>
               <SelectTrigger className="text-sm" data-testid="filter-district">
                 <SelectValue placeholder={city ? "選擇區域" : "先選縣市"} />
               </SelectTrigger>
