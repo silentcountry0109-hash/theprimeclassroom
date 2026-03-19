@@ -1337,7 +1337,7 @@ function parseAddressToLocation(address: string): { city: string; district: stri
           return { city: c, district: d };
         }
       }
-      return { city: c, district: "" };
+      return null;
     }
   }
   return null;
@@ -1362,16 +1362,21 @@ function BookingFlowTab() {
   const [recurringSlots, setRecurringSlots] = useState<RecurringSlotInfo[]>([]);
   const [selectedRecurringSlots, setSelectedRecurringSlots] = useState<Set<number>>(new Set());
   const [recurringLoading, setRecurringLoading] = useState(false);
+  const autoFillDoneRef = useRef(false);
+
+  const credAddress = credUser?.address ?? null;
 
   useEffect(() => {
-    const addr = credUser?.address || "";
-    const parsed = parseAddressToLocation(addr);
-    if (parsed && parsed.city) {
+    if (autoFillDoneRef.current) return;
+    if (credAddress === null) return;
+    autoFillDoneRef.current = true;
+    const parsed = parseAddressToLocation(credAddress);
+    if (parsed) {
       setCity(parsed.city);
       setDistrict(parsed.district);
       setIsAutoFilled(true);
     }
-  }, []);
+  }, [credAddress]);
 
   const districts = city ? TAIWAN_DISTRICTS[city] || [] : [];
 
@@ -2207,9 +2212,8 @@ function BookingFlowTab() {
 
       {isAutoFilled && (
         <div className="flex items-center gap-1.5 px-1" data-testid="badge-address-recommendation">
-          <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }}>
-            <MapPin className="w-3 h-3" />
-            根據您的地址推薦
+          <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }}>
+            📍 根據您的地址推薦
           </span>
         </div>
       )}
