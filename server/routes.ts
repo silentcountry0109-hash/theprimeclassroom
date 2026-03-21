@@ -14,6 +14,19 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 
+interface PgUniqueViolation {
+  code: "23505";
+  constraint?: string;
+}
+
+function isPgUniqueViolation(err: unknown): err is PgUniqueViolation {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as Record<string, unknown>).code === "23505"
+  );
+}
+
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -252,12 +265,12 @@ export async function registerRoutes(
         const { passwordHash: _, ...safeUser } = newUser;
         res.json({ ...safeUser, isNewUser: true });
       });
-    } catch (error: any) {
-      if (error?.code === "23505") {
-        if (error?.constraint?.includes("email")) {
+    } catch (error: unknown) {
+      if (isPgUniqueViolation(error)) {
+        if (error.constraint?.includes("email")) {
           return res.status(400).json({ message: "此 Email 已被使用，請直接登入或使用其他 Email" });
         }
-        if (error?.constraint?.includes("username")) {
+        if (error.constraint?.includes("username")) {
           return res.status(400).json({ message: "此帳號已被使用" });
         }
       }
