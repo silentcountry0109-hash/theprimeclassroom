@@ -215,6 +215,10 @@ export async function registerRoutes(
       if (existing) {
         return res.status(400).json({ message: "此帳號已被使用" });
       }
+      const [existingEmail] = await db.select().from(users).where(eq(users.email, email));
+      if (existingEmail) {
+        return res.status(400).json({ message: "此 Email 已被使用，請直接登入或使用其他 Email" });
+      }
       const hash = await bcrypt.hash(password, 10);
       const [newUser] = await db.insert(users).values({
         id: `parent-${username}-${Date.now()}`,
@@ -248,7 +252,15 @@ export async function registerRoutes(
         const { passwordHash: _, ...safeUser } = newUser;
         res.json({ ...safeUser, isNewUser: true });
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        if (error?.constraint?.includes("email")) {
+          return res.status(400).json({ message: "此 Email 已被使用，請直接登入或使用其他 Email" });
+        }
+        if (error?.constraint?.includes("username")) {
+          return res.status(400).json({ message: "此帳號已被使用" });
+        }
+      }
       res.status(500).json({ message: "註冊失敗，請稍後再試" });
     }
   });
