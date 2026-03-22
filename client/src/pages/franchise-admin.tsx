@@ -393,7 +393,7 @@ export default function FranchiseAdminDashboard() {
             </h2>
             <div className="relative">
               <button
-                onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications && unreadCount > 0) markAllReadMutation.mutate(); }}
+                onClick={() => setShowNotifications(!showNotifications)}
                 className="text-muted-foreground hover:text-foreground transition-colors p-1.5 relative"
                 data-testid="franchise-button-notifications"
               >
@@ -405,11 +405,20 @@ export default function FranchiseAdminDashboard() {
                 )}
               </button>
               {showNotifications && (
-                <div className="absolute right-0 top-10 w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-50 max-h-96 overflow-y-auto" data-testid="franchise-notifications-panel">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                    <span className="text-sm font-semibold text-foreground">通知</span>
-                    <button onClick={() => setShowNotifications(false)} className="text-xs text-muted-foreground hover:text-foreground">關閉</button>
-                  </div>
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                  <div className="absolute right-0 top-10 w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-50 max-h-96 overflow-y-auto" data-testid="franchise-notifications-panel">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <span className="text-sm font-semibold text-foreground">通知</span>
+                      <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (
+                          <button onClick={() => markAllReadMutation.mutate()} className="text-xs text-tiffany hover:underline" data-testid="franchise-button-mark-all-read">
+                            全部標為已讀
+                          </button>
+                        )}
+                        <button onClick={() => setShowNotifications(false)} className="text-xs text-muted-foreground hover:text-foreground">關閉</button>
+                      </div>
+                    </div>
                   {notifList.length === 0 ? (
                     <div className="px-4 py-8 text-center text-sm text-muted-foreground">目前沒有通知</div>
                   ) : (
@@ -446,6 +455,7 @@ export default function FranchiseAdminDashboard() {
                     ))
                   )}
                 </div>
+                </>
               )}
             </div>
           </header>
