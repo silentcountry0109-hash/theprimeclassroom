@@ -466,10 +466,12 @@ export default function FranchiseAdminDashboard() {
 function OverviewTab() {
   const { data: stats, isLoading } = useQuery<FranchiseStats>({
     queryKey: ["/api/franchise-admin/stats"],
+    refetchInterval: 30000,
   });
 
   const { data: todayStats, isLoading: todayLoading } = useQuery<TodayStats>({
     queryKey: ["/api/franchise-admin/stats/today"],
+    refetchInterval: 30000,
   });
 
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
@@ -2970,6 +2972,7 @@ function TimeSlotsTab() {
 function BookingsTab() {
   const { data: bookings = [], isLoading } = useQuery<FranchiseBooking[]>({
     queryKey: ["/api/franchise-admin/bookings"],
+    refetchInterval: 30000,
   });
   const [searchName, setSearchName] = useState("");
   const [searchDate, setSearchDate] = useState("");
