@@ -212,14 +212,21 @@ export default function CoachDashboard() {
                                 <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                                   <CalendarPlus className="w-3.5 h-3.5 text-green-600" />
                                 </div>
+                              ) : n.type === "new_booking" ? (
+                                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <Users className="w-3.5 h-3.5 text-blue-600" />
+                                </div>
                               ) : (
                                 <div className="w-6 h-6 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                                   <Bell className="w-3.5 h-3.5 text-tiffany" />
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`text-sm font-medium ${!n.isRead ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</span>
+                                  {n.type === "new_booking" && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 flex-shrink-0">新預約</span>
+                                  )}
                                   {!n.isRead && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>

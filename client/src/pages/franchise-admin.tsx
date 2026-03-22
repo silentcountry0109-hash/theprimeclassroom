@@ -416,19 +416,31 @@ export default function FranchiseAdminDashboard() {
                     notifList.map((n) => (
                       <div
                         key={n.id}
-                        className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.isRead ? "bg-tiffany/5" : ""}`}
+                        className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.isRead && n.type === "new_booking" ? "bg-blue-50/40" : !n.isRead ? "bg-tiffany/5" : ""}`}
                         onClick={() => !n.isRead && markReadMutation.mutate(n.id)}
                         data-testid={`franchise-notification-${n.id}`}
                       >
                         <div className="flex items-start gap-2">
-                          {n.type === "new_booking" && <span className="mt-0.5 text-tiffany">📋</span>}
-                          {n.type !== "new_booking" && <span className="mt-0.5 text-muted-foreground">🔔</span>}
+                          {n.type === "new_booking" ? (
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <CalendarCheck className="w-3.5 h-3.5 text-blue-600" />
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                              {n.type === "new_booking" && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 flex-shrink-0">新預約</span>
+                              )}
+                              {!n.isRead && <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />}
+                            </div>
                             <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
                             <p className="text-[10px] text-muted-foreground/60 mt-1">{new Date(n.createdAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
                           </div>
-                          {!n.isRead && <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 mt-1" />}
                         </div>
                       </div>
                     ))
