@@ -5,6 +5,7 @@ The Prime 質數教室 is an S2B2C education platform for elementary school math
 
 ## User Preferences
 - **Communication Style**: Clear, concise, and professional.
+- **Language**: 一律以繁體中文回覆使用者。
 - **Workflow**: Iterative development with regular check-ins.
 - **Interaction**: Ask for confirmation before implementing significant architectural changes or adding new external dependencies.
 
