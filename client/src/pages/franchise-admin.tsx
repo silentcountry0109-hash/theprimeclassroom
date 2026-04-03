@@ -59,6 +59,7 @@ import {
   KeyRound,
   UserPlus,
   ShieldCheck,
+  Unlink,
   CalendarDays,
   AlertTriangle,
   List,
@@ -1884,6 +1885,24 @@ function CoachesTab() {
     },
   });
 
+  const unlinkAccountMutation = useMutation({
+    mutationFn: async (coachId: number) => {
+      const res = await apiRequest("DELETE", `/api/franchise-admin/coaches/${coachId}/account`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "解除連結失敗");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "帳號連結已解除", description: "老師已與原帳號解除連結，可重新依手機號碼建立或串聯帳號" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "解除連結失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
@@ -1952,9 +1971,25 @@ function CoachesTab() {
                   <span className="text-[11px] text-muted-foreground w-6">{coach.isActive !== false ? "啟用" : "停用"}</span>
                 </div>
                 {coach.userId ? (
-                  <Button variant="outline" size="sm" onClick={() => openResetPassword(coach)} data-testid={`button-reset-password-coach-${coach.id}`}>
-                    <KeyRound className="w-4 h-4 mr-1" />重設密碼
-                  </Button>
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => openResetPassword(coach)} data-testid={`button-reset-password-coach-${coach.id}`}>
+                      <KeyRound className="w-4 h-4 mr-1" />重設密碼
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="text-red-400 hover:text-red-600 hover:border-red-300"
+                      title="解除帳號連結"
+                      data-testid={`button-unlink-account-coach-${coach.id}`}
+                      onClick={() => {
+                        const username = (coach as any).accountUsername || "此帳號";
+                        if (!confirm(`確定要解除「${coach.name}」與帳號「${username}」的連結嗎？\n\n解除後老師將無法登入，可重新依手機號碼建立或串聯帳號。`)) return;
+                        unlinkAccountMutation.mutate(coach.id);
+                      }}
+                    >
+                      <Unlink className="w-4 h-4" />
+                    </Button>
+                  </>
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => openCreateAccount(coach)} data-testid={`button-create-account-coach-${coach.id}`}>
                     <UserPlus className="w-4 h-4 mr-1" />建立帳號

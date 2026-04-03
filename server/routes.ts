@@ -1786,6 +1786,19 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/franchise-admin/coaches/:id/account", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coachId = parseInt(req.params.id);
+      const coach = await storage.getCoach(coachId);
+      if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
+      if (!coach.userId) return res.status(400).json({ message: "此老師尚未連結帳號" });
+      await storage.updateCoach(coachId, { userId: null } as any);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "解除連結失敗" });
+    }
+  });
+
   app.patch("/api/franchise-admin/coaches/:id/account", isFranchiseAdmin, async (req: any, res) => {
     try {
       const coachId = parseInt(req.params.id);
