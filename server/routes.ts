@@ -263,18 +263,15 @@ export async function registerRoutes(
       }
       const otp = String(Math.floor(100000 + Math.random() * 900000));
       otpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[DEV] OTP for ${phone}: ${otp}`);
-      }
       try {
         await sendMitakeSms(phone, `【質數教室】您的驗證碼為 ${otp}，5 分鐘內有效，請勿告知他人。`);
       } catch (smsError: unknown) {
-        if (process.env.NODE_ENV !== "development") {
-          otpStore.delete(phone);
-          const msg = smsError instanceof Error ? smsError.message : "簡訊發送失敗，請稍後再試";
-          return res.status(500).json({ message: msg });
-        }
-        console.log(`[DEV] SMS send failed (continuing for dev testing): ${smsError instanceof Error ? smsError.message : smsError}`);
+        otpStore.delete(phone);
+        const msg = smsError instanceof Error ? smsError.message : "簡訊發送失敗，請稍後再試";
+        return res.status(500).json({ message: msg });
+      }
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[DEV] OTP for ${phone}: ${otp}`);
       }
       return res.json({ message: "驗證碼已發送" });
     } catch (error: unknown) {
