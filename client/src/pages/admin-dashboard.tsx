@@ -1620,10 +1620,14 @@ function UsersTab() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div className="bg-white border border-gray-100 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-tiffany">{operationalUsers.length}</p>
-          <p className="text-xs text-muted-foreground mt-1">🏫 分校主任 / 總部</p>
+          <p className="text-2xl font-bold text-tiffany">{operationalUsers.filter((u) => u.role === "franchise_admin").length}</p>
+          <p className="text-xs text-muted-foreground mt-1">🏫 分校主任</p>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-coral">{operationalUsers.filter((u) => u.role === "admin").length}</p>
+          <p className="text-xs text-muted-foreground mt-1">🛡️ 總部管理員</p>
         </div>
         <div className="bg-white border border-gray-100 rounded-xl p-4 text-center">
           <p className="text-2xl font-bold text-blue-600">{coachUsers.length}</p>
