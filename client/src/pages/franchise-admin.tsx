@@ -1703,17 +1703,43 @@ function CoachesTab() {
   const [accountDialogCoach, setAccountDialogCoach] = useState<Coach | null>(null);
   const [accountPassword, setAccountPassword] = useState("");
 
+  type PhoneCheckResult = {
+    sameFranchise: { coachId: number; coachName: string; franchiseName: string; hasAccount: boolean; accountUsername: string | null }[];
+    crossFranchise: { coachId: number; coachName: string; franchiseName: string; hasAccount: boolean; accountUsername: string | null }[];
+  };
+  const [phoneCheck, setPhoneCheck] = useState<PhoneCheckResult | null>(null);
+  const [phoneCheckLoading, setPhoneCheckLoading] = useState(false);
+
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
 
   const resetForm = () => {
     setFormData({ name: "", phone: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0 });
     setSpecialtyInput("");
     setEditingCoach(null);
+    setPhoneCheck(null);
   };
 
   const resetAccountForm = () => {
     setAccountDialogCoach(null);
     setAccountPassword("");
+  };
+
+  const checkPhoneNumber = async (phone: string, excludeCoachId?: number) => {
+    const trimmed = phone.trim();
+    if (trimmed.length < 6) { setPhoneCheck(null); return; }
+    setPhoneCheckLoading(true);
+    try {
+      const params = new URLSearchParams({ phone: trimmed });
+      if (excludeCoachId) params.set("excludeCoachId", String(excludeCoachId));
+      const res = await fetch(`/api/franchise-admin/coaches/check-phone?${params}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setPhoneCheck(data);
+      }
+    } catch {
+      setPhoneCheck(null);
+    }
+    setPhoneCheckLoading(false);
   };
 
   const openAdd = () => { resetForm(); setShowDialog(true); };
@@ -1723,16 +1749,35 @@ function CoachesTab() {
       name: c.name, phone: c.phone || "", bio: c.bio || "", specialties: c.specialties || [],
       isCertified: c.isCertified, rating: c.rating || 0, reviewCount: c.reviewCount || 0,
     });
+    setPhoneCheck(null);
     setShowDialog(true);
   };
 
-  const openCreateAccount = (c: Coach) => {
+  const openCreateAccount = async (c: Coach) => {
     if (!c.phone || c.phone.length < 6) {
       toast({ title: "無法建立帳號", description: "請先填寫老師手機號碼（至少 6 位）", variant: "destructive" });
       return;
     }
     const phoneLast6 = c.phone.slice(-6);
-    if (!confirm(`將以「${c.name}@prime」建立帳號\n預設密碼為手機末六碼（${phoneLast6}）\n老師首次登入須修改密碼\n\n確定建立？`)) return;
+
+    let confirmMsg = `將以「${c.name}@prime」建立帳號\n預設密碼為手機末六碼（${phoneLast6}）\n老師首次登入須修改密碼\n\n確定建立？`;
+    try {
+      const params = new URLSearchParams({ phone: c.phone, excludeCoachId: String(c.id) });
+      const res = await fetch(`/api/franchise-admin/coaches/check-phone?${params}`, { credentials: "include" });
+      if (res.ok) {
+        const data: PhoneCheckResult = await res.json();
+        const allMatches = [...data.sameFranchise, ...data.crossFranchise];
+        const withAccount = allMatches.find(m => m.hasAccount && m.accountUsername);
+        if (withAccount) {
+          confirmMsg = `此老師手機號碼已有關聯帳號（${withAccount.accountUsername}）\n所在分校：${withAccount.franchiseName}\n\n點確定後將直接串聯至該帳號，不會另外建立新帳號。`;
+        } else if (allMatches.length > 0) {
+          const names = allMatches.map(m => `${m.franchiseName} / ${m.coachName}`).join("、");
+          confirmMsg = `此手機號碼已由其他老師使用（${names}）\n請確認是否為同一位老師跨分校任教。\n\n確定建立帳號？`;
+        }
+      }
+    } catch { /* ignore, use default confirm */ }
+
+    if (!confirm(confirmMsg)) return;
     createAccountMutation.mutate({ coachId: c.id });
   };
 
@@ -1935,7 +1980,41 @@ function CoachesTab() {
             </div>
             <div>
               <Label>手機號碼</Label>
-              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="例：0912345678" data-testid="input-franchise-coach-phone" />
+              <Input
+                value={formData.phone}
+                onChange={(e) => {
+                  setFormData({ ...formData, phone: e.target.value });
+                  setPhoneCheck(null);
+                }}
+                onBlur={(e) => checkPhoneNumber(e.target.value, editingCoach?.id)}
+                placeholder="例：0912345678"
+                data-testid="input-franchise-coach-phone"
+              />
+              {phoneCheckLoading && (
+                <p className="text-xs text-gray-400 mt-1">確認手機號碼中…</p>
+              )}
+              {!phoneCheckLoading && phoneCheck && phoneCheck.sameFranchise.length > 0 && (
+                <div className="mt-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700" data-testid="phone-check-same-franchise">
+                  <span className="font-semibold">⚠️ 此分校已有其他老師使用此手機號碼：</span>
+                  {phoneCheck.sameFranchise.map(m => (
+                    <div key={m.coachId} className="mt-0.5">
+                      {m.coachName}{m.hasAccount ? `（帳號：${m.accountUsername}）` : "（尚未建立帳號）"}
+                    </div>
+                  ))}
+                  <div className="mt-1 text-red-600">請確認是否為重複登錄。</div>
+                </div>
+              )}
+              {!phoneCheckLoading && phoneCheck && phoneCheck.crossFranchise.length > 0 && (
+                <div className="mt-2 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-700" data-testid="phone-check-cross-franchise">
+                  <span className="font-semibold">ℹ️ 此手機號碼已由其他分校老師使用：</span>
+                  {phoneCheck.crossFranchise.map(m => (
+                    <div key={m.coachId} className="mt-0.5">
+                      {m.franchiseName} / {m.coachName}{m.hasAccount ? `（帳號：${m.accountUsername}）` : "（尚未建立帳號）"}
+                    </div>
+                  ))}
+                  <div className="mt-1 text-blue-600">若為同一位老師跨分校任教，建立帳號時將自動串聯至同一個登入帳號。</div>
+                </div>
+              )}
             </div>
             <div>
               <Label>簡介</Label>

@@ -6,7 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import { users } from "@shared/models/auth";
-import { coaches, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
+import { coaches, franchises, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -1344,6 +1344,45 @@ export async function registerRoutes(
       res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch coaches" });
+    }
+  });
+
+  app.get("/api/franchise-admin/coaches/check-phone", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const phone = (req.query.phone as string || "").trim();
+      const excludeCoachId = req.query.excludeCoachId ? parseInt(req.query.excludeCoachId as string) : null;
+      if (!phone || phone.length < 6) return res.json({ sameFranchise: [], crossFranchise: [] });
+
+      const matchingCoaches = await db.select().from(coaches)
+        .where(and(eq(coaches.phone, phone), eq(coaches.isActive, true)));
+
+      const filtered = matchingCoaches.filter(c => c.id !== excludeCoachId);
+
+      const sameFranchise: any[] = [];
+      const crossFranchise: any[] = [];
+
+      for (const c of filtered) {
+        let accountUsername: string | null = null;
+        if (c.userId) {
+          const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, c.userId));
+          accountUsername = user?.username || null;
+        }
+        const [franchise] = await db.select({ name: franchises.name }).from(franchises).where(eq(franchises.id, c.franchiseId));
+        const entry = {
+          coachId: c.id,
+          coachName: c.name,
+          franchiseName: franchise?.name || `分校 #${c.franchiseId}`,
+          franchiseId: c.franchiseId,
+          hasAccount: !!c.userId,
+          accountUsername,
+        };
+        if (c.franchiseId === req.franchiseId) sameFranchise.push(entry);
+        else crossFranchise.push(entry);
+      }
+
+      res.json({ sameFranchise, crossFranchise });
+    } catch (error) {
+      res.status(500).json({ message: "查詢失敗" });
     }
   });
 
