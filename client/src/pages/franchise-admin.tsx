@@ -48,7 +48,6 @@ import {
   Star,
   Phone,
   School,
-  Tag,
   MapPin,
   FileText,
   Users,
@@ -851,24 +850,16 @@ function OverviewTab() {
                   <thead>
                     <tr className="border-b border-gray-100 text-left">
                       <th className="py-2 pr-4 text-xs font-medium text-muted-foreground">老師</th>
-                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">薪酬方式</th>
                       <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">課消堂數</th>
-                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">實收金額</th>
-                      <th className="py-2 text-xs font-medium text-muted-foreground text-center">老師薪酬</th>
+                      <th className="py-2 text-xs font-medium text-muted-foreground text-center">實收金額</th>
                     </tr>
                   </thead>
                   <tbody>
                     {earningsStats.coachStats.map((coach) => (
                       <tr key={coach.coachId} className="border-b border-gray-50" data-testid={`earnings-coach-${coach.coachId}`}>
                         <td className="py-3 pr-4 font-medium text-foreground whitespace-nowrap">{coach.coachName}</td>
-                        <td className="py-3 pr-4 text-center">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-tiffany/10 text-tiffany">
-                            {coach.compensationType === "fixed" ? `每堂 $${coach.compensationAmount}` : coach.compensationType === "hourly" ? `時薪 $${coach.compensationAmount}` : `${coach.compensationAmount}%`}
-                          </span>
-                        </td>
                         <td className="py-3 pr-4 text-center text-muted-foreground">{coach.totalLessons}</td>
-                        <td className="py-3 pr-4 text-center text-muted-foreground">${coach.totalNetRevenue.toLocaleString()}</td>
-                        <td className="py-3 text-center font-medium text-foreground">${coach.coachEarnings.toLocaleString()}</td>
+                        <td className="py-3 text-center text-muted-foreground">${coach.totalNetRevenue.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -909,8 +900,6 @@ interface CoachEarningsStats {
   coachStats: Array<{
     coachId: number;
     coachName: string;
-    compensationType: string;
-    compensationAmount: number;
     totalLessons: number;
     totalNetRevenue: number;
     coachEarnings: number;
@@ -1705,7 +1694,6 @@ function CoachesTab() {
   const [editingCoach, setEditingCoach] = useState<Coach | null>(null);
   const [formData, setFormData] = useState({
     name: "", phone: "", bio: "", specialties: [] as string[], isCertified: true, rating: 0, reviewCount: 0,
-    compensationType: "fixed" as string, compensationAmount: 200,
   });
   const [specialtyInput, setSpecialtyInput] = useState("");
   const [scheduleCoach, setScheduleCoach] = useState<Coach | null>(null);
@@ -1718,7 +1706,7 @@ function CoachesTab() {
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0, compensationType: "fixed", compensationAmount: 200 });
+    setFormData({ name: "", phone: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0 });
     setSpecialtyInput("");
     setEditingCoach(null);
   };
@@ -1734,7 +1722,6 @@ function CoachesTab() {
     setFormData({
       name: c.name, phone: c.phone || "", bio: c.bio || "", specialties: c.specialties || [],
       isCertified: c.isCertified, rating: c.rating || 0, reviewCount: c.reviewCount || 0,
-      compensationType: c.compensationType || "fixed", compensationAmount: c.compensationAmount ?? 200,
     });
     setShowDialog(true);
   };
@@ -1899,15 +1886,6 @@ function CoachesTab() {
                     <Phone className="w-3 h-3" />{coach.phone}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1" data-testid={`coach-compensation-${coach.id}`}>
-                  <Tag className="w-3 h-3" />
-                  {coach.compensationType === "percentage"
-                    ? `按比例抽成 ${coach.compensationAmount ?? 0}%`
-                    : coach.compensationType === "hourly"
-                    ? `時薪 $${coach.compensationAmount ?? 250}/hr`
-                    : `每堂固定 $${coach.compensationAmount ?? 200}`
-                  }
-                </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {coach.rating != null && coach.rating > 0 && (
@@ -1985,41 +1963,6 @@ function CoachesTab() {
               <Label>認證狀態</Label>
               <Switch checked={formData.isCertified} onCheckedChange={(checked) => setFormData({ ...formData, isCertified: checked })} data-testid="switch-franchise-coach-certified" />
               <span className="text-sm text-muted-foreground">{formData.isCertified ? "已認證" : "未認證"}</span>
-            </div>
-            <div className="border-t border-gray-100 pt-4 mt-2">
-              <Label className="text-sm font-semibold mb-2 block">薪酬設定</Label>
-              <div className="space-y-3">
-                <div>
-                  <Label>薪酬類型</Label>
-                  <Select value={formData.compensationType} onValueChange={(val) => setFormData({ ...formData, compensationType: val, compensationAmount: val === "fixed" ? 200 : val === "hourly" ? 250 : 40 })} data-testid="select-coach-compensation-type">
-                    <SelectTrigger data-testid="select-trigger-coach-compensation-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fixed">每堂固定金額</SelectItem>
-                      <SelectItem value="hourly">時薪</SelectItem>
-                      <SelectItem value="percentage">按比例抽成</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>{formData.compensationType === "fixed" ? "每堂金額（元）" : formData.compensationType === "hourly" ? "時薪（元/小時）" : "抽成比例（%）"}</Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={formData.compensationType === "percentage" ? 100 : undefined}
-                      value={formData.compensationAmount}
-                      onChange={(e) => setFormData({ ...formData, compensationAmount: parseInt(e.target.value) || 0 })}
-                      placeholder={formData.compensationType === "fixed" ? "每堂 $___" : formData.compensationType === "hourly" ? "每小時 $___" : "____%"}
-                      data-testid="input-coach-compensation-amount"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                      {formData.compensationType === "fixed" ? "元/堂" : formData.compensationType === "hourly" ? "元/時" : "%"}
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
           <DialogFooter>

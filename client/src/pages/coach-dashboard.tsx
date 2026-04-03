@@ -53,9 +53,6 @@ import {
   ChevronDown,
   HelpCircle,
   Settings,
-  DollarSign,
-  TrendingUp,
-  Wallet,
   Library,
   CheckCircle2,
 } from "lucide-react";
@@ -66,7 +63,7 @@ const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 export default function CoachDashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "salary" | "profile" | "manual" | "materials">("calendar");
+  const [activeTab, setActiveTab] = useState<"calendar" | "students" | "profile" | "manual" | "materials">("calendar");
   const [showBindingSuccess, setShowBindingSuccess] = useState(false);
 
   useEffect(() => {
@@ -144,7 +141,6 @@ export default function CoachDashboard() {
     { id: "calendar" as const, label: "行事曆", icon: Calendar },
     { id: "students" as const, label: "我的學生", icon: Users },
     { id: "materials" as const, label: "教材庫", icon: Library },
-    { id: "salary" as const, label: "收入總覽", icon: DollarSign },
     { id: "profile" as const, label: "個人資料", icon: User },
     { id: "manual" as const, label: "使用手冊", icon: BookOpen },
   ];
@@ -273,7 +269,6 @@ export default function CoachDashboard() {
         {activeTab === "calendar" && <CalendarTab coachId={userData.coach?.id} />}
         {activeTab === "students" && <StudentsTab coachId={userData.coach?.id} />}
         {activeTab === "materials" && <MaterialsTab />}
-        {activeTab === "salary" && <SalaryTab coachId={userData.coach?.id} coach={userData.coach} />}
         {activeTab === "profile" && <ProfileTab />}
         {activeTab === "manual" && <ManualTab />}
       </div>
@@ -1381,183 +1376,6 @@ function ContactBookCard({ entry, showChild = true }: { entry: any; showChild?: 
               <p className="text-sm text-amber-800">{entry.teacherRemarks}</p>
             </div>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SalaryTab({ coachId, coach }: { coachId: number; coach?: any }) {
-  const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
-
-  const { data: earnings, isLoading } = useQuery<any>({
-    queryKey: ["/api/coach/earnings", startDate, endDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/coach/earnings?startDate=${startDate}&endDate=${endDate}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch earnings");
-      return res.json();
-    },
-    enabled: !!coachId,
-    retry: 1,
-  });
-
-  const prevMonth = () => {
-    if (month === 1) { setYear(y => y - 1); setMonth(12); }
-    else setMonth(m => m - 1);
-  };
-  const nextMonth = () => {
-    if (month === 12) { setYear(y => y + 1); setMonth(1); }
-    else setMonth(m => m + 1);
-  };
-
-  const compType = earnings?.compensationType ?? coach?.compensationType ?? "fixed";
-  const compAmount = earnings?.compensationAmount ?? coach?.compensationAmount ?? 200;
-  const compensationLabel = compType === "fixed"
-    ? `每堂 $${compAmount}`
-    : compType === "hourly"
-    ? `每小時 $${compAmount}`
-    : `課堂收入 ${compAmount}%`;
-
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-100 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <Button variant="ghost" size="icon" onClick={prevMonth} data-testid="button-salary-prev">
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <h2 className="text-base font-semibold" data-testid="text-salary-month">{year} 年 {month} 月 收入總覽</h2>
-          <Button variant="ghost" size="icon" onClick={nextMonth} data-testid="button-salary-next">
-            <ChevronRight className="w-5 h-5" />
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-tiffany/5 border border-tiffany/20 mb-4" data-testid="card-compensation-method">
-          <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
-            <Wallet className="w-5 h-5 text-tiffany" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">薪酬計算方式</p>
-            <p className="text-sm font-semibold text-foreground" data-testid="text-compensation-type">
-              {compType === "fixed" ? "每堂固定金額" : compType === "hourly" ? "時薪" : "按比例抽成"}
-            </p>
-            <p className="text-lg font-bold text-tiffany" data-testid="text-compensation-value">
-              {compensationLabel}
-            </p>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <Skeleton className="h-32 w-full rounded-lg" />
-        ) : earnings ? (
-          <>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="text-center p-3 rounded-lg bg-gray-50">
-                <div className="w-8 h-8 rounded-full bg-gray-200/60 flex items-center justify-center mx-auto mb-1">
-                  <BookOpen className="w-4 h-4 text-foreground/70" />
-                </div>
-                <p className="text-2xl font-bold text-foreground" data-testid="text-total-lessons">{earnings.totalLessons}</p>
-                <p className="text-xs text-muted-foreground">已完成課消</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-green-50">
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-1">
-                  <DollarSign className="w-4 h-4 text-green-600" />
-                </div>
-                <p className="text-2xl font-bold text-green-600" data-testid="text-coach-earnings">${earnings.coachEarnings.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">已確認收入</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-tiffany/10">
-                <div className="w-8 h-8 rounded-full bg-tiffany/20 flex items-center justify-center mx-auto mb-1">
-                  <TrendingUp className="w-4 h-4 text-tiffany" />
-                </div>
-                <p className="text-2xl font-bold text-tiffany" data-testid="text-projected-earnings">
-                  {isCurrentMonth ? `$${earnings.monthlyProjection.projectedEarnings.toLocaleString()}` : "-"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {isCurrentMonth ? "預估月收入" : "非當月"}
-                </p>
-              </div>
-            </div>
-
-            {isCurrentMonth && earnings.monthlyProjection.totalSlots > 0 && (
-              <p className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-lg">
-                <TrendingUp className="w-3.5 h-3.5 inline mr-1 text-tiffany" />
-                本月共排定 {earnings.monthlyProjection.totalSlots} 堂課，預估月收入根據已排定時段計算
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="text-center p-3 rounded-lg bg-gray-50">
-              <p className="text-2xl font-bold text-foreground" data-testid="text-total-lessons">0</p>
-              <p className="text-xs text-muted-foreground">已完成課消</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-green-50">
-              <p className="text-2xl font-bold text-green-600" data-testid="text-coach-earnings">$0</p>
-              <p className="text-xs text-muted-foreground">已確認收入</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-tiffany/10">
-              <p className="text-2xl font-bold text-tiffany" data-testid="text-projected-earnings">-</p>
-              <p className="text-xs text-muted-foreground">本月無資料</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {!isLoading && earnings && earnings.dailyStats.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-50">
-            <h3 className="text-sm font-semibold text-foreground" data-testid="text-daily-detail-title">每日收入明細</h3>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {earnings.dailyStats.map((day: any) => {
-              const d = new Date(day.date + "T00:00:00");
-              const dayLabel = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
-              return (
-                <div key={day.date} className="flex items-center px-4 py-3 gap-3" data-testid={`salary-row-${day.date}`}>
-                  <div className="w-16 text-center">
-                    <p className="text-sm font-semibold">{day.date.slice(5)}</p>
-                    <p className="text-[10px] text-muted-foreground">週{dayLabel}</p>
-                  </div>
-                  <div className="flex-1 flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-1 text-xs">
-                      <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-muted-foreground">{day.lessons} 堂</span>
-                    </div>
-                    {(earnings.compensationType === "percentage" || earnings.compensationType === "hourly") && (
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className="text-muted-foreground">實收 ${Math.round(day.revenue).toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-semibold text-green-600" data-testid={`text-daily-earnings-${day.date}`}>
-                      ${Math.round(day.earnings).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">合計</span>
-            <span className="text-sm font-bold text-foreground" data-testid="text-daily-total">
-              ${earnings.coachEarnings.toLocaleString()}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {!isLoading && earnings && earnings.dailyStats.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-6 text-center text-sm text-muted-foreground">
-          本月尚無課消收入記錄
         </div>
       )}
     </div>
