@@ -1480,6 +1480,9 @@ function UsersTab() {
   const [newFranchiseId, setNewFranchiseId] = useState<number>(0);
   const [credUsername, setCredUsername] = useState("");
   const [credPassword, setCredPassword] = useState("");
+  const [parentExpanded, setParentExpanded] = useState(false);
+  const [parentSearch, setParentSearch] = useState("");
+  const parentSectionRef = useRef<HTMLDivElement>(null);
 
   const { data: userList = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -1537,6 +1540,7 @@ function UsersTab() {
   const roleLabels: Record<string, { label: string; color: string }> = {
     admin: { label: "總部管理員", color: "bg-coral/10 text-coral" },
     franchise_admin: { label: "分校主任", color: "bg-tiffany/10 text-tiffany" },
+    coach: { label: "教練", color: "bg-blue-50 text-blue-600" },
     parent: { label: "家長", color: "bg-gray-100 text-gray-600" },
   };
 
@@ -1545,65 +1549,174 @@ function UsersTab() {
     return franchiseList.find((f) => f.id === fId)?.name || "";
   };
 
+  const operationalUsers = userList.filter((u) => ["admin", "franchise_admin"].includes(u.role || ""));
+  const coachUsers = userList.filter((u) => u.role === "coach");
+  const parentUsers = userList.filter((u) => u.role === "parent");
+  const filteredParents = parentSearch.trim()
+    ? parentUsers.filter((u) => {
+        const q = parentSearch.toLowerCase();
+        return (
+          (u.firstName || "").toLowerCase().includes(q) ||
+          (u.lastName || "").toLowerCase().includes(q) ||
+          (u.email || "").toLowerCase().includes(q) ||
+          (u.username || "").toLowerCase().includes(q) ||
+          (u.phone || "").includes(q)
+        );
+      })
+    : parentUsers;
+
+  const renderUserRow = (u: User, opts: { showButtons?: boolean; showPhone?: boolean } = {}) => {
+    const { showButtons = true, showPhone = false } = opts;
+    const role = roleLabels[u.role || "parent"] || roleLabels.parent;
+    return (
+      <div key={u.id} className="bg-white rounded-md border border-gray-100 p-4 flex items-center gap-4" data-testid={`admin-user-${u.id}`}>
+        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+          {u.profileImageUrl ? (
+            <img src={u.profileImageUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <Users className="w-5 h-5 text-gray-400" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-medium text-foreground">
+              {u.firstName || ""} {u.lastName || ""}
+              {!u.firstName && !u.lastName && <span className="text-muted-foreground">未命名</span>}
+            </p>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${role.color}`}>{role.label}</span>
+            {(u.role === "franchise_admin" || u.role === "coach") && u.franchiseId && (
+              <span className="text-xs bg-amber-warm text-amber-700 px-2 py-0.5 rounded-full">
+                {getFranchiseName(u.franchiseId)}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {u.email || "無 Email"}
+            {u.username && <span className="ml-2 text-tiffany">帳號: {u.username}</span>}
+            {showPhone && u.phone && <span className="ml-2">📱 {u.phone}</span>}
+          </p>
+        </div>
+        {showButtons && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {(u.role === "admin" || u.role === "franchise_admin") && (
+              <Button variant="outline" size="sm" onClick={() => openCredentialDialog(u)} data-testid={`button-set-credential-${u.id}`}>
+                <Lock className="w-3.5 h-3.5 mr-1" />{u.username ? "改密碼" : "設帳號"}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => openRoleDialog(u)} data-testid={`button-edit-user-role-${u.id}`}>
+              <Shield className="w-3.5 h-3.5 mr-1" />權限
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="max-w-4xl">
-      <div className="mb-6">
+    <div className="max-w-4xl space-y-6">
+      <div>
         <h1 className="text-xl font-semibold text-foreground">帳號管理</h1>
         <p className="text-sm text-muted-foreground">管理使用者角色，指派分校主任帳號</p>
       </div>
 
+      {/* Stats cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-gray-100 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-tiffany">{operationalUsers.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">🏫 分校主任 / 總部</p>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-blue-600">{coachUsers.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">👨‍🏫 教練</p>
+        </div>
+        <button
+          className="bg-white border border-gray-100 rounded-xl p-4 text-center hover:border-tiffany/40 transition-colors cursor-pointer"
+          onClick={() => {
+            setParentExpanded(true);
+            setTimeout(() => parentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+          }}
+          data-testid="stat-card-parents"
+        >
+          <p className="text-2xl font-bold text-gray-600">{parentUsers.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">👨‍👩‍👧 家長帳號</p>
+        </button>
+      </div>
+
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}</div>
-      ) : userList.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-md border border-gray-100">
-          <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">尚無使用者</p>
-        </div>
       ) : (
-        <div className="space-y-2">
-          {userList.map((u) => {
-            const role = roleLabels[u.role || "parent"] || roleLabels.parent;
-            return (
-              <div key={u.id} className="bg-white rounded-md border border-gray-100 p-4 flex items-center gap-4" data-testid={`admin-user-${u.id}`}>
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                  {u.profileImageUrl ? (
-                    <img src={u.profileImageUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <Users className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-foreground">
-                      {u.firstName || ""} {u.lastName || ""}
-                      {!u.firstName && !u.lastName && <span className="text-muted-foreground">未命名</span>}
-                    </p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${role.color}`}>{role.label}</span>
-                    {u.role === "franchise_admin" && u.franchiseId && (
-                      <span className="text-xs bg-amber-warm text-amber-700 px-2 py-0.5 rounded-full">
-                        {getFranchiseName(u.franchiseId)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {u.email || "無 Email"}
-                    {u.username && <span className="ml-2 text-tiffany">帳號: {u.username}</span>}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {(u.role === "admin" || u.role === "franchise_admin") && (
-                    <Button variant="outline" size="sm" onClick={() => openCredentialDialog(u)} data-testid={`button-set-credential-${u.id}`}>
-                      <Lock className="w-3.5 h-3.5 mr-1" />{u.username ? "改密碼" : "設帳號"}
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => openRoleDialog(u)} data-testid={`button-edit-user-role-${u.id}`}>
-                    <Shield className="w-3.5 h-3.5 mr-1" />權限
-                  </Button>
-                </div>
+        <>
+          {/* Section 1: Operational accounts */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">營運帳號</h2>
+              <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">{operationalUsers.length} 人</span>
+            </div>
+            {operationalUsers.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">尚無營運帳號</p>
+            ) : (
+              <div className="space-y-2">
+                {operationalUsers.map((u) => renderUserRow(u, { showButtons: true }))}
               </div>
-            );
-          })}
-        </div>
+            )}
+          </div>
+
+          {/* Section 2: Coach accounts */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">教練帳號</h2>
+              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{coachUsers.length} 人</span>
+              <span className="text-xs text-muted-foreground">（由各分校主任管理）</span>
+            </div>
+            {coachUsers.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">尚無教練帳號</p>
+            ) : (
+              <div className="space-y-2">
+                {coachUsers.map((u) => renderUserRow(u, { showButtons: false }))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Parent accounts - collapsible */}
+          <div className="space-y-2" ref={parentSectionRef}>
+            <button
+              className="w-full flex items-center gap-2 text-left group"
+              onClick={() => setParentExpanded((v) => !v)}
+              data-testid="toggle-parent-section"
+            >
+              <h2 className="text-sm font-semibold text-foreground">家長帳號</h2>
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{parentUsers.length} 人</span>
+              <ChevronDown
+                className={`w-4 h-4 text-muted-foreground ml-auto transition-transform ${parentExpanded ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {parentExpanded && (
+              <div className="space-y-3">
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                  共 {parentUsers.length} 位家長，HQ 通常不需要修改家長帳號。家長可自行在個人資料頁更新資訊。
+                </p>
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    value={parentSearch}
+                    onChange={(e) => setParentSearch(e.target.value)}
+                    placeholder="搜尋姓名、Email、帳號、手機..."
+                    className="pl-9 text-sm h-9"
+                    data-testid="input-parent-search"
+                  />
+                </div>
+                {filteredParents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">找不到符合條件的家長帳號</p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredParents.map((u) => renderUserRow(u, { showButtons: false, showPhone: true }))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       <Dialog open={showRoleDialog} onOpenChange={(open) => { if (!open) setSelectedUser(null); setShowRoleDialog(open); }}>
