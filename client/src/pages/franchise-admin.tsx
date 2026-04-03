@@ -1735,6 +1735,8 @@ function CoachesTab() {
       if (res.ok) {
         const data = await res.json();
         setPhoneCheck(data);
+      } else {
+        setPhoneCheck(null);
       }
     } catch {
       setPhoneCheck(null);
