@@ -1354,7 +1354,9 @@ function BookingFlowTab() {
   const [step, setStep] = useState<"search" | "detail" | "confirm">("search");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [autoFillSource, setAutoFillSource] = useState<"address" | "gps" | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState("");
   const [selectedFranchiseId, setSelectedFranchiseId] = useState<number | null>(null);
   const [bookingSlot, setBookingSlot] = useState<SlotWithCoach | null>(null);
   const [selectedChild, setSelectedChild] = useState("");
@@ -1378,9 +1380,61 @@ function BookingFlowTab() {
     if (parsed) {
       setCity(parsed.city);
       setDistrict(parsed.district);
-      setIsAutoFilled(true);
+      setAutoFillSource("address");
     }
   }, [credAddress]);
+
+  const handleGpsLocate = () => {
+    if (!navigator.geolocation) {
+      setGpsError("您的瀏覽器不支援 GPS 定位");
+      return;
+    }
+    setGpsLoading(true);
+    setGpsError("");
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=zh-TW`,
+            { headers: { "User-Agent": "PrimeMath/1.0" } },
+          );
+          const data = await res.json();
+          const addr = data.address || {};
+          const normalize = (s: string) => (s || "").replace(/臺/g, "台");
+          const rawCity = normalize(addr.city || addr.county || addr.state || "");
+          const rawDistrict = normalize(addr.suburb || addr.district || addr.town || addr.quarter || "");
+          const matchedCity = CITIES.find((c) => rawCity.includes(c) || c.includes(rawCity)) || "";
+          const matchedDistrict = matchedCity
+            ? (TAIWAN_DISTRICTS[matchedCity] || []).find((d) => rawDistrict.includes(d) || d.includes(rawDistrict)) || ""
+            : "";
+          if (matchedCity) {
+            setCity(matchedCity);
+            setDistrict(matchedDistrict);
+            setAutoFillSource("gps");
+            setGpsError("");
+          } else {
+            setGpsError("無法識別目前位置的縣市，請手動選擇");
+          }
+        } catch {
+          setGpsError("定位失敗，請手動選擇");
+        } finally {
+          setGpsLoading(false);
+        }
+      },
+      (error) => {
+        setGpsLoading(false);
+        if (error.code === error.PERMISSION_DENIED) {
+          setGpsError("請允許瀏覽器存取位置權限");
+        } else if (error.code === error.TIMEOUT) {
+          setGpsError("定位逾時，請手動選擇");
+        } else {
+          setGpsError("定位失敗，請手動選擇");
+        }
+      },
+      { timeout: 10000 },
+    );
+  };
 
   const districts = city ? TAIWAN_DISTRICTS[city] || [] : [];
 
@@ -2214,19 +2268,48 @@ function BookingFlowTab() {
         <p className="text-sm text-muted-foreground">選擇地區，找到離你最近的教室</p>
       </div>
 
-      {isAutoFilled && (
-        <div className="flex items-center gap-1.5 px-1" data-testid="badge-address-recommendation">
-          <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }}>
-            📍 根據您的地址推薦
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-1">
+        <button
+          type="button"
+          onClick={handleGpsLocate}
+          disabled={gpsLoading}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ borderColor: "#81D8D0", color: "#4aaba3", backgroundColor: gpsLoading ? "#e6f8f7" : "white" }}
+          data-testid="button-gps-locate"
+        >
+          {gpsLoading ? (
+            <>
+              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              定位中...
+            </>
+          ) : (
+            <>📍 使用目前位置</>
+          )}
+        </button>
+
+        {autoFillSource === "address" && (
+          <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }} data-testid="badge-address-recommendation">
+            根據您的地址推薦
           </span>
-        </div>
-      )}
+        )}
+        {autoFillSource === "gps" && (
+          <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }} data-testid="badge-gps-recommendation">
+            根據 GPS 定位推薦
+          </span>
+        )}
+        {gpsError && (
+          <span className="text-xs text-red-500" data-testid="text-gps-error">{gpsError}</span>
+        )}
+      </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Label className="text-xs text-muted-foreground mb-1.5 block">縣市</Label>
-            <Select value={city} onValueChange={(val) => { setCity(val); setDistrict(""); setIsAutoFilled(false); }}>
+            <Select value={city} onValueChange={(val) => { setCity(val); setDistrict(""); setAutoFillSource(null); setGpsError(""); }}>
               <SelectTrigger className="text-sm" data-testid="filter-city">
                 <SelectValue placeholder="選擇縣市" />
               </SelectTrigger>
@@ -2239,7 +2322,7 @@ function BookingFlowTab() {
           </div>
           <div className="flex-1">
             <Label className="text-xs text-muted-foreground mb-1.5 block">區/鄉鎮</Label>
-            <Select value={district} onValueChange={(val) => { setDistrict(val); setIsAutoFilled(false); }} disabled={!city}>
+            <Select value={district} onValueChange={(val) => { setDistrict(val); setAutoFillSource(null); setGpsError(""); }} disabled={!city}>
               <SelectTrigger className="text-sm" data-testid="filter-district">
                 <SelectValue placeholder={city ? "選擇區域" : "先選縣市"} />
               </SelectTrigger>
