@@ -36,6 +36,12 @@ interface OtpRecord {
   attempts: number;
 }
 const otpStore = new Map<string, OtpRecord>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [phone, record] of otpStore.entries()) {
+    if (now > record.expiresAt) otpStore.delete(phone);
+  }
+}, 10 * 60_000);
 
 async function sendMitakeSms(phone: string, body: string): Promise<void> {
   const username = process.env.MITAKE_USERNAME;
@@ -257,7 +263,13 @@ export async function registerRoutes(
       }
       const otp = String(Math.floor(100000 + Math.random() * 900000));
       otpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
-      await sendMitakeSms(phone, `【質數教室】您的驗證碼為 ${otp}，5 分鐘內有效，請勿告知他人。`);
+      try {
+        await sendMitakeSms(phone, `【質數教室】您的驗證碼為 ${otp}，5 分鐘內有效，請勿告知他人。`);
+      } catch (smsError: unknown) {
+        otpStore.delete(phone);
+        const msg = smsError instanceof Error ? smsError.message : "簡訊發送失敗，請稍後再試";
+        return res.status(500).json({ message: msg });
+      }
       return res.json({ message: "驗證碼已發送" });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "發送失敗，請稍後再試";
@@ -292,7 +304,6 @@ export async function registerRoutes(
         const left = 3 - (record.attempts + 1);
         return res.status(400).json({ message: `驗證碼不正確，還剩 ${left} 次機會` });
       }
-      otpStore.delete(phone);
       if (password.length < 6) {
         return res.status(400).json({ message: "密碼至少需要 6 個字元" });
       }
@@ -319,6 +330,7 @@ export async function registerRoutes(
         referralSource: referralSource && referralSource.length > 0 ? referralSource : null,
         role: "parent",
       }).returning();
+      otpStore.delete(phone);
       const [freePurchase] = await db.insert(creditPurchases).values({
         parentId: newUser.id,
         credits: 2,
