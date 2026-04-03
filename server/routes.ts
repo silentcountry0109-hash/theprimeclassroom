@@ -28,6 +28,37 @@ function isPgUniqueViolation(err: unknown): err is PgUniqueViolation {
 }
 
 const uploadsDir = path.join(process.cwd(), "uploads");
+
+interface OtpRecord {
+  otp: string;
+  expiresAt: number;
+  sentAt: number;
+  attempts: number;
+}
+const otpStore = new Map<string, OtpRecord>();
+
+async function sendMitakeSms(phone: string, body: string): Promise<void> {
+  const username = process.env.MITAKE_USERNAME;
+  const password = process.env.MITAKE_PASSWORD;
+  if (!username || !password) {
+    throw new Error("簡訊服務未設定，請聯絡系統管理員");
+  }
+  const params = new URLSearchParams({
+    username,
+    password,
+    dstaddr: phone,
+    smbody: body,
+  });
+  const res = await fetch(`https://smexpress.mitake.com.tw:9600/SmSendPost?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
+  const text = await res.text();
+  if (!text.includes("statuscode=0") && !text.includes("StatusCode=0")) {
+    console.error("[Mitake SMS] Response:", text);
+    throw new Error("簡訊發送失敗，請稍後再試");
+  }
+}
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const curriculumDir = path.join(uploadsDir, "curriculum");
@@ -212,12 +243,56 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/send-otp", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone || !/^09\d{8}$/.test(phone)) {
+        return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
+      }
+      const now = Date.now();
+      const existing = otpStore.get(phone);
+      if (existing && now - existing.sentAt < 60_000) {
+        const remaining = Math.ceil((60_000 - (now - existing.sentAt)) / 1000);
+        return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
+      }
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      otpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
+      await sendMitakeSms(phone, `【質數教室】您的驗證碼為 ${otp}，5 分鐘內有效，請勿告知他人。`);
+      return res.json({ message: "驗證碼已發送" });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "發送失敗，請稍後再試";
+      return res.status(500).json({ message: msg });
+    }
+  });
+
   app.post("/api/parent-register", async (req: any, res) => {
     try {
-      const { username, password, firstName, email, phone, address, referralSource } = req.body;
+      const { username, password, firstName, email, phone, address, referralSource, otp } = req.body;
       if (!username || !password || !firstName || !phone || !email) {
         return res.status(400).json({ message: "請填寫所有必填欄位" });
       }
+      if (!otp) {
+        return res.status(400).json({ message: "請先完成手機驗證" });
+      }
+      const now = Date.now();
+      const record = otpStore.get(phone);
+      if (!record) {
+        return res.status(400).json({ message: "請先發送驗證碼至手機" });
+      }
+      if (now > record.expiresAt) {
+        otpStore.delete(phone);
+        return res.status(400).json({ message: "驗證碼已過期，請重新發送" });
+      }
+      if (record.attempts >= 3) {
+        otpStore.delete(phone);
+        return res.status(400).json({ message: "驗證碼錯誤次數過多，請重新發送" });
+      }
+      if (record.otp !== String(otp)) {
+        otpStore.set(phone, { ...record, attempts: record.attempts + 1 });
+        const left = 3 - (record.attempts + 1);
+        return res.status(400).json({ message: `驗證碼不正確，還剩 ${left} 次機會` });
+      }
+      otpStore.delete(phone);
       if (password.length < 6) {
         return res.status(400).json({ message: "密碼至少需要 6 個字元" });
       }

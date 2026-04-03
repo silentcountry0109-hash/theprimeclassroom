@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Lock, User, ArrowLeft, Mail, UserPlus, Phone, MapPin, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Lock, User, ArrowLeft, Mail, UserPlus, Phone, MapPin, CheckCircle2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 const REFERRAL_OPTIONS = [
   "網路搜尋（Google、Yahoo 等）",
@@ -32,6 +32,49 @@ export default function ParentLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, []);
+
+  const startCountdown = () => {
+    setCountdown(60);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) { clearInterval(countdownRef.current!); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleSendOtp = async () => {
+    setOtpError("");
+    if (!phone) { setOtpError("請先輸入手機號碼"); return; }
+    if (!/^09\d{8}$/.test(phone)) { setOtpError("請輸入正確格式（09 開頭 10 碼）"); return; }
+    setOtpLoading(true);
+    try {
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpError(data.message || "發送失敗，請稍後再試"); return; }
+      setOtpSent(true);
+      startCountdown();
+    } catch {
+      setOtpError("網路錯誤，請稍後再試");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
 
   const resetForm = () => {
     setUsername("");
@@ -43,6 +86,11 @@ export default function ParentLogin() {
     setReferralSource([]);
     setError("");
     setShowSuccess(false);
+    setOtp("");
+    setOtpSent(false);
+    setOtpError("");
+    setCountdown(0);
+    if (countdownRef.current) clearInterval(countdownRef.current);
   };
 
   const toggleReferral = (option: string) => {
@@ -101,6 +149,7 @@ export default function ParentLogin() {
           phone,
           address: address || undefined,
           referralSource: referralSource.length > 0 ? referralSource : undefined,
+          otp,
         }),
       });
       const data = await res.json();
@@ -269,19 +318,60 @@ export default function ParentLogin() {
                 </div>
                 <div>
                   <Label htmlFor="reg-phone" className="text-sm">手機號碼 <span className="text-coral">*</span></Label>
-                  <div className="relative mt-1.5">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="reg-phone"
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="09XX-XXX-XXX"
-                      className="pl-10"
-                      data-testid="input-register-phone"
-                    />
+                  <div className="flex gap-2 mt-1.5">
+                    <div className="relative flex-1">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="reg-phone"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value);
+                          if (otpSent) { setOtpSent(false); setOtp(""); setOtpError(""); setCountdown(0); if (countdownRef.current) clearInterval(countdownRef.current); }
+                        }}
+                        placeholder="0912345678"
+                        className="pl-10"
+                        data-testid="input-register-phone"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSendOtp}
+                      disabled={otpLoading || countdown > 0}
+                      className="shrink-0 text-xs whitespace-nowrap"
+                      data-testid="button-send-otp"
+                    >
+                      {otpLoading ? "發送中..." : countdown > 0 ? `${countdown}s 後重發` : otpSent ? "重新發送" : "發送驗證碼"}
+                    </Button>
                   </div>
+                  {otpError && (
+                    <p className="text-xs text-red-500 mt-1" data-testid="text-otp-error">{otpError}</p>
+                  )}
+                  {otpSent && !otpError && (
+                    <p className="text-xs text-tiffany mt-1">驗證碼已發送至 {phone}，請查收簡訊</p>
+                  )}
                 </div>
+                {otpSent && (
+                  <div>
+                    <Label htmlFor="reg-otp" className="text-sm">手機驗證碼 <span className="text-coral">*</span></Label>
+                    <div className="relative mt-1.5">
+                      <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="reg-otp"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                        placeholder="請輸入 6 位數驗證碼"
+                        className="pl-10 tracking-widest font-mono text-center"
+                        data-testid="input-register-otp"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="reg-email" className="text-sm">Email <span className="text-coral">*</span></Label>
                   <div className="relative mt-1.5">
@@ -380,7 +470,7 @@ export default function ParentLogin() {
                 <Button
                   type="submit"
                   className="w-full rounded-lg"
-                  disabled={loading || !username || !password || !firstName || !phone || !email}
+                  disabled={loading || !username || !password || !firstName || !phone || !email || !otpSent || otp.length !== 6}
                   data-testid="button-parent-register"
                 >
                   {loading ? "註冊中..." : "註冊"}
