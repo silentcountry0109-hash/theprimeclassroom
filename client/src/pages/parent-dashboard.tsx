@@ -1397,7 +1397,6 @@ function BookingFlowTab() {
           const { latitude, longitude } = position.coords;
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=zh-TW`,
-            { headers: { "User-Agent": "PrimeMath/1.0" } },
           );
           const data = await res.json();
           const addr = data.address || {};
