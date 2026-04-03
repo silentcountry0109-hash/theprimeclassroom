@@ -1425,9 +1425,7 @@ function BookingFlowTab() {
       (error) => {
         setGpsLoading(false);
         if (error.code === error.PERMISSION_DENIED) {
-          setGpsError("請允許瀏覽器存取位置權限");
-        } else if (error.code === error.TIMEOUT) {
-          setGpsError("定位逾時，請手動選擇");
+          setGpsError("請允許瀏覽器存取位置");
         } else {
           setGpsError("定位失敗，請手動選擇");
         }
@@ -2292,12 +2290,12 @@ function BookingFlowTab() {
 
         {autoFillSource === "address" && (
           <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }} data-testid="badge-address-recommendation">
-            根據您的地址推薦
+            📍 根據您的地址推薦
           </span>
         )}
         {autoFillSource === "gps" && (
           <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e6f8f7", color: "#4aaba3" }} data-testid="badge-gps-recommendation">
-            根據 GPS 定位推薦
+            📍 根據 GPS 定位推薦
           </span>
         )}
         {gpsError && (
