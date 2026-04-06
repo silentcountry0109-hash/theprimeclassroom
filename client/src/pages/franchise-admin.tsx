@@ -63,6 +63,7 @@ import {
   CalendarDays,
   AlertTriangle,
   List,
+  Camera,
   ChevronLeft,
   DoorOpen,
   Check,
@@ -1710,8 +1711,39 @@ function CoachesTab() {
   };
   const [phoneCheck, setPhoneCheck] = useState<PhoneCheckResult | null>(null);
   const [phoneCheckLoading, setPhoneCheckLoading] = useState(false);
+  const [uploadingCoachId, setUploadingCoachId] = useState<number | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [pendingUploadCoachId, setPendingUploadCoachId] = useState<number | null>(null);
 
   const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
+
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async ({ coachId, file }: { coachId: number; file: File }) => {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const res = await fetch(`/api/franchise-admin/coaches/${coachId}/upload-photo`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "上傳失敗");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
+      toast({ title: "照片已更新" });
+      setUploadingCoachId(null);
+      setPendingUploadCoachId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "上傳失敗", description: error.message, variant: "destructive" });
+      setUploadingCoachId(null);
+      setPendingUploadCoachId(null);
+    },
+  });
 
   const resetForm = () => {
     setFormData({ name: "", phone: "", bio: "", specialties: [], isCertified: true, rating: 0, reviewCount: 0 });
@@ -1923,11 +1955,57 @@ function CoachesTab() {
           <p className="text-sm text-muted-foreground">尚無老師資料</p>
         </div>
       ) : (
+        <>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          data-testid="input-coach-photo-file"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file || !pendingUploadCoachId) return;
+            if (file.size > 5 * 1024 * 1024) {
+              toast({ title: "檔案過大", description: "請選擇 5MB 以下的圖片", variant: "destructive" });
+              return;
+            }
+            setUploadingCoachId(pendingUploadCoachId);
+            uploadPhotoMutation.mutate({ coachId: pendingUploadCoachId, file });
+            e.target.value = "";
+          }}
+        />
         <div className="space-y-3">
           {coaches.map((coach) => (
             <div key={coach.id} className={`bg-white rounded-md border p-4 flex items-center gap-4 ${coach.isActive === false ? "border-gray-200 opacity-60" : "border-gray-100"}`} data-testid={`franchise-coach-${coach.id}`}>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${coach.isActive === false ? "bg-gray-100" : "bg-tiffany/10"}`}>
-                <span className={`text-lg font-serif ${coach.isActive === false ? "text-gray-400" : "text-tiffany"}`}>{coach.name[0]}</span>
+              <div className="relative shrink-0 group">
+                {coach.photoUrl ? (
+                  <img
+                    src={coach.photoUrl}
+                    alt={coach.name}
+                    className="w-12 h-12 rounded-full object-cover border border-gray-200"
+                    data-testid={`img-coach-photo-${coach.id}`}
+                  />
+                ) : (
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${coach.isActive === false ? "bg-gray-100" : "bg-tiffany/10"}`}>
+                    <span className={`text-lg font-serif ${coach.isActive === false ? "text-gray-400" : "text-tiffany"}`}>{coach.name[0]}</span>
+                  </div>
+                )}
+                <button
+                  className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  title={coach.photoUrl ? "更換照片" : "上傳照片"}
+                  data-testid={`button-upload-photo-${coach.id}`}
+                  disabled={uploadingCoachId === coach.id}
+                  onClick={() => {
+                    setPendingUploadCoachId(coach.id);
+                    photoInputRef.current?.click();
+                  }}
+                >
+                  {uploadingCoachId === coach.id ? (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4 text-white" />
+                  )}
+                </button>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2005,6 +2083,7 @@ function CoachesTab() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       <Dialog open={showDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowDialog(open); }}>

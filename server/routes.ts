@@ -1288,6 +1288,21 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/franchise-admin/coaches/:id/upload-photo", isFranchiseAdmin, upload.single("photo"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
+      const coachId = parseInt(req.params.id);
+      const coach = await storage.getCoach(coachId);
+      if (!coach) return res.status(404).json({ message: "Coach not found" });
+      if (coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "無權限" });
+      const photoUrl = `/uploads/${req.file.filename}`;
+      await storage.updateCoach(coachId, { photoUrl });
+      res.json({ url: photoUrl });
+    } catch (error) {
+      res.status(500).json({ message: "上傳失敗" });
+    }
+  });
+
   app.delete("/api/franchise-admin/delete-photo", isFranchiseAdmin, async (req: any, res) => {
     try {
       const { photoUrl } = req.body;
