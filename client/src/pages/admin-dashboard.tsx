@@ -3464,7 +3464,7 @@ function SiteEditorTab() {
 
                   if (field.type === "image") {
                     const spec = field.imageSpec;
-                    const imageUrl = contentMap[field.key] ?? "";
+                    const imageUrl = getFieldValue(field.key);
                     return (
                       <div key={field.key} className="rounded-xl border border-gray-100 p-4 space-y-3 bg-gray-50/50">
                         <div className="flex items-center gap-2">

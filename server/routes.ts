@@ -83,9 +83,9 @@ const uploadSiteContent = multer({
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+    const allowed = /\.(jpg|jpeg|png|webp)$/i;
     if (allowed.test(path.extname(file.originalname))) cb(null, true);
-    else cb(new Error("只允許上傳圖片檔案"));
+    else cb(new Error("只允許上傳 JPG / PNG / WebP 格式的圖片"));
   },
 });
 
