@@ -3,14 +3,14 @@ import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 
-const HEADSHOT_PROMPT = `Transform this photo into a professional teacher headshot for a children's math tutoring center:
+const HEADSHOT_PROMPT = `Transform this photo into a professional teacher portrait for a children's math tutoring center:
 - Keep the facial features of the person in the uploaded image exactly consistent.
-- Professional yet warm and approachable look suitable for an educational setting.
-- Clean solid light gray or soft white studio background.
-- Neat, professional attire (no casual wear).
-- Soft studio lighting, slight warm tone.
-- Portrait aspect ratio 3:4, centered composition, shoulders clearly visible.
-- Ultra-realistic, high quality. No text overlays.`;
+- Professional yet warm and approachable expression.
+- Background: a bright, clean math classroom — a whiteboard or blackboard behind the subject with math formulas, equations, and geometric diagrams written on it; natural daylight from a window on the side, warm and inviting atmosphere.
+- Attire: formal dark navy business suit with a white dress shirt (for men); formal dark navy blazer with a white blouse (for women). No casual clothing.
+- Soft natural lighting with slight warm tone, no harsh shadows.
+- Portrait aspect ratio 3:4, centered composition, upper body visible (head to just below the waist).
+- Ultra-realistic, high quality. No text overlays on the person.`;
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 
