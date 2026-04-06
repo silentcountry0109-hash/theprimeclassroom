@@ -13,6 +13,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
+import { generateCoachHeadshot } from "./gemini-image";
 
 interface PgUniqueViolation {
   code: "23505";
@@ -1295,9 +1296,19 @@ export async function registerRoutes(
       const coach = await storage.getCoach(coachId);
       if (!coach) return res.status(404).json({ message: "Coach not found" });
       if (coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "無權限" });
-      const photoUrl = `/uploads/${req.file.filename}`;
-      await storage.updateCoach(coachId, { photoUrl });
-      res.json({ url: photoUrl });
+      const originalPhotoUrl = `/uploads/${req.file.filename}`;
+      await storage.updateCoach(coachId, { photoUrl: originalPhotoUrl });
+
+      const originalFilePath = path.join(uploadsDir, req.file.filename);
+      const mimeType = req.file.mimetype || "image/jpeg";
+      const aiPhotoUrl = await generateCoachHeadshot(originalFilePath, mimeType);
+
+      if (aiPhotoUrl) {
+        await storage.updateCoach(coachId, { photoUrl: aiPhotoUrl });
+        res.json({ url: aiPhotoUrl, aiGenerated: true });
+      } else {
+        res.json({ url: originalPhotoUrl, aiGenerated: false });
+      }
     } catch (error) {
       res.status(500).json({ message: "上傳失敗" });
     }

@@ -1732,9 +1732,13 @@ function CoachesTab() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { url: string; aiGenerated?: boolean }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
-      toast({ title: "照片已更新" });
+      if (data?.aiGenerated) {
+        toast({ title: "AI 定裝照已生成", description: "已自動生成符合前台尺寸的專業師資照片" });
+      } else {
+        toast({ title: "照片已更新" });
+      }
       setUploadingCoachId(null);
       setPendingUploadCoachId(null);
     },
@@ -2012,6 +2016,12 @@ function CoachesTab() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-foreground">{coach.name}</p>
+                  {uploadingCoachId === coach.id && (
+                    <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`ai-generating-badge-${coach.id}`}>
+                      <span className="w-2.5 h-2.5 border border-amber-500 border-t-transparent rounded-full animate-spin inline-block" />
+                      AI 生成定裝照中…
+                    </span>
+                  )}
                   {coach.isCertified && <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">已認證</span>}
                   {coach.isActive === false && (
                     <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full" data-testid={`coach-inactive-badge-${coach.id}`}>已停用</span>
