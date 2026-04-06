@@ -1967,6 +1967,8 @@ function CoachesTab() {
             if (!file || !pendingUploadCoachId) return;
             if (file.size > 5 * 1024 * 1024) {
               toast({ title: "檔案過大", description: "請選擇 5MB 以下的圖片", variant: "destructive" });
+              e.target.value = "";
+              setPendingUploadCoachId(null);
               return;
             }
             setUploadingCoachId(pendingUploadCoachId);
@@ -1991,7 +1993,7 @@ function CoachesTab() {
                   </div>
                 )}
                 <button
-                  className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center opacity-30 group-hover:opacity-100 transition-opacity cursor-pointer"
                   title={coach.photoUrl ? "更換照片" : "上傳照片"}
                   data-testid={`button-upload-photo-${coach.id}`}
                   disabled={uploadingCoachId === coach.id}
