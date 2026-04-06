@@ -70,6 +70,25 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const curriculumDir = path.join(uploadsDir, "curriculum");
 if (!fs.existsSync(curriculumDir)) fs.mkdirSync(curriculumDir, { recursive: true });
 
+const siteContentDir = path.join(uploadsDir, "site-content");
+if (!fs.existsSync(siteContentDir)) fs.mkdirSync(siteContentDir, { recursive: true });
+
+const uploadSiteContent = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, siteContentDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+    if (allowed.test(path.extname(file.originalname))) cb(null, true);
+    else cb(new Error("只允許上傳圖片檔案"));
+  },
+});
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadsDir),
@@ -2315,6 +2334,16 @@ export async function registerRoutes(
       res.json(results);
     } catch (error) {
       res.status(500).json({ message: "批次更新網站內容失敗" });
+    }
+  });
+
+  app.post("/api/admin/site-content/upload-image", isAdmin, uploadSiteContent.single("image"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
+      const url = `/uploads/site-content/${req.file.filename}`;
+      res.json({ url });
+    } catch (error) {
+      res.status(500).json({ message: "圖片上傳失敗" });
     }
   });
 

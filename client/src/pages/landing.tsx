@@ -224,6 +224,7 @@ function HeroSection() {
   const heroTagline = useSiteContent("hero.tagline", "讓教學回歸「1 位老師」對「1 位學生」的學習體驗");
   const heroSearchHint = useSiteContent("hero.searchHint", "找到最適合孩子的數學老師，立即預約免費診斷");
   const heroSocialProof = useSiteContent("hero.socialProof", "200+ 位家長推薦");
+  const heroBackgroundImage = useSiteContent("hero.backgroundImage", "");
 
   const [, navigate] = useLocation();
   const [city, setCity] = useState("");
@@ -273,6 +274,17 @@ function HeroSection() {
       className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-16 md:pt-20 pb-12 md:pb-16"
       style={{ backgroundColor: "#FAF9F6" }}
     >
+      {heroBackgroundImage && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url(${heroBackgroundImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            opacity: 0.15,
+          }}
+        />
+      )}
       <div
         className="absolute inset-0 pointer-events-none animate-grid-h"
         style={{
@@ -498,6 +510,7 @@ function BrandPhilosophySection() {
   const brandTitle = useSiteContent("brand.title", "品牌與教學理念");
   const brandDescription = useSiteContent("brand.description", "The Prime 質數教室，專注國小數學個別指導。我們相信每個孩子都有獨特的學習節奏，不該被統一的進度框架限制。透過一對一的個別指導，讓每位孩子都能按照自己的步調，扎實地建立數學基礎。");
   const brandQuote = useSiteContent("brand.quote", "不是補習，是真正理解數學。當孩子真正理解了，分數自然會來。");
+  const brandHeroImage = useSiteContent("brand.heroImage", "");
   const brandPhil1Title = useSiteContent("brand.phil1.title", "個別指導・個別進度");
   const brandPhil1Desc = useSiteContent("brand.phil1.desc", "每位孩子都有專屬的學習計畫，老師一對一關注，不是大班齊頭式教學");
   const brandPhil2Title = useSiteContent("brand.phil2.title", "理解優先・不靠死背");
@@ -535,7 +548,7 @@ function BrandPhilosophySection() {
           transition={{ duration: 0.7 }}
         >
           <img
-            src={brandPhilosophyImg}
+            src={brandHeroImage || brandPhilosophyImg}
             alt="質數教室的溫暖教學環境"
             className="w-full h-[220px] sm:h-[300px] md:h-[400px] object-cover"
           />
@@ -1649,6 +1662,7 @@ function FAQSection() {
 function CTASection() {
   const ctaTitle = useSiteContent("cta.title", "立即預約免費診斷");
   const ctaDesc = useSiteContent("cta.description", "讓我們的認證老師為您的孩子進行一次免費的數學能力適性診斷，了解孩子的學習狀態，制定最適合的學習計畫。");
+  const ctaBackgroundImage = useSiteContent("cta.backgroundImage", "");
 
   return (
     <section
@@ -1671,7 +1685,7 @@ function CTASection() {
             transition={{ duration: 0.7 }}
           >
             <img
-              src={parentChildImg}
+              src={ctaBackgroundImage || parentChildImg}
               alt="家長與孩子一起學習"
               className="w-full h-[220px] sm:h-[300px] md:h-[360px] object-cover rounded-2xl shadow-lg"
             />

@@ -78,6 +78,7 @@ import {
   Upload,
   X,
   CheckCircle2,
+  ImageIcon,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode, Textbook, TextbookQuiz, CurriculumMidtermExam } from "@shared/schema";
@@ -3051,10 +3052,25 @@ function ParentWalletsSection() {
   );
 }
 
+interface SiteContentImageSpec {
+  width: number;
+  height: number;
+  formats: string[];
+  maxMB: number;
+}
+
+interface SiteContentField {
+  key: string;
+  label: string;
+  multiline?: boolean;
+  type?: "text" | "image";
+  imageSpec?: SiteContentImageSpec;
+}
+
 interface SiteContentSection {
   id: string;
   label: string;
-  fields: { key: string; label: string; multiline?: boolean }[];
+  fields: SiteContentField[];
 }
 
 const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
@@ -3066,6 +3082,7 @@ const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
       { key: "hero.tagline", label: "標語", multiline: true },
       { key: "hero.searchHint", label: "搜尋提示文字" },
       { key: "hero.socialProof", label: "社群證明文字" },
+      { key: "hero.backgroundImage", label: "Hero 背景圖", type: "image", imageSpec: { width: 1920, height: 600, formats: ["JPG", "PNG", "WebP"], maxMB: 5 } },
     ],
   },
   {
@@ -3083,6 +3100,7 @@ const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
       { key: "brand.phil3.desc", label: "理念3 描述", multiline: true },
       { key: "brand.phil4.title", label: "理念4 標題" },
       { key: "brand.phil4.desc", label: "理念4 描述", multiline: true },
+      { key: "brand.heroImage", label: "品牌理念配圖", type: "image", imageSpec: { width: 800, height: 600, formats: ["JPG", "PNG", "WebP"], maxMB: 5 } },
     ],
   },
   {
@@ -3137,6 +3155,7 @@ const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
     fields: [
       { key: "cta.title", label: "標題" },
       { key: "cta.description", label: "描述", multiline: true },
+      { key: "cta.backgroundImage", label: "行動呼籲配圖", type: "image", imageSpec: { width: 1920, height: 400, formats: ["JPG", "PNG", "WebP"], maxMB: 5 } },
     ],
   },
   {
@@ -3208,6 +3227,9 @@ function SiteEditorTab() {
   const [activeSection, setActiveSection] = useState("hero");
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingImageKey, setPendingImageKey] = useState<string | null>(null);
 
   const { data: siteContent = [], isLoading } = useQuery<{ id: number; sectionKey: string; value: string; updatedAt: string }[]>({
     queryKey: ["/api/admin/site-content"],
@@ -3280,6 +3302,49 @@ function SiteEditorTab() {
     if (Object.keys(newEditValues).length === 0) setHasChanges(false);
   };
 
+  const handleImageUpload = async (key: string, file: File) => {
+    setUploadingImageKey(key);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/admin/site-content/upload-image", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "上傳失敗");
+      }
+      const { url } = await res.json();
+      const newEditValues = { ...editValues, [key]: url };
+      setEditValues(newEditValues);
+      setHasChanges(true);
+      const items = [{ sectionKey: key, value: url }];
+      await apiRequest("PUT", "/api/admin/site-content/batch", { items });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/site-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/site-content"] });
+      const newValues = { ...newEditValues };
+      delete newValues[key];
+      setEditValues(newValues);
+      if (Object.keys(newValues).length === 0) setHasChanges(false);
+      toast({ title: "圖片已上傳", description: "圖片已成功上傳並儲存" });
+    } catch (err: any) {
+      toast({ title: "上傳失敗", description: err.message || "請稍後再試", variant: "destructive" });
+    } finally {
+      setUploadingImageKey(null);
+      setPendingImageKey(null);
+    }
+  };
+
+  const triggerImageUpload = (key: string) => {
+    setPendingImageKey(key);
+    if (imageFileInputRef.current) {
+      imageFileInputRef.current.value = "";
+      imageFileInputRef.current.click();
+    }
+  };
+
   const currentSection = SITE_CONTENT_SECTIONS.find((s) => s.id === activeSection);
   const sectionHasChanges = currentSection?.fields.some((f) => editValues[f.key] !== undefined) ?? false;
 
@@ -3311,6 +3376,20 @@ function SiteEditorTab() {
           </Button>
         )}
       </div>
+
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp"
+        className="hidden"
+        data-testid="input-site-image-upload"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && pendingImageKey) {
+            handleImageUpload(pendingImageKey, file);
+          }
+        }}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="md:col-span-1">
@@ -3381,6 +3460,66 @@ function SiteEditorTab() {
                 {currentSection.fields.map((field) => {
                   const currentValue = getFieldValue(field.key);
                   const isEdited = editValues[field.key] !== undefined;
+                  const isUploadingThis = uploadingImageKey === field.key;
+
+                  if (field.type === "image") {
+                    const spec = field.imageSpec;
+                    const imageUrl = contentMap[field.key] ?? "";
+                    return (
+                      <div key={field.key} className="rounded-xl border border-gray-100 p-4 space-y-3 bg-gray-50/50">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-tiffany" />
+                          <Label className="text-sm font-medium text-foreground">{field.label}</Label>
+                        </div>
+                        {spec && (
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="text-[11px] bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full font-medium">
+                              建議 {spec.width}×{spec.height} px
+                            </span>
+                            <span className="text-[11px] bg-gray-100 text-muted-foreground px-2 py-0.5 rounded-full">
+                              {spec.formats.join(" / ")}
+                            </span>
+                            <span className="text-[11px] bg-gray-100 text-muted-foreground px-2 py-0.5 rounded-full">
+                              上限 {spec.maxMB} MB
+                            </span>
+                          </div>
+                        )}
+                        {imageUrl ? (
+                          <div className="relative rounded-lg overflow-hidden border border-gray-100">
+                            <img
+                              src={imageUrl}
+                              alt={field.label}
+                              className="w-full h-36 object-cover"
+                              data-testid={`img-preview-${field.key}`}
+                            />
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-3 py-1.5">
+                              <p className="text-[11px] text-white/80 truncate font-mono">{imageUrl}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center h-28 rounded-lg border-2 border-dashed border-gray-200 bg-white" data-testid={`img-placeholder-${field.key}`}>
+                            <div className="text-center">
+                              <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-1" />
+                              <p className="text-xs text-muted-foreground">尚未上傳圖片</p>
+                            </div>
+                          </div>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => triggerImageUpload(field.key)}
+                          disabled={isUploadingThis}
+                          className="text-xs"
+                          data-testid={`button-upload-${field.key}`}
+                        >
+                          <Upload className="w-3 h-3 mr-1.5" />
+                          {isUploadingThis ? "上傳中..." : imageUrl ? "更換圖片" : "上傳圖片"}
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground font-mono">{field.key}</p>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={field.key}>
                       <div className="flex items-center justify-between mb-1.5">
