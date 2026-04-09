@@ -2719,12 +2719,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertTextbookFile(data: InsertTextbookFile): Promise<TextbookFile> {
-    const existing = await this.getTextbookFile(data.textbookId, data.fileType);
-    if (existing) {
-      const [file] = await db.update(textbookFiles).set({ ...data, updatedAt: new Date() }).where(eq(textbookFiles.id, existing.id)).returning();
-      return file;
-    }
-    const [file] = await db.insert(textbookFiles).values(data).returning();
+    const [file] = await db.insert(textbookFiles)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [textbookFiles.textbookId, textbookFiles.fileType],
+        set: {
+          originalName: data.originalName,
+          storedPath: data.storedPath,
+          uploadedBy: data.uploadedBy ?? null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!file) throw new Error("DB upsert returned no record");
     return file;
   }
 

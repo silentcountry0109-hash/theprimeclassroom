@@ -428,7 +428,9 @@ export const textbookFiles = pgTable("textbook_files", {
   uploadedBy: varchar("uploaded_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  uniqueTextbookFileType: uniqueIndex("textbook_files_textbook_id_file_type_idx").on(t.textbookId, t.fileType),
+}));
 
 export const insertTextbookFileSchema = createInsertSchema(textbookFiles).omit({ id: true, createdAt: true, updatedAt: true });
 export type TextbookFile = typeof textbookFiles.$inferSelect;
