@@ -3749,7 +3749,13 @@ function TextbooksTab() {
     setBlobUrl(null); setPdfError(null); setViewingPdf({ title }); setLoadingPdf(true);
     try {
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) { setPdfError("尚未上傳此教材"); setLoadingPdf(false); return; }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const msg = res.status === 404
+          ? (errData.message === "檔案已遺失" ? "檔案已遺失（可能需要重新上傳）" : "尚未上傳此教材")
+          : "載入失敗，請稍後再試";
+        setPdfError(msg); setLoadingPdf(false); return;
+      }
       const blob = await res.blob();
       setBlobUrl(URL.createObjectURL(blob));
     } catch { setPdfError("載入失敗，請稍後再試"); }

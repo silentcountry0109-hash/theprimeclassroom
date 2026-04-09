@@ -2690,8 +2690,10 @@ export async function registerRoutes(
         storedPath,
         uploadedBy: req.currentUser?.id ?? null,
       });
+      console.log("[textbook-upload] SUCCESS textbookId=%d fileType=%s file=%s", textbookId, fileType, storedPath);
       res.json(file);
-    } catch {
+    } catch (error) {
+      console.error("[textbook-upload] FAILED:", error);
       res.status(500).json({ message: "上傳失敗" });
     }
   });

@@ -2152,7 +2152,11 @@ function MaterialsTab() {
     try {
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) {
-        setPdfError("尚未上傳此教材");
+        const errData = await res.json().catch(() => ({}));
+        const msg = res.status === 404
+          ? (errData.message === "檔案已遺失" ? "檔案已遺失（請聯絡總部重新上傳）" : "尚未上傳此教材")
+          : "載入失敗，請稍後再試";
+        setPdfError(msg);
         setLoadingPdf(false);
         return;
       }
