@@ -864,8 +864,9 @@ function FranchiseInfoTab() {
   const [schoolInput, setSchoolInput] = useState("");
 
   type DayHours = { isOpen: boolean; openTime: string; closeTime: string };
-  type BusinessHours = Record<string, DayHours>;
   type SpecialDayEntry = { date: string; isOpen: boolean; openTime?: string; closeTime?: string; note?: string };
+  type BusinessHours = Record<string, DayHours>;
+  type BusinessHoursPayload = BusinessHours & { special?: SpecialDayEntry[] };
 
   const defaultBusinessHours: BusinessHours = {
     "0": { isOpen: false, openTime: "09:00", closeTime: "21:00" },
@@ -891,10 +892,10 @@ function FranchiseInfoTab() {
       setPhone(franchise.phone || "");
       setTags(franchise.tags || []);
       setNearbySchools(franchise.nearbySchools || []);
-      const bh = (franchise.businessHours as any) || {};
+      const bh = (franchise.businessHours as BusinessHoursPayload) || {};
       const { special, ...weeklyHours } = bh;
       setBusinessHours({ ...defaultBusinessHours, ...weeklyHours });
-      setSpecialHours(Array.isArray(special) ? special : []);
+      setSpecialHours(special ?? []);
     }
     setNewSpecialDate("");
     setNewSpecialIsOpen(false);
@@ -1015,13 +1016,13 @@ function FranchiseInfoTab() {
               })}
             </div>
             {(() => {
-              const special = (franchise.businessHours as any)?.special;
-              if (!Array.isArray(special) || special.length === 0) return null;
+              const special = (franchise.businessHours as BusinessHoursPayload)?.special;
+              if (!special || special.length === 0) return null;
               return (
                 <div className="mt-3 pt-3 border-t border-gray-100">
                   <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" />特殊節日</p>
                   <div className="space-y-1">
-                    {special.map((s: any, i: number) => (
+                    {special.map((s: SpecialDayEntry, i: number) => (
                       <div key={i} className="flex items-center gap-3 text-sm" data-testid={`display-special-hours-${s.date}`}>
                         <span className="font-medium text-foreground w-24">{s.date}</span>
                         {s.isOpen ? (
@@ -2314,28 +2315,31 @@ function TimeSlotsTab() {
 
   type DayHoursConfig = { isOpen: boolean; openTime?: string; closeTime?: string };
   type SpecialDayConfig = { date: string; isOpen: boolean; openTime?: string; closeTime?: string; note?: string };
-  const businessHours = franchise?.businessHours as Record<string, DayHoursConfig> | undefined;
-  const specialHoursList = (franchise?.businessHours as any)?.special as SpecialDayConfig[] | undefined;
+  type SlotHoursPayload = Record<string, DayHoursConfig> & { special?: SpecialDayConfig[] };
+  type DayHoursResult = { openTime: string; closeTime: string; isSpecial?: true; note?: string };
+
+  const slotBusinessHours = franchise?.businessHours as SlotHoursPayload | undefined;
+  const specialHoursList = slotBusinessHours?.special;
 
   const isDayClosed = (dateStr: string) => {
     if (!dateStr) return false;
     const special = specialHoursList?.find((s) => s.date === dateStr);
     if (special) return !special.isOpen;
-    if (!businessHours) return false;
+    if (!slotBusinessHours) return false;
     const dow = new Date(dateStr + "T00:00:00").getDay().toString();
-    return businessHours[dow] && !businessHours[dow].isOpen;
+    return slotBusinessHours[dow] && !slotBusinessHours[dow].isOpen;
   };
 
-  const getDayBusinessHours = (dateStr: string) => {
+  const getDayBusinessHours = (dateStr: string): DayHoursResult | null => {
     if (!dateStr) return null;
     const special = specialHoursList?.find((s) => s.date === dateStr);
     if (special) {
       if (!special.isOpen) return null;
       return { openTime: special.openTime || "00:00", closeTime: special.closeTime || "23:59", isSpecial: true, note: special.note };
     }
-    if (!businessHours) return null;
+    if (!slotBusinessHours) return null;
     const dow = new Date(dateStr + "T00:00:00").getDay().toString();
-    const dh = businessHours[dow];
+    const dh = slotBusinessHours[dow];
     if (!dh || !dh.isOpen) return null;
     return { openTime: dh.openTime || "00:00", closeTime: dh.closeTime || "23:59" };
   };
@@ -2943,7 +2947,7 @@ function TimeSlotsTab() {
                     const dh = getDayBusinessHours(slotForm.date)!;
                     return (
                       <p className="text-xs text-muted-foreground mt-1">
-                        {(dh as any).isSpecial ? `特殊節日${(dh as any).note ? `（${(dh as any).note}）` : ""}：` : "營業時間："}{dh.openTime} - {dh.closeTime}
+                        {dh.isSpecial ? `特殊節日${dh.note ? `（${dh.note}）` : ""}：` : "營業時間："}{dh.openTime} - {dh.closeTime}
                       </p>
                     );
                   })()}
