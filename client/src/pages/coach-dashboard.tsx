@@ -54,7 +54,6 @@ import {
   HelpCircle,
   Settings,
   Library,
-  CheckCircle2,
 } from "lucide-react";
 import type { Notification } from "@shared/schema";
 
@@ -2080,60 +2079,26 @@ function ManualTab() {
 }
 
 // ─── Materials Tab ────────────────────────────────────────────────────────────
-interface TbFileCoach {
-  id: number; textbookId: number; fileType: string; originalName: string;
-}
-interface TextbookWithFilesCoach {
-  id: number; grade: number; unitCode: string; unitName: string; sortOrder: number;
-  files: TbFileCoach[];
-}
 interface CuMidterm {
   id: number; title: string; semester: string | null; grade: number | null; originalName: string; createdAt: string;
 }
 
-const MATERIAL_SLOTS = [
-  { key: "material", label: "教材（詳解）" },
-  { key: "quiz_1",   label: "考卷 1" },
-  { key: "quiz_2",   label: "考卷 2" },
-  { key: "quiz_3",   label: "考卷 3" },
-  { key: "quiz_4",   label: "考卷 4" },
-] as const;
-
-const GRADE_LABELS_COACH: Record<number, string> = {
-  1: "一年級", 2: "二年級", 3: "三年級", 4: "四年級", 5: "五年級", 6: "六年級",
-};
-
 function MaterialsTab() {
   const [section, setSection] = useState<"units" | "midterm">("units");
-  const [search, setSearch] = useState("");
-  const [gradeFilter, setGradeFilter] = useState<number | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [viewingPdf, setViewingPdf] = useState<{ title: string } | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const { data: midterms = [] } = useQuery<CuMidterm[]>({
+    queryKey: ["/api/curriculum/midterm-exams"],
+  });
 
   useEffect(() => {
     return () => {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
   }, [blobUrl]);
-
-  const { data: textbooks = [], isLoading } = useQuery<TextbookWithFilesCoach[]>({
-    queryKey: ["/api/textbooks"],
-  });
-  const { data: midterms = [] } = useQuery<CuMidterm[]>({
-    queryKey: ["/api/curriculum/midterm-exams"],
-  });
-
-  const filtered = textbooks.filter(u => {
-    if (gradeFilter !== null && u.grade !== gradeFilter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return u.unitCode.toLowerCase().includes(q) || u.unitName.toLowerCase().includes(q);
-    }
-    return true;
-  });
 
   function closePdf() {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -2184,8 +2149,20 @@ function MaterialsTab() {
         ))}
       </div>
 
-      {/* PDF Viewer */}
-      {viewingPdf && (
+      {/* ── 教材庫（外部練習網站）── */}
+      {section === "units" && (
+        <iframe
+          src="https://silentcountry0109-hash.github.io/math-master/"
+          className="w-full rounded-lg border-0"
+          style={{ height: "82vh" }}
+          title="教材庫"
+          data-testid="iframe-materials-external"
+          allow="fullscreen"
+        />
+      )}
+
+      {/* ── 期中考歸檔 PDF 檢視器 ── */}
+      {section === "midterm" && viewingPdf && (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50">
             <span className="text-sm font-medium truncate">{viewingPdf.title}</span>
@@ -2211,80 +2188,6 @@ function MaterialsTab() {
           )}
           {blobUrl && !loadingPdf && !pdfError && (
             <PdfViewer url={blobUrl} />
-          )}
-        </div>
-      )}
-
-      {/* ── 教材庫 ── */}
-      {section === "units" && !viewingPdf && (
-        <div className="space-y-3">
-          {/* 年級篩選 */}
-          <div className="flex gap-1 flex-wrap">
-            {[null, 1, 2, 3, 4, 5, 6].map(g => (
-              <button key={g ?? "all"}
-                onClick={() => setGradeFilter(g)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${gradeFilter === g ? "bg-tiffany text-white border-tiffany" : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany/50"}`}
-                data-testid={`button-grade-filter-coach-${g ?? "all"}`}
-              >
-                {g === null ? "全部" : `${g}年級`}
-              </button>
-            ))}
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜尋編號或名稱..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-tiffany/30 bg-white"
-              data-testid="input-materials-search"
-            />
-          </div>
-          {isLoading ? (
-            <div className="text-sm text-muted-foreground">載入中...</div>
-          ) : filtered.length === 0 ? (
-            <div className="text-sm text-muted-foreground text-center py-12">尚無教材單元</div>
-          ) : (
-            <div className="space-y-2">
-              {filtered.map(unit => {
-                const fileMap = Object.fromEntries(unit.files.map(f => [f.fileType, f]));
-                const count = unit.files.length;
-                const isExpanded = expandedId === unit.id;
-                return (
-                  <div key={unit.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid={`materials-unit-${unit.id}`}>
-                    <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50"
-                      onClick={() => setExpandedId(isExpanded ? null : unit.id)}>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-tiffany/10 text-tiffany shrink-0">{GRADE_LABELS_COACH[unit.grade] || `${unit.grade}年`}</span>
-                      <span className="text-xs font-mono text-muted-foreground shrink-0">{unit.unitCode}</span>
-                      <span className="text-sm font-medium flex-1">{unit.unitName}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${count >= 5 ? "bg-green-100 text-green-700" : count > 0 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
-                        {count >= 5 ? <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />完整</span> : `${count}/5`}
-                      </span>
-                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} />
-                    </div>
-                    {isExpanded && (
-                      <div className="border-t border-gray-100 px-4 py-3 space-y-2">
-                        {MATERIAL_SLOTS.map(slot => {
-                          const f = fileMap[slot.key];
-                          return (
-                            <div key={slot.key} className="flex items-center gap-3 py-1.5" data-testid={`material-slot-${unit.id}-${slot.key}`}>
-                              <span className="text-xs text-muted-foreground w-24 shrink-0">{slot.label}</span>
-                              {f ? (
-                                <button onClick={() => openPdf(`${unit.unitCode} ${unit.unitName}・${slot.label}`, `/api/textbooks/${unit.id}/files/${slot.key}/view`)}
-                                  className="flex-1 text-left text-xs text-tiffany hover:underline truncate flex items-center gap-1"
-                                  data-testid={`button-open-pdf-${unit.id}-${slot.key}`}>
-                                  <FileText className="w-3.5 h-3.5 shrink-0" />
-                                  {f.originalName}
-                                </button>
-                              ) : (
-                                <span className="flex-1 text-xs text-muted-foreground italic">尚未上傳</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           )}
         </div>
       )}
