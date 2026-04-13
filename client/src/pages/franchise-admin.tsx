@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, getActiveFranchiseId } from "@/lib/queryClient";
@@ -140,35 +140,8 @@ function SliderConfirmDialog({
   onConfirm: () => void;
   isPending: boolean;
 }) {
-  const [sliderValue, setSliderValue] = useState(0);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const targetValue = Math.max(state.bookingCount, 1);
-  const isUnlocked = sliderValue >= targetValue;
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    isDragging.current = true;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging.current || !trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const pct = x / rect.width;
-    const val = Math.round(pct * targetValue);
-    setSliderValue(val);
-  }, [targetValue]);
-
-  const handlePointerUp = useCallback(() => {
-    isDragging.current = false;
-    if (sliderValue < targetValue) {
-      setSliderValue(0);
-    }
-  }, [sliderValue, targetValue]);
-
   return (
-    <Dialog open={state.open} onOpenChange={(open) => { if (!open) { setSliderValue(0); onClose(); } }}>
+    <Dialog open={state.open} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-600">
@@ -196,49 +169,18 @@ function SliderConfirmDialog({
               </div>
             ))}
           </div>
-
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground text-center">
-              拖曳滑桿至 <span className="font-bold text-red-600">{targetValue}</span> 以確認刪除
-            </p>
-            <div className="relative select-none" data-testid="slider-confirm-track">
-              <div
-                ref={trackRef}
-                className="h-12 bg-gray-100 rounded-full relative overflow-hidden cursor-pointer border-2 border-gray-200"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-              >
-                <div
-                  className={`absolute inset-y-0 left-0 rounded-full transition-colors ${isUnlocked ? "bg-red-500" : "bg-red-300"}`}
-                  style={{ width: `${(sliderValue / targetValue) * 100}%` }}
-                />
-                <div
-                  className={`absolute top-1 h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md transition-colors ${isUnlocked ? "bg-red-600" : "bg-red-400"}`}
-                  style={{ left: `calc(${(sliderValue / targetValue) * 100}% - ${sliderValue === 0 ? 0 : 20}px)` }}
-                >
-                  {sliderValue}
-                </div>
-                {!isUnlocked && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-xs text-gray-400 ml-12">→ 拖曳至 {targetValue} 確認刪除</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => { setSliderValue(0); onClose(); }} data-testid="button-cancel-force-delete">
+          <Button variant="outline" onClick={onClose} data-testid="button-cancel-force-delete">
             取消
           </Button>
           <Button
             variant="destructive"
-            disabled={!isUnlocked || isPending}
+            disabled={isPending}
             onClick={onConfirm}
             data-testid="button-confirm-force-delete"
           >
-            {isPending ? "刪除中..." : "確認刪除"}
+            {isPending ? "刪除中..." : "確認刪除並取消預約"}
           </Button>
         </DialogFooter>
       </DialogContent>

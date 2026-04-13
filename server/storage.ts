@@ -2237,19 +2237,21 @@ export class DatabaseStorage implements IStorage {
     for (const b of activeBookings) {
       await db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
 
-      try {
-        await this.refundCredits(b.parentId, b.id, `教室取消課程退回 1 堂（${slot.date} ${slot.startTime}）`);
-      } catch (refundErr) {
-        console.error("Refund failed for booking", b.id, refundErr);
-      }
+      if (b.parentId) {
+        try {
+          await this.refundCredits(b.parentId, b.id, `教室取消課程退回 1 堂（${slot.date} ${slot.startTime}）`);
+        } catch (refundErr) {
+          console.error("Refund failed for booking", b.id, refundErr);
+        }
 
-      await db.insert(notifications).values({
-        userId: b.parentId,
-        type: "slot_cancelled",
-        title: "課程已取消",
-        message: `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂。`,
-        isRead: false,
-      });
+        await db.insert(notifications).values({
+          userId: b.parentId,
+          type: "slot_cancelled",
+          title: "課程已取消",
+          message: `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂。`,
+          isRead: false,
+        });
+      }
     }
   }
 
