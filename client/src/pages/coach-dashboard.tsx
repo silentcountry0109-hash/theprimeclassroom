@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import { PdfViewer } from "@/components/PdfViewer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -1768,7 +1767,7 @@ function ManualTab() {
           content: (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                切換到 <strong className="text-foreground">「教材庫」</strong> 分頁，預設會顯示「📁 教材庫」子分頁，內嵌質數教室的數學練習網站。
+                切換到 <strong className="text-foreground">「教材庫」</strong> 分頁，即可直接瀏覽質數教室的數學練習網站（mathmaster.theprimeclassroom.com）。
               </p>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex gap-2"><span className="text-teal-500 font-bold">•</span>網站包含各年級的數學題目與練習資源</li>
@@ -1789,17 +1788,10 @@ function ManualTab() {
           content: (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                在「教材庫」分頁切換到 <strong className="text-foreground">「📋 期中考歸檔」</strong> 子分頁，可以查閱歷次期中考試卷（PDF 格式）。
+                期中考試卷資源已整合至教材庫網站（<strong className="text-foreground">mathmaster.theprimeclassroom.com</strong>），請直接在教材庫分頁的網站內查閱。
               </p>
-              <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground">
-                <li>點擊上方的 <strong className="text-foreground">「📋 期中考歸檔」</strong> 按鈕切換子分頁</li>
-                <li>列表中會顯示所有已上傳的期中考試卷</li>
-                <li>點擊試卷名稱，PDF 閱讀器會在頁面內開啟</li>
-                <li>可在頁面內上下翻頁、縮放查看</li>
-                <li>點擊右上角的按鈕可收起 PDF 閱讀器</li>
-              </ol>
               <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-800">
-                期中考試卷由總部上傳，如果顯示「尚未上傳此教材」或「檔案已遺失」，請聯繫分校主任或總部處理。
+                教材庫網站的內容由總部統一維護更新。如有疑問，請聯繫分校主任或總部處理。
               </div>
             </div>
           ),
@@ -2131,140 +2123,17 @@ function ManualTab() {
 }
 
 // ─── Materials Tab ────────────────────────────────────────────────────────────
-interface CuMidterm {
-  id: number; title: string; semester: string | null; grade: number | null; originalName: string; createdAt: string;
-}
-
 function MaterialsTab() {
-  const [section, setSection] = useState<"units" | "midterm">("units");
-  const [viewingPdf, setViewingPdf] = useState<{ title: string } | null>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [loadingPdf, setLoadingPdf] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-
-  const { data: midterms = [] } = useQuery<CuMidterm[]>({
-    queryKey: ["/api/curriculum/midterm-exams"],
-  });
-
-  useEffect(() => {
-    return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-    };
-  }, [blobUrl]);
-
-  function closePdf() {
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    setBlobUrl(null);
-    setViewingPdf(null);
-    setPdfError(null);
-    setLoadingPdf(false);
-  }
-
-  async function openPdf(title: string, url: string) {
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    setBlobUrl(null);
-    setPdfError(null);
-    setViewingPdf({ title });
-    setLoadingPdf(true);
-    try {
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const msg = res.status === 404
-          ? (errData.message === "檔案已遺失" ? "檔案已遺失（請聯絡總部重新上傳）" : "尚未上傳此教材")
-          : "載入失敗，請稍後再試";
-        setPdfError(msg);
-        setLoadingPdf(false);
-        return;
-      }
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      setBlobUrl(objUrl);
-    } catch {
-      setPdfError("載入失敗，請稍後再試");
-    } finally {
-      setLoadingPdf(false);
-    }
-  }
-
   return (
-    <div className="space-y-4" data-testid="materials-tab">
-      {/* Sub-tab header */}
-      <div className="flex gap-1 bg-white border border-gray-100 rounded-lg p-1 w-fit">
-        {(["units", "midterm"] as const).map(s => (
-          <button key={s} onClick={() => { setSection(s); closePdf(); }}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${section === s ? "bg-tiffany/10 text-tiffany" : "text-muted-foreground hover:bg-gray-50"}`}
-            data-testid={`materials-section-${s}`}
-          >
-            {s === "units" ? "📁 教材庫" : "📋 期中考歸檔"}
-          </button>
-        ))}
-      </div>
-
-      {/* ── 教材庫（外部練習網站）── */}
-      {section === "units" && (
-        <iframe
-          src="https://silentcountry0109-hash.github.io/math-master/"
-          className="w-full rounded-lg border-0"
-          style={{ height: "82vh" }}
-          title="教材庫"
-          data-testid="iframe-materials-external"
-          allow="fullscreen"
-        />
-      )}
-
-      {/* ── 期中考歸檔 PDF 檢視器 ── */}
-      {section === "midterm" && viewingPdf && (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50">
-            <span className="text-sm font-medium truncate">{viewingPdf.title}</span>
-            <button onClick={closePdf} className="text-muted-foreground hover:text-foreground p-1" data-testid="button-close-pdf">
-              <ChevronDown className="w-4 h-4" />
-            </button>
-          </div>
-          {loadingPdf && (
-            <div className="w-full flex items-center justify-center bg-gray-50" style={{ height: "70vh" }}>
-              <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                <div className="w-8 h-8 border-2 border-tiffany border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm">載入中...</span>
-              </div>
-            </div>
-          )}
-          {pdfError && !loadingPdf && (
-            <div className="w-full flex items-center justify-center bg-gray-50" style={{ height: "70vh" }}>
-              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <FileText className="w-10 h-10 text-gray-300" />
-                <span className="text-sm">{pdfError}</span>
-              </div>
-            </div>
-          )}
-          {blobUrl && !loadingPdf && !pdfError && (
-            <PdfViewer url={blobUrl} />
-          )}
-        </div>
-      )}
-
-      {/* ── 期中考歸檔 ── */}
-      {section === "midterm" && !viewingPdf && (
-        <div className="space-y-2">
-          {midterms.length === 0 ? (
-            <div className="text-sm text-muted-foreground text-center py-12">尚無期中考歸檔</div>
-          ) : midterms.map((exam: CuMidterm) => (
-            <button key={exam.id} onClick={() => openPdf(exam.title, `/api/curriculum/midterm-exams/${exam.id}/view`)}
-              className="w-full bg-white border border-gray-200 rounded-lg flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
-              data-testid={`midterm-item-${exam.id}`}>
-              <FileText className="w-5 h-5 text-tiffany shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{exam.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {exam.semester && `${exam.semester}・`}{exam.grade && `${exam.grade}年級・`}{exam.originalName}
-                </p>
-              </div>
-              <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90 shrink-0" />
-            </button>
-          ))}
-        </div>
-      )}
+    <div data-testid="materials-tab">
+      <iframe
+        src="https://mathmaster.theprimeclassroom.com/"
+        className="w-full rounded-lg border-0"
+        style={{ height: "82vh" }}
+        title="教材庫"
+        data-testid="iframe-materials-external"
+        allow="fullscreen"
+      />
     </div>
   );
 }
