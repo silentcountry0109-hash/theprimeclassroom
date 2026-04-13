@@ -865,6 +865,8 @@ function FranchiseInfoTab() {
 
   type DayHours = { isOpen: boolean; openTime: string; closeTime: string };
   type BusinessHours = Record<string, DayHours>;
+  type SpecialDayEntry = { date: string; isOpen: boolean; openTime?: string; closeTime?: string; note?: string };
+
   const defaultBusinessHours: BusinessHours = {
     "0": { isOpen: false, openTime: "09:00", closeTime: "21:00" },
     "1": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
@@ -875,6 +877,12 @@ function FranchiseInfoTab() {
     "6": { isOpen: true, openTime: "09:00", closeTime: "21:00" },
   };
   const [businessHours, setBusinessHours] = useState<BusinessHours>(defaultBusinessHours);
+  const [specialHours, setSpecialHours] = useState<SpecialDayEntry[]>([]);
+  const [newSpecialDate, setNewSpecialDate] = useState("");
+  const [newSpecialIsOpen, setNewSpecialIsOpen] = useState(false);
+  const [newSpecialOpenTime, setNewSpecialOpenTime] = useState("09:00");
+  const [newSpecialCloseTime, setNewSpecialCloseTime] = useState("21:00");
+  const [newSpecialNote, setNewSpecialNote] = useState("");
   const dayOrder = ["1", "2", "3", "4", "5", "6", "0"];
 
   const startEdit = () => {
@@ -883,15 +891,41 @@ function FranchiseInfoTab() {
       setPhone(franchise.phone || "");
       setTags(franchise.tags || []);
       setNearbySchools(franchise.nearbySchools || []);
-      setBusinessHours((franchise.businessHours as BusinessHours) || defaultBusinessHours);
+      const bh = (franchise.businessHours as any) || {};
+      const { special, ...weeklyHours } = bh;
+      setBusinessHours({ ...defaultBusinessHours, ...weeklyHours });
+      setSpecialHours(Array.isArray(special) ? special : []);
     }
+    setNewSpecialDate("");
+    setNewSpecialIsOpen(false);
+    setNewSpecialOpenTime("09:00");
+    setNewSpecialCloseTime("21:00");
+    setNewSpecialNote("");
     setEditing(true);
+  };
+
+  const addSpecialDay = () => {
+    if (!newSpecialDate) return;
+    if (specialHours.some((s) => s.date === newSpecialDate)) {
+      toast({ title: "此日期已設定過，請先刪除再重新加入", variant: "destructive" });
+      return;
+    }
+    const entry: SpecialDayEntry = { date: newSpecialDate, isOpen: newSpecialIsOpen };
+    if (newSpecialIsOpen) { entry.openTime = newSpecialOpenTime; entry.closeTime = newSpecialCloseTime; }
+    if (newSpecialNote.trim()) entry.note = newSpecialNote.trim();
+    setSpecialHours([...specialHours, entry].sort((a, b) => a.date.localeCompare(b.date)));
+    setNewSpecialDate("");
+    setNewSpecialIsOpen(false);
+    setNewSpecialOpenTime("09:00");
+    setNewSpecialCloseTime("21:00");
+    setNewSpecialNote("");
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const payload = { ...businessHours, special: specialHours };
       const res = await apiRequest("PATCH", "/api/franchise-admin/my-franchise", {
-        description, phone, tags, nearbySchools, businessHours,
+        description, phone, tags, nearbySchools, businessHours: payload,
       });
       return res.json();
     },
@@ -980,6 +1014,28 @@ function FranchiseInfoTab() {
                 );
               })}
             </div>
+            {(() => {
+              const special = (franchise.businessHours as any)?.special;
+              if (!Array.isArray(special) || special.length === 0) return null;
+              return (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" />特殊節日</p>
+                  <div className="space-y-1">
+                    {special.map((s: any, i: number) => (
+                      <div key={i} className="flex items-center gap-3 text-sm" data-testid={`display-special-hours-${s.date}`}>
+                        <span className="font-medium text-foreground w-24">{s.date}</span>
+                        {s.isOpen ? (
+                          <span className="text-muted-foreground">{s.openTime} - {s.closeTime}</span>
+                        ) : (
+                          <span className="text-coral text-xs">休息</span>
+                        )}
+                        {s.note && <span className="text-xs text-muted-foreground">（{s.note}）</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       ) : (
@@ -1064,6 +1120,70 @@ function FranchiseInfoTab() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+          <div className="border-t border-gray-100 pt-4">
+            <Label className="flex items-center gap-1 mb-3"><CalendarDays className="w-3.5 h-3.5" />特殊節日設定</Label>
+            {specialHours.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {specialHours.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-md px-3 py-2 text-sm" data-testid={`special-hours-entry-${s.date}`}>
+                    <span className="font-medium w-24 shrink-0">{s.date}</span>
+                    {s.isOpen ? (
+                      <span className="text-muted-foreground">{s.openTime} - {s.closeTime}</span>
+                    ) : (
+                      <span className="text-coral text-xs">休息</span>
+                    )}
+                    {s.note && <span className="text-xs text-muted-foreground flex-1">（{s.note}）</span>}
+                    <button
+                      type="button"
+                      onClick={() => setSpecialHours(specialHours.filter((_, idx) => idx !== i))}
+                      className="ml-auto text-gray-400 hover:text-red-500"
+                      data-testid={`button-remove-special-${s.date}`}
+                    >&times;</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="bg-gray-50/70 rounded-md p-3 space-y-2">
+              <p className="text-xs text-muted-foreground mb-1">新增特殊日期</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Input
+                  type="date"
+                  value={newSpecialDate}
+                  onChange={(e) => setNewSpecialDate(e.target.value)}
+                  className="w-36 h-8 text-sm"
+                  data-testid="input-special-date"
+                />
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    checked={newSpecialIsOpen}
+                    onCheckedChange={setNewSpecialIsOpen}
+                    data-testid="switch-special-isopen"
+                  />
+                  <span className="text-xs text-muted-foreground">{newSpecialIsOpen ? "自訂時間" : "休息"}</span>
+                </div>
+                {newSpecialIsOpen && (
+                  <>
+                    <Input type="time" value={newSpecialOpenTime} onChange={(e) => setNewSpecialOpenTime(e.target.value)} className="w-28 h-8 text-sm" data-testid="input-special-open-time" />
+                    <span className="text-muted-foreground text-sm">~</span>
+                    <Input type="time" value={newSpecialCloseTime} onChange={(e) => setNewSpecialCloseTime(e.target.value)} className="w-28 h-8 text-sm" data-testid="input-special-close-time" />
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newSpecialNote}
+                  onChange={(e) => setNewSpecialNote(e.target.value)}
+                  placeholder="備註（如：元旦、春節）"
+                  className="h-8 text-sm flex-1"
+                  data-testid="input-special-note"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSpecialDay(); } }}
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addSpecialDay} disabled={!newSpecialDate} data-testid="button-add-special-day">
+                  新增
+                </Button>
+              </div>
             </div>
           </div>
           <div className="flex gap-3 pt-2">
@@ -2193,16 +2313,27 @@ function TimeSlotsTab() {
   const { data: franchise } = useQuery<Franchise>({ queryKey: ["/api/franchise-admin/my-franchise"] });
 
   type DayHoursConfig = { isOpen: boolean; openTime?: string; closeTime?: string };
+  type SpecialDayConfig = { date: string; isOpen: boolean; openTime?: string; closeTime?: string; note?: string };
   const businessHours = franchise?.businessHours as Record<string, DayHoursConfig> | undefined;
+  const specialHoursList = (franchise?.businessHours as any)?.special as SpecialDayConfig[] | undefined;
 
   const isDayClosed = (dateStr: string) => {
-    if (!businessHours || !dateStr) return false;
+    if (!dateStr) return false;
+    const special = specialHoursList?.find((s) => s.date === dateStr);
+    if (special) return !special.isOpen;
+    if (!businessHours) return false;
     const dow = new Date(dateStr + "T00:00:00").getDay().toString();
     return businessHours[dow] && !businessHours[dow].isOpen;
   };
 
   const getDayBusinessHours = (dateStr: string) => {
-    if (!businessHours || !dateStr) return null;
+    if (!dateStr) return null;
+    const special = specialHoursList?.find((s) => s.date === dateStr);
+    if (special) {
+      if (!special.isOpen) return null;
+      return { openTime: special.openTime || "00:00", closeTime: special.closeTime || "23:59", isSpecial: true, note: special.note };
+    }
+    if (!businessHours) return null;
     const dow = new Date(dateStr + "T00:00:00").getDay().toString();
     const dh = businessHours[dow];
     if (!dh || !dh.isOpen) return null;
@@ -2800,16 +2931,22 @@ function TimeSlotsTab() {
                 <div>
                   <Label>上課日期 *</Label>
                   <Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} data-testid="input-franchise-slot-date" />
-                  {slotForm.date && isDayClosed(slotForm.date) && (
-                    <p className="text-xs text-coral mt-1" data-testid="text-day-closed-warning">
-                      {DAY_LABELS[new Date(slotForm.date + "T00:00:00").getDay().toString()]}未營業，無法排課
-                    </p>
-                  )}
-                  {slotForm.date && !isDayClosed(slotForm.date) && getDayBusinessHours(slotForm.date) && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      營業時間：{getDayBusinessHours(slotForm.date)!.openTime} - {getDayBusinessHours(slotForm.date)!.closeTime}
-                    </p>
-                  )}
+                  {slotForm.date && isDayClosed(slotForm.date) && (() => {
+                    const sp = specialHoursList?.find((s) => s.date === slotForm.date);
+                    return (
+                      <p className="text-xs text-coral mt-1" data-testid="text-day-closed-warning">
+                        {sp ? `特殊節日休息${sp.note ? `（${sp.note}）` : ""}，無法排課` : `${DAY_LABELS[new Date(slotForm.date + "T00:00:00").getDay().toString()]}未營業，無法排課`}
+                      </p>
+                    );
+                  })()}
+                  {slotForm.date && !isDayClosed(slotForm.date) && getDayBusinessHours(slotForm.date) && (() => {
+                    const dh = getDayBusinessHours(slotForm.date)!;
+                    return (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {(dh as any).isSpecial ? `特殊節日${(dh as any).note ? `（${(dh as any).note}）` : ""}：` : "營業時間："}{dh.openTime} - {dh.closeTime}
+                      </p>
+                    );
+                  })()}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
