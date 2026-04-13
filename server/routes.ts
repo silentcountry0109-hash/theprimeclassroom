@@ -1279,15 +1279,22 @@ export async function registerRoutes(
     try {
       const franchise = await storage.getFranchise(req.franchiseId);
       if (!franchise) return res.status(404).json({ message: "找不到分校資料" });
-      const { name, city, district, address, nearbySchools, tags, maxSeats } = franchise;
+      const body = req.body as {
+        name?: string;
+        city?: string;
+        district?: string;
+        address?: string;
+        nearbySchools?: string[];
+        tags?: string[];
+      };
       const description = await generateFranchiseDescription({
-        name: name || "",
-        city: city || undefined,
-        district: district || undefined,
-        address: address || undefined,
-        nearbySchools: (nearbySchools as string[]) || [],
-        tags: (tags as string[]) || [],
-        maxSeats: maxSeats || undefined,
+        name: body.name || franchise.name || "",
+        city: body.city ?? franchise.city ?? undefined,
+        district: body.district ?? franchise.district ?? undefined,
+        address: body.address ?? franchise.address ?? undefined,
+        nearbySchools: Array.isArray(body.nearbySchools) ? body.nearbySchools : (franchise.nearbySchools as string[]) || [],
+        tags: Array.isArray(body.tags) ? body.tags : (franchise.tags as string[]) || [],
+        maxSeats: franchise.maxSeats || undefined,
       });
       if (!description) {
         return res.status(503).json({ message: "AI 服務暫時無法使用，請稍後再試" });

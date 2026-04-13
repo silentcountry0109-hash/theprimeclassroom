@@ -941,7 +941,15 @@ function FranchiseInfoTab() {
 
   const generateDescMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/franchise-admin/generate-description", {});
+      const payload = {
+        name: franchise?.name ?? "",
+        city: franchise?.city ?? undefined,
+        district: franchise?.district ?? undefined,
+        address: franchise?.address ?? undefined,
+        nearbySchools,
+        tags,
+      };
+      const res = await apiRequest("POST", "/api/franchise-admin/generate-description", payload);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { message?: string }).message || "生成失敗");
