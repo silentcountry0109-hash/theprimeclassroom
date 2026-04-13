@@ -6,3 +6,9 @@ id = "0fac_NhxDsnWTwJqmw1kQ"
 uri = "file://.local/質數教室_平台策略完整文件.md"
 type = "text"
 title = "質數教室｜平台策略完整文件"
+
+[[outputs]]
+id = "kgkUmae0fppyuhxMmwJjl"
+uri = "file://docs/加盟主教育訓練手冊.pdf"
+type = "pdf"
+title = "加盟主教育訓練手冊 v1.0 (PDF)"
