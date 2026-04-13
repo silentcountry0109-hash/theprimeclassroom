@@ -950,10 +950,6 @@ function FranchiseInfoTab() {
         tags,
       };
       const res = await apiRequest("POST", "/api/franchise-admin/generate-description", payload);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { message?: string }).message || "生成失敗");
-      }
       return res.json() as Promise<{ description: string }>;
     },
     onSuccess: (data) => {
