@@ -3028,7 +3028,7 @@ function TimeSlotsTab() {
                       { day: 1, label: "一" }, { day: 2, label: "二" }, { day: 3, label: "三" },
                       { day: 4, label: "四" }, { day: 5, label: "五" }, { day: 6, label: "六" }, { day: 0, label: "日" },
                     ].map(({ day, label }) => {
-                      const closed = businessHours?.[day.toString()] && !businessHours[day.toString()].isOpen;
+                      const closed = slotBusinessHours?.[day.toString()] && !slotBusinessHours[day.toString()].isOpen;
                       return (
                         <button
                           key={day}
