@@ -2461,12 +2461,32 @@ function TimeSlotsTab() {
     }
   };
 
-  const [manualBookSlot, setManualBookSlot] = useState<TimeSlot | null>(null);
-  const [studentSearch, setStudentSearch] = useState("");
+  const [mbOpen, setMbOpen] = useState(false);
+  const [mbStep, setMbStep] = useState<1 | 2 | 3>(1);
+  const [mbSlot, setMbSlot] = useState<TimeSlot | null>(null);
+  const [mbSearch, setMbSearch] = useState("");
+  const [mbMode, setMbMode] = useState<"search" | "walkin">("search");
+  const [mbSelected, setMbSelected] = useState<any | null>(null);
+  const [mbWalkInName, setMbWalkInName] = useState("");
+  const [mbWalkInGrade, setMbWalkInGrade] = useState("1");
+  const [mbOverride, setMbOverride] = useState(false);
 
-  const { data: availableStudents = [] } = useQuery<{ id: number; name: string; grade: number; school: string | null; parentId: string }[]>({
+  const closeMb = () => {
+    setMbOpen(false); setMbStep(1); setMbSlot(null); setMbSearch("");
+    setMbMode("search"); setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbOverride(false);
+  };
+  const openMbFromSlot = (slot: TimeSlot) => {
+    setMbSlot(slot); setMbStep(2); setMbSearch(""); setMbMode("search");
+    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbOverride(false); setMbOpen(true);
+  };
+  const openMbGlobal = () => {
+    setMbSlot(null); setMbStep(1); setMbSearch(""); setMbMode("search");
+    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbOverride(false); setMbOpen(true);
+  };
+
+  const { data: availableStudents = [] } = useQuery<{ id: number; name: string; grade: number; school: string | null; parentId: string | null }[]>({
     queryKey: ["/api/franchise-admin/available-students"],
-    enabled: !!manualBookSlot,
+    enabled: mbOpen && mbStep === 2,
   });
 
   const { data: slotBookings = [] } = useQuery<{ id: number; slotId: number; childId: number; childName: string; status: string }[]>({
@@ -2474,17 +2494,18 @@ function TimeSlotsTab() {
   });
 
   const manualBookMutation = useMutation({
-    mutationFn: async ({ slotId, childId }: { slotId: number; childId: number }) => {
-      const res = await apiRequest("POST", "/api/franchise-admin/manual-booking", { slotId, childId });
+    mutationFn: async (params: { slotId: number; childId?: number; walkInName?: string; walkInGrade?: number; overrideCapacity?: boolean }) => {
+      const res = await apiRequest("POST", "/api/franchise-admin/manual-booking", params);
       return res.json();
     },
     onSuccess: (data: any) => {
       toast({ title: "加排成功", description: `已成功加排 ${data.childName || "學生"}` });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/available-students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
-      setManualBookSlot(null);
-      setStudentSearch("");
+      closeMb();
     },
     onError: (error: Error) => {
       toast({ title: "加排失敗", description: error.message, variant: "destructive" });
@@ -2629,6 +2650,9 @@ function TimeSlotsTab() {
               <Button variant="outline" size="sm" onClick={() => setBatchDeleteMode(true)} data-testid="button-enter-batch-delete">
                 <Trash2 className="w-4 h-4 mr-1" />批量刪除
               </Button>
+              <Button variant="outline" size="sm" onClick={openMbGlobal} className="rounded-full border-tiffany/40 text-tiffany hover:bg-tiffany/5" data-testid="button-walk-in-booking">
+                <UserPlus className="w-4 h-4 mr-1.5" />臨時加課
+              </Button>
               <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-franchise-slot">
                 <Plus className="w-4 h-4 mr-1.5" />新增時段
               </Button>
@@ -2678,8 +2702,8 @@ function TimeSlotsTab() {
                 </div>
                 {!batchDeleteMode && (
                   <div className="flex items-center gap-1">
-                    {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
-                      <Button variant="outline" size="icon" onClick={() => { setManualBookSlot(slot); setStudentSearch(""); }} data-testid={`button-manual-book-${slot.id}`} title="加排學生">
+                    {!isSlotExpired(slot) && (
+                      <Button variant="outline" size="icon" onClick={() => openMbFromSlot(slot)} data-testid={`button-manual-book-${slot.id}`} title="臨時加課">
                         <UserPlus className="w-4 h-4 text-tiffany" />
                       </Button>
                     )}
@@ -2787,8 +2811,8 @@ function TimeSlotsTab() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
-                            <Button variant="outline" size="icon" onClick={() => { setManualBookSlot(slot); setStudentSearch(""); }} data-testid={`button-manual-book-cal-${slot.id}`} title="加排學生">
+                          {!isSlotExpired(slot) && (
+                            <Button variant="outline" size="icon" onClick={() => openMbFromSlot(slot)} data-testid={`button-manual-book-cal-${slot.id}`} title="臨時加課">
                               <UserPlus className="w-4 h-4 text-tiffany" />
                             </Button>
                           )}
@@ -3042,84 +3066,250 @@ function TimeSlotsTab() {
         isPending={forceDeleting}
       />
 
-      <Dialog open={!!manualBookSlot} onOpenChange={(open) => { if (!open) { setManualBookSlot(null); setStudentSearch(""); } }}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+      {/* ─── 臨時加課 3-step Dialog ─────────────────────────────────────── */}
+      <Dialog open={mbOpen} onOpenChange={(open) => { if (!open) closeMb(); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>手動加排學生</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-tiffany" />
+              臨時加課
+              <span className="ml-auto text-xs font-normal text-muted-foreground">步驟 {mbStep} / 3</span>
+            </DialogTitle>
           </DialogHeader>
-          {manualBookSlot && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-md p-3 space-y-1">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium">{manualBookSlot.date} ({getDayLabel(manualBookSlot.date)})</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-tiffany font-medium">{manualBookSlot.startTime} - {manualBookSlot.endTime}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <span>已預約 {manualBookSlot.bookedSeats}/{manualBookSlot.maxSeats}（剩 {manualBookSlot.maxSeats - manualBookSlot.bookedSeats} 位）</span>
-                </div>
-              </div>
 
-              <div>
-                <Label>搜尋學生</Label>
-                <Input
-                  placeholder="輸入學生姓名搜尋..."
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  data-testid="input-student-search"
-                />
-              </div>
-
-              <div className="border rounded-md max-h-[300px] overflow-y-auto">
-                {availableStudents.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">尚無學生資料</p>
+          {/* Step 1 — Select a slot */}
+          {mbStep === 1 && (() => {
+            const today = new Date();
+            const limit = new Date(); limit.setDate(today.getDate() + 14);
+            const upcoming = [...slots]
+              .filter(s => s.isActive && !isSlotExpired(s) && new Date(s.date + "T00:00:00") <= limit)
+              .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+            return (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">選擇要加排學生的課堂（未來 14 天）</p>
+                {upcoming.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">目前無可用時段，請先在時段管理建立時段</div>
                 ) : (
-                  (() => {
-                    const bookedChildIds = getSlotBookedChildIds(manualBookSlot.id);
-                    const filtered = availableStudents.filter((s) =>
-                      !studentSearch || s.name.includes(studentSearch)
-                    );
-                    if (filtered.length === 0) {
-                      return <p className="text-sm text-muted-foreground text-center py-6">找不到符合的學生</p>;
-                    }
-                    return filtered.map((student) => {
-                      const isBooked = bookedChildIds.includes(student.id);
+                  <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                    {upcoming.map(slot => {
+                      const cn = coaches.find(c => c.id === slot.coachId)?.name || "未指派";
+                      const isFull = slot.bookedSeats >= slot.maxSeats;
                       return (
-                        <div
-                          key={student.id}
-                          className={`flex items-center justify-between p-3 border-b last:border-b-0 ${isBooked ? "bg-gray-50 opacity-60" : "hover:bg-gray-50"}`}
-                          data-testid={`student-option-${student.id}`}
+                        <button
+                          key={slot.id}
+                          className="w-full text-left p-3 rounded-md border border-gray-100 bg-white hover:border-tiffany/40 hover:bg-tiffany/5 transition-colors"
+                          onClick={() => { setMbSlot(slot); setMbStep(2); }}
+                          data-testid={`mb-slot-option-${slot.id}`}
                         >
-                          <div>
-                            <span className="text-sm font-medium">{student.name}</span>
-                            <span className="text-xs text-muted-foreground ml-2">
-                              {student.grade}年級{student.school ? ` · ${student.school}` : ""}
-                            </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <span className="text-sm font-medium">{slot.date}</span>
+                              <span className="text-xs text-muted-foreground ml-1">({getDayLabel(slot.date)})</span>
+                              <span className="text-sm text-tiffany font-medium ml-2">{slot.startTime}–{slot.endTime}</span>
+                            </div>
+                            {isFull ? (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full shrink-0">已額滿</span>
+                            ) : (
+                              <span className="text-xs text-tiffany shrink-0">剩 {slot.maxSeats - slot.bookedSeats} 位</span>
+                            )}
                           </div>
-                          {isBooked ? (
-                            <span className="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full" data-testid={`badge-already-booked-${student.id}`}>已預約</span>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-tiffany border-tiffany/30 hover:bg-tiffany/5"
-                              onClick={() => manualBookMutation.mutate({ slotId: manualBookSlot.id, childId: student.id })}
-                              disabled={manualBookMutation.isPending}
-                              data-testid={`button-book-student-${student.id}`}
-                            >
-                              <UserPlus className="w-3.5 h-3.5 mr-1" />
-                              {manualBookMutation.isPending ? "加排中..." : "加排"}
-                            </Button>
-                          )}
+                          <div className="text-xs text-muted-foreground mt-0.5">{cn}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Step 2 — Select student or walk-in */}
+          {mbStep === 2 && mbSlot && (
+            <div className="space-y-4">
+              {/* Slot summary */}
+              <div className="bg-tiffany/5 border border-tiffany/20 rounded-md p-3 space-y-1 text-sm">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5 text-tiffany" />
+                  <span className="font-medium">{mbSlot.date} ({getDayLabel(mbSlot.date)}) {mbSlot.startTime}–{mbSlot.endTime}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>已預約 {mbSlot.bookedSeats}/{mbSlot.maxSeats}</span>
+                  {mbSlot.bookedSeats >= mbSlot.maxSeats && (
+                    <span className="text-amber-600 font-medium">（已額滿）</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Mode toggle */}
+              <div className="flex rounded-md overflow-hidden border border-gray-200">
+                <button
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${mbMode === "search" ? "bg-tiffany text-white" : "bg-white text-muted-foreground hover:bg-gray-50"}`}
+                  onClick={() => setMbMode("search")}
+                  data-testid="mb-mode-search"
+                >搜尋本分校學生</button>
+                <button
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${mbMode === "walkin" ? "bg-tiffany text-white" : "bg-white text-muted-foreground hover:bg-gray-50"}`}
+                  onClick={() => setMbMode("walkin")}
+                  data-testid="mb-mode-walkin"
+                >臨時加入</button>
+              </div>
+
+              {mbMode === "search" ? (
+                <>
+                  <Input
+                    placeholder="輸入學生姓名搜尋..."
+                    value={mbSearch}
+                    onChange={(e) => setMbSearch(e.target.value)}
+                    data-testid="input-mb-search"
+                    autoFocus
+                  />
+                  <div className="border rounded-md max-h-[250px] overflow-y-auto">
+                    {(() => {
+                      const bookedIds = getSlotBookedChildIds(mbSlot.id);
+                      const filtered = availableStudents.filter(s => !mbSearch || s.name.includes(mbSearch));
+                      if (availableStudents.length === 0) return <p className="text-sm text-muted-foreground text-center py-6">尚無學生資料</p>;
+                      if (filtered.length === 0) return (
+                        <div className="text-center py-6 space-y-2">
+                          <p className="text-sm text-muted-foreground">找不到「{mbSearch}」</p>
+                          <button className="text-xs text-tiffany underline" onClick={() => setMbMode("walkin")} data-testid="mb-switch-to-walkin">改用臨時加入</button>
                         </div>
                       );
-                    });
-                  })()
-                )}
+                      return filtered.map(student => {
+                        const isBooked = bookedIds.includes(student.id);
+                        return (
+                          <div
+                            key={student.id}
+                            className={`flex items-center justify-between p-3 border-b last:border-b-0 ${isBooked ? "opacity-50" : "hover:bg-gray-50 cursor-pointer"}`}
+                            onClick={() => { if (!isBooked) { setMbSelected({ ...student, type: "existing" }); setMbStep(3); } }}
+                            data-testid={`mb-student-option-${student.id}`}
+                          >
+                            <div>
+                              <span className="text-sm font-medium">{student.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{student.grade}年級{student.school ? ` · ${student.school}` : ""}</span>
+                              {!student.parentId && <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">臨時</span>}
+                            </div>
+                            {isBooked
+                              ? <span className="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">已預約</span>
+                              : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            }
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">填寫臨時學生資料，系統將自動建立記錄</p>
+                  <div>
+                    <Label className="text-xs">姓名 <span className="text-red-500">*</span></Label>
+                    <Input
+                      placeholder="學生姓名"
+                      value={mbWalkInName}
+                      onChange={(e) => setMbWalkInName(e.target.value)}
+                      data-testid="input-mb-walkin-name"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">年級 <span className="text-red-500">*</span></Label>
+                    <Select value={mbWalkInGrade} onValueChange={setMbWalkInGrade}>
+                      <SelectTrigger data-testid="select-mb-walkin-grade">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1,2,3,4,5,6].map(g => <SelectItem key={g} value={g.toString()}>{g}年級</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={!mbWalkInName.trim()}
+                    onClick={() => { setMbSelected({ name: mbWalkInName.trim(), grade: parseInt(mbWalkInGrade), type: "walkin" }); setMbStep(3); }}
+                    data-testid="button-mb-walkin-next"
+                  >
+                    <ChevronRight className="w-4 h-4 mr-1" />繼續
+                  </Button>
+                </div>
+              )}
+
+              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => setMbStep(1)} data-testid="button-mb-back-1">
+                <ChevronLeft className="w-4 h-4 mr-1" />返回選擇課堂
+              </Button>
+            </div>
+          )}
+
+          {/* Step 3 — Confirm */}
+          {mbStep === 3 && mbSlot && mbSelected && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">請確認以下加排資訊</p>
+
+              <div className="bg-gray-50 rounded-md p-4 space-y-3">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">課堂</p>
+                  <div className="text-sm font-medium">{mbSlot.date} ({getDayLabel(mbSlot.date)})</div>
+                  <div className="text-sm text-tiffany">{mbSlot.startTime}–{mbSlot.endTime}</div>
+                  <div className="text-xs text-muted-foreground">
+                    已預約 {mbSlot.bookedSeats}/{mbSlot.maxSeats}
+                    {mbSlot.bookedSeats >= mbSlot.maxSeats && <span className="text-amber-600 font-medium ml-1">（已額滿）</span>}
+                  </div>
+                </div>
+                <hr />
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">學生</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{mbSelected.name}</span>
+                    <span className="text-xs text-muted-foreground">{mbSelected.grade}年級</span>
+                    {mbSelected.type === "walkin" && (
+                      <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">臨時學生</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {mbSlot.bookedSeats >= mbSlot.maxSeats && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-700 text-sm font-medium">
+                    <AlertTriangle className="w-4 h-4" />此時段已額滿
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={mbOverride}
+                      onChange={(e) => setMbOverride(e.target.checked)}
+                      className="w-4 h-4 accent-amber-600"
+                      data-testid="checkbox-mb-override"
+                    />
+                    <span>主任特批，允許超額加入</span>
+                  </label>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setMbStep(2)} data-testid="button-mb-back-2">
+                  <ChevronLeft className="w-4 h-4 mr-1" />返回
+                </Button>
+                <Button
+                  className="flex-1 bg-tiffany hover:bg-tiffany/90 text-white"
+                  disabled={manualBookMutation.isPending || (mbSlot.bookedSeats >= mbSlot.maxSeats && !mbOverride)}
+                  onClick={() => {
+                    const params: any = {
+                      slotId: mbSlot.id,
+                      overrideCapacity: mbOverride,
+                    };
+                    if (mbSelected.type === "existing") {
+                      params.childId = mbSelected.id;
+                    } else {
+                      params.walkInName = mbSelected.name;
+                      params.walkInGrade = mbSelected.grade;
+                    }
+                    manualBookMutation.mutate(params);
+                  }}
+                  data-testid="button-mb-confirm"
+                >
+                  {manualBookMutation.isPending ? "加排中..." : "確認加排"}
+                </Button>
               </div>
             </div>
           )}
@@ -3404,6 +3594,7 @@ function StudentsTab() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium" data-testid={`text-student-name-${student.id}`}>{student.name}</span>
                         <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">{student.grade}年級</span>
+                        {!student.parentId && <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full" data-testid={`badge-walkin-student-${student.id}`}>臨時</span>}
                         {student.school && <span className="text-xs text-muted-foreground">{student.school}</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">

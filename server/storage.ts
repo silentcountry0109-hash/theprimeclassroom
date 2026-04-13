@@ -207,6 +207,14 @@ export interface IStorage {
   getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]>;
   getFranchiseStudentContactBooks(franchiseId: number, childId: number): Promise<any[]>;
   createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
+  createManualBookingExtended(params: {
+    slotId: number;
+    franchiseId: number;
+    childId?: number;
+    walkInName?: string;
+    walkInGrade?: number;
+    overrideCapacity?: boolean;
+  }): Promise<any>;
 
   getAllFranchiseAnalytics(): Promise<any[]>;
 
@@ -901,6 +909,77 @@ export class DatabaseStorage implements IStorage {
       slotId,
       childId,
       parentId: child.parentId,
+      status: "confirmed",
+    }).returning();
+
+    return { ...created, childName: child.name };
+  }
+
+  async createManualBookingExtended(params: {
+    slotId: number;
+    franchiseId: number;
+    childId?: number;
+    walkInName?: string;
+    walkInGrade?: number;
+    overrideCapacity?: boolean;
+  }): Promise<any> {
+    const { slotId, franchiseId, childId, walkInName, walkInGrade, overrideCapacity } = params;
+
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, slotId));
+    if (!slot) throw new Error("時段不存在");
+    if (slot.franchiseId !== franchiseId) throw new Error("此時段不屬於您的分校");
+
+    const now = new Date();
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    if (now > slotEnd) throw new Error("此時段已結束，無法加排");
+
+    if (!overrideCapacity && slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿，請勾選「主任特批超額」");
+
+    let child: { id: number; name: string; grade: number; parentId: string | null };
+
+    if (walkInName && walkInGrade) {
+      const [created] = await db.insert(children).values({
+        parentId: null,
+        name: walkInName.trim(),
+        grade: walkInGrade,
+      }).returning();
+      child = created as any;
+      const existing = await db.select().from(franchiseStudents)
+        .where(and(eq(franchiseStudents.childId, created.id), eq(franchiseStudents.franchiseId, franchiseId)));
+      if (existing.length === 0) {
+        await db.insert(franchiseStudents).values({ franchiseId, childId: created.id });
+      }
+    } else if (childId) {
+      const [found] = await db.select().from(children).where(eq(children.id, childId));
+      if (!found) throw new Error("學生不存在");
+      const franchiseBookings = await db.select({ id: bookings.id }).from(bookings)
+        .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+        .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId))).limit(1);
+      const linked = await db.select({ id: franchiseStudents.id }).from(franchiseStudents)
+        .where(and(eq(franchiseStudents.childId, childId), eq(franchiseStudents.franchiseId, franchiseId))).limit(1);
+      if (franchiseBookings.length === 0 && linked.length === 0) throw new Error("此學生非本分校學生，無法加排");
+      child = found as any;
+    } else {
+      throw new Error("請選擇學生或填寫臨時學生資料");
+    }
+
+    const existingBooking = await db.select().from(bookings).where(
+      and(eq(bookings.slotId, slotId), eq(bookings.childId, child.id), inArray(bookings.status, ["confirmed", "checked_in"]))
+    );
+    if (existingBooking.length > 0) throw new Error("此學生已預約此時段");
+
+    const overlapping = await this.getChildOverlappingBookings(child.id, slot.date, slot.startTime, slot.endTime);
+    if (overlapping.length > 0) {
+      const c = overlapping[0];
+      throw new Error(`此學生在 ${c.date} ${c.startTime}-${c.endTime} 已有其他預約，時間衝突`);
+    }
+
+    await db.update(timeSlots).set({ bookedSeats: sql`${timeSlots.bookedSeats} + 1` }).where(eq(timeSlots.id, slotId));
+
+    const [created] = await db.insert(bookings).values({
+      slotId,
+      childId: child.id,
+      parentId: child.parentId ?? null,
       status: "confirmed",
     }).returning();
 

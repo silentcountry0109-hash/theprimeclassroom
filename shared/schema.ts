@@ -47,7 +47,7 @@ export const coaches = pgTable("coaches", {
 
 export const children = pgTable("children", {
   id: serial("id").primaryKey(),
-  parentId: varchar("parent_id").references(() => users.id).notNull(),
+  parentId: varchar("parent_id").references(() => users.id),
   name: text("name").notNull(),
   gender: text("gender").default("male"),
   grade: integer("grade").notNull(),
@@ -92,7 +92,7 @@ export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   slotId: integer("slot_id").references(() => timeSlots.id).notNull(),
   childId: integer("child_id").references(() => children.id).notNull(),
-  parentId: varchar("parent_id").references(() => users.id).notNull(),
+  parentId: varchar("parent_id").references(() => users.id),
   status: text("status").default("confirmed").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

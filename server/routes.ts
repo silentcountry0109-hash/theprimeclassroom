@@ -1768,11 +1768,17 @@ export async function registerRoutes(
 
   app.post("/api/franchise-admin/manual-booking", isFranchiseAdmin, async (req: any, res) => {
     try {
-      const { slotId, childId } = req.body;
-      if (!slotId || !childId) {
-        return res.status(400).json({ message: "缺少必要參數" });
-      }
-      const result = await storage.createManualBooking(slotId, childId, req.franchiseId);
+      const { slotId, childId, walkInName, walkInGrade, overrideCapacity } = req.body;
+      if (!slotId) return res.status(400).json({ message: "缺少時段資訊" });
+      if (!childId && !walkInName) return res.status(400).json({ message: "請選擇學生或填寫臨時學生資料" });
+      const result = await storage.createManualBookingExtended({
+        slotId,
+        franchiseId: req.franchiseId,
+        childId: childId ? parseInt(childId) : undefined,
+        walkInName,
+        walkInGrade: walkInGrade ? parseInt(walkInGrade) : undefined,
+        overrideCapacity: !!overrideCapacity,
+      });
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message || "加排失敗" });
