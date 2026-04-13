@@ -2125,7 +2125,7 @@ function ManualTab() {
 // ─── Materials Tab ────────────────────────────────────────────────────────────
 function MaterialsTab() {
   return (
-    <div data-testid="materials-tab">
+    <div className="space-y-4" data-testid="materials-tab">
       <iframe
         src="https://mathmaster.theprimeclassroom.com/"
         className="w-full rounded-lg border-0"
