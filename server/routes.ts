@@ -14,6 +14,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { generateCoachHeadshot } from "./gemini-image";
+import { generateFranchiseDescription } from "./gemini-text";
 
 interface PgUniqueViolation {
   code: "23505";
@@ -1271,6 +1272,29 @@ export async function registerRoutes(
       res.json(franchise);
     } catch (error) {
       res.status(500).json({ message: "Failed to update franchise" });
+    }
+  });
+
+  app.post("/api/franchise-admin/generate-description", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const franchise = await storage.getFranchise(req.franchiseId);
+      if (!franchise) return res.status(404).json({ message: "找不到分校資料" });
+      const { name, city, district, address, nearbySchools, tags, maxSeats } = franchise;
+      const description = await generateFranchiseDescription({
+        name: name || "",
+        city: city || undefined,
+        district: district || undefined,
+        address: address || undefined,
+        nearbySchools: (nearbySchools as string[]) || [],
+        tags: (tags as string[]) || [],
+        maxSeats: maxSeats || undefined,
+      });
+      if (!description) {
+        return res.status(503).json({ message: "AI 服務暫時無法使用，請稍後再試" });
+      }
+      res.json({ description });
+    } catch (error) {
+      res.status(500).json({ message: "生成失敗，請稍後再試" });
     }
   });
 
