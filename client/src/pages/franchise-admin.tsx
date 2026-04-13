@@ -2350,6 +2350,12 @@ function TimeSlotsTab() {
     return `${String(Math.floor(totalMin / 60) % 24).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
   };
 
+  const isTimeWithinBusinessHours = (dateStr: string, startTime: string, endTime: string): boolean => {
+    const hours = getDayBusinessHours(dateStr);
+    if (!hours) return false;
+    return startTime >= hours.openTime && endTime <= hours.closeTime;
+  };
+
   const handleBatchSubmit = async () => {
     const { startDate, endDate, weekdays, startTimes, coachId, classroomId } = batchForm;
     if (!startDate || !endDate || weekdays.length === 0 || startTimes.length === 0) return;
@@ -2367,10 +2373,20 @@ function TimeSlotsTab() {
       cur.setDate(cur.getDate() + 1);
     }
     let created = 0;
+    let skipped = 0;
     const conflicts: string[] = [];
     for (const date of dates) {
+      if (isDayClosed(date)) {
+        skipped += startTimes.filter(Boolean).length;
+        continue;
+      }
       for (const startTime of startTimes) {
+        if (!startTime) continue;
         const endTime = computeEndTime(startTime);
+        if (slotBusinessHours && !isTimeWithinBusinessHours(date, startTime, endTime)) {
+          skipped++;
+          continue;
+        }
         try {
           const res = await fetch("/api/franchise-admin/time-slots", {
             method: "POST",
@@ -2389,11 +2405,17 @@ function TimeSlotsTab() {
     setBatchSubmitting(false);
     queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
     queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
-    if (created > 0) {
-      toast({ title: `成功新增 ${created} 個時段` });
-    }
-    if (conflicts.length > 0) {
-      toast({ title: `${conflicts.length} 個時段衝突`, description: conflicts.slice(0, 3).join("\n"), variant: "destructive" });
+    const parts: string[] = [];
+    if (created > 0) parts.push(`成功 ${created} 堂`);
+    if (skipped > 0) parts.push(`略過 ${skipped} 堂（非營業）`);
+    if (conflicts.length > 0) parts.push(`失敗 ${conflicts.length} 堂（衝堂/其他）`);
+    if (parts.length > 0) {
+      const hasError = conflicts.length > 0;
+      toast({
+        title: parts.join("，"),
+        description: conflicts.length > 0 ? conflicts.slice(0, 3).join("\n") : undefined,
+        variant: hasError ? "destructive" : "default",
+      });
     }
     if (conflicts.length === 0) {
       setShowAdd(false);
