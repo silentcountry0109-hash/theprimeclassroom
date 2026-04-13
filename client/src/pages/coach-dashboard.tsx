@@ -1755,6 +1755,58 @@ function ManualTab() {
       ],
     },
     {
+      id: "materials-group",
+      title: "教材庫功能介紹",
+      icon: Library,
+      color: "border-l-teal-400",
+      items: [
+        {
+          id: "materials-website",
+          title: "數學練習網站",
+          icon: Library,
+          keywords: ["教材庫", "練習", "網站", "數學", "題目", "練習題"],
+          content: (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                切換到 <strong className="text-foreground">「教材庫」</strong> 分頁，預設會顯示「📁 教材庫」子分頁，內嵌質數教室的數學練習網站。
+              </p>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex gap-2"><span className="text-teal-500 font-bold">•</span>網站包含各年級的數學題目與練習資源</li>
+                <li className="flex gap-2"><span className="text-teal-500 font-bold">•</span>可直接在頁面內瀏覽，無需另開分頁</li>
+                <li className="flex gap-2"><span className="text-teal-500 font-bold">•</span>可配合上課單元，引導學生練習對應題型</li>
+              </ul>
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-800">
+                練習網站的題目內容由總部統一維護更新，老師無法自行新增或刪除題目。
+              </div>
+            </div>
+          ),
+        },
+        {
+          id: "materials-archive",
+          title: "期中考歸檔",
+          icon: FileText,
+          keywords: ["期中考", "歸檔", "PDF", "試卷", "考試", "查閱"],
+          content: (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                在「教材庫」分頁切換到 <strong className="text-foreground">「📋 期中考歸檔」</strong> 子分頁，可以查閱歷次期中考試卷（PDF 格式）。
+              </p>
+              <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground">
+                <li>點擊上方的 <strong className="text-foreground">「📋 期中考歸檔」</strong> 按鈕切換子分頁</li>
+                <li>列表中會顯示所有已上傳的期中考試卷</li>
+                <li>點擊試卷名稱，PDF 閱讀器會在頁面內開啟</li>
+                <li>可在頁面內上下翻頁、縮放查看</li>
+                <li>點擊右上角的按鈕可收起 PDF 閱讀器</li>
+              </ol>
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-800">
+                期中考試卷由總部上傳，如果顯示「尚未上傳此教材」或「檔案已遺失」，請聯繫分校主任或總部處理。
+              </div>
+            </div>
+          ),
+        },
+      ],
+    },
+    {
       id: "salary-group",
       title: "工作紀錄介紹",
       icon: ClipboardCheck,
@@ -2072,7 +2124,7 @@ function ManualTab() {
       ))}
 
       <div className="text-center py-4">
-        <p className="text-xs text-muted-foreground">最後更新：2026 年 3 月</p>
+        <p className="text-xs text-muted-foreground">最後更新：2026 年 4 月</p>
       </div>
     </div>
   );
