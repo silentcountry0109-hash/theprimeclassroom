@@ -2659,6 +2659,15 @@ function TimeSlotsTab() {
     return now > slotEnd;
   };
 
+  const getSlotStatus = (slot: TimeSlot): "upcoming" | "in_progress" | "completed" => {
+    const now = new Date();
+    const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    if (now < slotStart) return "upcoming";
+    if (now <= slotEnd) return "in_progress";
+    return "completed";
+  };
+
   const getSlotBookedChildIds = (slotId: number) => {
     return slotBookings
       .filter((b: any) => b.slotId === slotId && (b.status === "confirmed" || b.status === "checked_in" || b.status === "absent"))
@@ -2839,6 +2848,12 @@ function TimeSlotsTab() {
                     {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
                       <span className="text-xs text-tiffany">剩 {slot.maxSeats - slot.bookedSeats} 位</span>
                     )}
+                    {getSlotStatus(slot) === "in_progress" && (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">進行中</span>
+                    )}
+                    {getSlotStatus(slot) === "completed" && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">已上完課</span>
+                    )}
                   </div>
                 </div>
                 {!batchDeleteMode && (
@@ -2848,9 +2863,18 @@ function TimeSlotsTab() {
                         <UserPlus className="w-4 h-4 text-tiffany" />
                       </Button>
                     )}
-                    <Button variant="outline" size="icon" onClick={() => handleDeleteSlot(slot.id)} data-testid={`button-delete-franchise-slot-${slot.id}`}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {(() => {
+                      const status = getSlotStatus(slot);
+                      const cantDelete = status === "in_progress" || status === "completed";
+                      const tipMsg = status === "in_progress" ? "課程進行中，無法刪除" : status === "completed" ? "課程已結束，無法刪除" : "";
+                      return (
+                        <span title={cantDelete ? tipMsg : undefined}>
+                          <Button variant="outline" size="icon" onClick={() => handleDeleteSlot(slot.id)} disabled={cantDelete} data-testid={`button-delete-franchise-slot-${slot.id}`} className={cantDelete ? "opacity-40 cursor-not-allowed" : ""}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </span>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -2949,6 +2973,12 @@ function TimeSlotsTab() {
                             {slot.bookedSeats < slot.maxSeats && !isSlotExpired(slot) && (
                               <span className="text-xs text-tiffany">剩 {slot.maxSeats - slot.bookedSeats} 位</span>
                             )}
+                            {getSlotStatus(slot) === "in_progress" && (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">進行中</span>
+                            )}
+                            {getSlotStatus(slot) === "completed" && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">已上完課</span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -2957,9 +2987,18 @@ function TimeSlotsTab() {
                               <UserPlus className="w-4 h-4 text-tiffany" />
                             </Button>
                           )}
-                          <Button variant="outline" size="icon" onClick={() => handleDeleteSlot(slot.id)} data-testid={`button-delete-cal-slot-${slot.id}`}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {(() => {
+                            const status = getSlotStatus(slot);
+                            const cantDelete = status === "in_progress" || status === "completed";
+                            const tipMsg = status === "in_progress" ? "課程進行中，無法刪除" : status === "completed" ? "課程已結束，無法刪除" : "";
+                            return (
+                              <span title={cantDelete ? tipMsg : undefined}>
+                                <Button variant="outline" size="icon" onClick={() => handleDeleteSlot(slot.id)} disabled={cantDelete} data-testid={`button-delete-cal-slot-${slot.id}`} className={cantDelete ? "opacity-40 cursor-not-allowed" : ""}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                     );

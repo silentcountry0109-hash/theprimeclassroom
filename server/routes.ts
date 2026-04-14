@@ -1124,6 +1124,20 @@ export async function registerRoutes(
   app.delete("/api/admin/time-slots/:id", isAdmin, async (req, res) => {
     try {
       const slotId = parseInt(req.params.id);
+
+      const slotForCheck = await storage.getSlot(slotId);
+      if (slotForCheck) {
+        const now = new Date();
+        const slotStart = new Date(`${slotForCheck.date}T${slotForCheck.startTime}:00+08:00`);
+        const slotEnd = new Date(`${slotForCheck.date}T${slotForCheck.endTime}:00+08:00`);
+        if (now >= slotStart && now <= slotEnd) {
+          return res.status(403).json({ message: "課程進行中，無法刪除" });
+        }
+        if (now > slotEnd) {
+          return res.status(403).json({ message: "課程已結束，無法刪除" });
+        }
+      }
+
       const activeBookings = await storage.getSlotBookings(slotId);
       const force = req.query.force === "true";
 
@@ -1627,6 +1641,16 @@ export async function registerRoutes(
       const slotList = await storage.getSlotsByFranchise(req.franchiseId);
       const slot = slotList.find((s) => s.id === slotId);
       if (!slot) return res.status(403).json({ message: "Forbidden" });
+
+      const now = new Date();
+      const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
+      const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+      if (now >= slotStart && now <= slotEnd) {
+        return res.status(403).json({ message: "課程進行中，無法刪除" });
+      }
+      if (now > slotEnd) {
+        return res.status(403).json({ message: "課程已結束，無法刪除" });
+      }
 
       const activeBookings = await storage.getSlotBookings(slotId);
       const force = req.query.force === "true";

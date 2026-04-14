@@ -1356,6 +1356,15 @@ function TimeSlotsTab() {
     return DAY_LABELS[d.getDay().toString()] || "";
   };
 
+  const getSlotStatus = (slot: { date: string; startTime: string; endTime: string }): "upcoming" | "in_progress" | "completed" => {
+    const now = new Date();
+    const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
+    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+    if (now < slotStart) return "upcoming";
+    if (now <= slotEnd) return "in_progress";
+    return "completed";
+  };
+
   const sortedSlots = [...slots].sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return a.startTime.localeCompare(b.startTime);
@@ -1409,11 +1418,26 @@ function TimeSlotsTab() {
                     <span className="text-sm text-tiffany font-medium">{slot.startTime} - {slot.endTime}</span>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{coachName}</span>
                     <span className="text-xs text-muted-foreground">已預約 {slot.bookedSeats}/{slot.maxSeats}</span>
+                    {getSlotStatus(slot) === "in_progress" && (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">進行中</span>
+                    )}
+                    {getSlotStatus(slot) === "completed" && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">已上完課</span>
+                    )}
                   </div>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} data-testid={`button-delete-slot-${slot.id}`}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {(() => {
+                  const status = getSlotStatus(slot);
+                  const cantDelete = status === "in_progress" || status === "completed";
+                  const tipMsg = status === "in_progress" ? "課程進行中，無法刪除" : status === "completed" ? "課程已結束，無法刪除" : "";
+                  return (
+                    <span title={cantDelete ? tipMsg : undefined}>
+                      <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} disabled={cantDelete} data-testid={`button-delete-slot-${slot.id}`} className={cantDelete ? "opacity-40 cursor-not-allowed" : ""}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </span>
+                  );
+                })()}
               </div>
             );
           })}
