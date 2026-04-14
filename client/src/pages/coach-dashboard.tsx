@@ -720,7 +720,7 @@ function DailyProgressCard({ coachId, date }: { coachId: number; date: string })
         </div>
       </div>
       {!record.isComplete && (
-        <p className="text-[10px] text-amber-600/80 mt-2">完成所有點名與聯絡簿填寫後，此日才計入薪資計算</p>
+        <p className="text-[10px] text-amber-600/80 mt-2">請務必在當天完成所有點名與聯絡簿填寫</p>
       )}
     </div>
   );
@@ -1837,7 +1837,7 @@ function ManualTab() {
           id: "daily-status",
           title: "每日完成狀態",
           icon: CheckCircle,
-          keywords: ["每日", "完成狀態", "薪資", "未完成", "點名完成", "聯絡簿完成"],
+          keywords: ["每日", "完成狀態", "未完成", "點名完成", "聯絡簿完成"],
           content: (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1849,7 +1849,7 @@ function ManualTab() {
                 <li className="flex gap-2"><span className="text-amber-400 font-bold">•</span>尚未完成：顯示黃色 <Badge className="bg-amber-100 text-amber-700 text-[10px]">未完成</Badge></li>
               </ul>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                每日工作的完成狀態會直接影響薪資計算，請務必在當天完成所有點名與聯絡簿。
+                請務必在當天完成所有點名與聯絡簿。
               </div>
             </div>
           ),
@@ -2002,7 +2002,7 @@ function ManualTab() {
                 { q: "忘記密碼怎麼辦？", a: "請聯繫您的分校主任，主任可以在後台為您重設密碼。" },
                 { q: "可以在手機上操作嗎？", a: "可以。老師系統支援手機瀏覽器，操作方式和電腦版相同。" },
                 { q: "如何查看過去學生的上課紀錄？", a: "切換到「我的學生」分頁，搜尋學生後點擊卡片，即可查看該學生的完整學習歷程。" },
-                { q: "工作記錄的完成率會影響什麼？", a: "完成率反映您每日點名和聯絡簿的完成狀況，直接影響薪資計算。建議維持 100% 完成率。" },
+                { q: "工作記錄的完成率會影響什麼？", a: "完成率反映您每日點名和聯絡簿的完成狀況，建議維持 100% 完成率。" },
               ].map((item, i) => (
                 <div key={i} className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="bg-gray-50 px-4 py-2.5">
