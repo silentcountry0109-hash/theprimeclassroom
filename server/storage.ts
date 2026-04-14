@@ -1770,6 +1770,7 @@ export class DatabaseStorage implements IStorage {
       childName: r.child.name,
       childGrade: r.child.grade,
       childGender: r.child.gender,
+      childSchool: r.child.school,
       childStudentCode: r.child.studentCode,
       parentId: r.booking.parentId,
       status: r.booking.status,
@@ -2221,6 +2222,7 @@ export class DatabaseStorage implements IStorage {
         status: bookings.status,
         childName: children.name,
         childGrade: children.grade,
+        childSchool: children.school,
       })
       .from(bookings)
       .leftJoin(children, eq(bookings.childId, children.id))
@@ -2238,6 +2240,7 @@ export class DatabaseStorage implements IStorage {
         status: bookings.status,
         childName: children.name,
         childGrade: children.grade,
+        childSchool: children.school,
       })
       .from(bookings)
       .leftJoin(children, eq(bookings.childId, children.id))

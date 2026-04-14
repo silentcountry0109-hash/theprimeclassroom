@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { TAIWAN_CITIES, getDistricts, getSchools } from "@shared/taiwan-schools";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, getActiveFranchiseId } from "@/lib/queryClient";
@@ -2569,20 +2570,30 @@ function TimeSlotsTab() {
   const [mbSelected, setMbSelected] = useState<any | null>(null);
   const [mbWalkInName, setMbWalkInName] = useState("");
   const [mbWalkInGrade, setMbWalkInGrade] = useState("1");
-  const [mbWalkInSchool, setMbWalkInSchool] = useState("");
+  const [mbWalkInSchoolCity, setMbWalkInSchoolCity] = useState("");
+  const [mbWalkInSchoolDistrict, setMbWalkInSchoolDistrict] = useState("");
+  const [mbWalkInSchoolName, setMbWalkInSchoolName] = useState("");
+  const mbWalkInSchool = useMemo(() => {
+    if (mbWalkInSchoolCity && mbWalkInSchoolDistrict && mbWalkInSchoolName) {
+      return `${mbWalkInSchoolCity}${mbWalkInSchoolDistrict}${mbWalkInSchoolName}`;
+    }
+    return "";
+  }, [mbWalkInSchoolCity, mbWalkInSchoolDistrict, mbWalkInSchoolName]);
+  const mbWalkInSchoolDistricts = useMemo(() => mbWalkInSchoolCity ? getDistricts(mbWalkInSchoolCity) : [], [mbWalkInSchoolCity]);
+  const mbWalkInSchoolNames = useMemo(() => (mbWalkInSchoolCity && mbWalkInSchoolDistrict) ? getSchools(mbWalkInSchoolCity, mbWalkInSchoolDistrict) : [], [mbWalkInSchoolCity, mbWalkInSchoolDistrict]);
   const [mbOverride, setMbOverride] = useState(false);
 
   const closeMb = () => {
     setMbOpen(false); setMbStep(1); setMbSlot(null); setMbSearch("");
-    setMbMode("search"); setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchool(""); setMbOverride(false);
+    setMbMode("search"); setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchoolCity(""); setMbWalkInSchoolDistrict(""); setMbWalkInSchoolName(""); setMbOverride(false);
   };
   const openMbFromSlot = (slot: TimeSlot) => {
     setMbSlot(slot); setMbStep(2); setMbSearch(""); setMbMode("search");
-    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchool(""); setMbOverride(false); setMbOpen(true);
+    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchoolCity(""); setMbWalkInSchoolDistrict(""); setMbWalkInSchoolName(""); setMbOverride(false); setMbOpen(true);
   };
   const openMbGlobal = () => {
     setMbSlot(null); setMbStep(1); setMbSearch(""); setMbMode("search");
-    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchool(""); setMbOverride(false); setMbOpen(true);
+    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchoolCity(""); setMbWalkInSchoolDistrict(""); setMbWalkInSchoolName(""); setMbOverride(false); setMbOpen(true);
   };
 
   const { data: availableStudents = [] } = useQuery<{ id: number; name: string; grade: number; school: string | null; parentId: string | null }[]>({
@@ -3375,13 +3386,33 @@ function TimeSlotsTab() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-xs">學校（選填）</Label>
-                    <Input
-                      placeholder="例：中正國小"
-                      value={mbWalkInSchool}
-                      onChange={(e) => setMbWalkInSchool(e.target.value)}
-                      data-testid="input-mb-walkin-school"
-                    />
+                    <Label className="text-xs">就讀學校（選填）</Label>
+                    <div className="flex gap-1.5 mt-1">
+                      <Select value={mbWalkInSchoolCity} onValueChange={(v) => { setMbWalkInSchoolCity(v); setMbWalkInSchoolDistrict(""); setMbWalkInSchoolName(""); }} data-testid="select-mb-walkin-school-city">
+                        <SelectTrigger className="flex-1 h-8 text-xs">
+                          <SelectValue placeholder="縣市" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TAIWAN_CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={mbWalkInSchoolDistrict} onValueChange={(v) => { setMbWalkInSchoolDistrict(v); setMbWalkInSchoolName(""); }} disabled={!mbWalkInSchoolCity} data-testid="select-mb-walkin-school-district">
+                        <SelectTrigger className="flex-1 h-8 text-xs">
+                          <SelectValue placeholder="行政區" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mbWalkInSchoolDistricts.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={mbWalkInSchoolName} onValueChange={setMbWalkInSchoolName} disabled={!mbWalkInSchoolDistrict} data-testid="select-mb-walkin-school-name">
+                        <SelectTrigger className="flex-1 h-8 text-xs">
+                          <SelectValue placeholder="學校" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mbWalkInSchoolNames.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <Button
                     className="w-full"
@@ -3504,6 +3535,7 @@ function TimeSlotsTab() {
                     <div>
                       <span className="text-sm font-medium" data-testid={`text-student-name-${s.id}`}>{s.childName}</span>
                       <span className="text-xs text-muted-foreground ml-2" data-testid={`text-student-grade-${s.id}`}>{s.childGrade}年級</span>
+                      {s.childSchool && <span className="text-xs text-muted-foreground ml-1">· {s.childSchool}</span>}
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.color}`} data-testid={`status-student-${s.id}`}>{st.label}</span>
                   </div>
