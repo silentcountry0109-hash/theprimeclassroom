@@ -190,6 +190,39 @@ function SliderConfirmDialog({
   );
 }
 
+function TimeSelect({ value, onChange, disabled, "data-testid": testId }: { value: string; onChange: (v: string) => void; disabled?: boolean; "data-testid"?: string }) {
+  const parts = value ? value.split(":") : ["", ""];
+  const hh = parts[0] ?? "";
+  const mm = parts[1] ?? "";
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const minutes = ["00", "15", "30", "45"];
+  return (
+    <div className="flex items-center gap-1" data-testid={testId}>
+      <Select value={hh} onValueChange={(h) => onChange(`${h}:${mm || "00"}`)} disabled={disabled}>
+        <SelectTrigger className="w-[72px]" data-testid="select-hour">
+          <SelectValue placeholder="時" />
+        </SelectTrigger>
+        <SelectContent>
+          {hours.map((h) => (
+            <SelectItem key={h} value={h}>{h}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <span className="text-muted-foreground">:</span>
+      <Select value={mm} onValueChange={(m) => onChange(`${hh || "00"}:${m}`)} disabled={disabled}>
+        <SelectTrigger className="w-[72px]" data-testid="select-minute">
+          <SelectValue placeholder="分" />
+        </SelectTrigger>
+        <SelectContent>
+          {minutes.map((m) => (
+            <SelectItem key={m} value={m}>{m}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export default function FranchiseAdminDashboard() {
   const { user, isLoading: authLoading, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
@@ -3058,14 +3091,16 @@ function TimeSlotsTab() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>開始時間 *</Label>
-                    <Input type="time" value={slotForm.startTime} onChange={(e) => {
-                      const start = e.target.value;
-                      setSlotForm({ ...slotForm, startTime: start, endTime: computeEndTime(start) });
-                    }} data-testid="input-franchise-slot-start" />
+                    <TimeSelect
+                      value={slotForm.startTime}
+                      onChange={(start) => setSlotForm({ ...slotForm, startTime: start, endTime: computeEndTime(start) })}
+                    />
                   </div>
                   <div>
                     <Label>結束時間</Label>
-                    <Input type="time" value={slotForm.endTime} disabled className="bg-gray-50" data-testid="input-franchise-slot-end" />
+                    <div className="flex items-center h-10 px-3 text-sm text-muted-foreground bg-gray-50 border rounded-md" data-testid="text-franchise-slot-end">
+                      {slotForm.startTime ? computeEndTime(slotForm.startTime) : "--:--"}
+                    </div>
                   </div>
                 </div>
                 {slotForm.date && slotForm.startTime && !isDayClosed(slotForm.date) && (() => {
@@ -3160,19 +3195,17 @@ function TimeSlotsTab() {
                   <Label>時段 *</Label>
                   <div className="space-y-2 mt-1.5">
                     {batchForm.startTimes.map((t, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Input
-                          type="time"
+                      <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                        <TimeSelect
                           value={t}
-                          onChange={(e) => {
+                          onChange={(val) => {
                             const updated = [...batchForm.startTimes];
-                            updated[i] = e.target.value;
+                            updated[i] = val;
                             setBatchForm({ ...batchForm, startTimes: updated });
                           }}
-                          className="flex-1"
                           data-testid={`input-batch-time-${i}`}
                         />
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">~ {t ? computeEndTime(t) : "--:--"}</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap w-16 text-center">~ {t ? computeEndTime(t) : "--:--"}</span>
                         {batchForm.startTimes.length > 1 && (
                           <Button
                             variant="outline"
