@@ -1429,7 +1429,7 @@ function TimeSlotsTab() {
                 {(() => {
                   const status = getSlotStatus(slot);
                   const cantDelete = status === "in_progress" || status === "completed";
-                  const tipMsg = cantDelete ? "課程已開始或結束，無法刪除" : undefined;
+                  const tipMsg = status === "in_progress" ? "課程進行中，無法刪除" : status === "completed" ? "課程已結束，無法刪除" : undefined;
                   return (
                     <span title={tipMsg}>
                       <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} disabled={cantDelete} data-testid={`button-delete-slot-${slot.id}`} className={cantDelete ? "opacity-40 cursor-not-allowed" : ""}>

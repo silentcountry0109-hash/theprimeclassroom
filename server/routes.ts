@@ -1129,7 +1129,6 @@ export async function registerRoutes(
       if (slotForCheck) {
         const now = new Date();
         const slotStart = new Date(`${slotForCheck.date}T${slotForCheck.startTime}:00+08:00`);
-        const slotEnd = new Date(`${slotForCheck.date}T${slotForCheck.endTime}:00+08:00`);
         if (now >= slotStart) {
           return res.status(403).json({ message: "課程已開始或結束，無法刪除" });
         }
