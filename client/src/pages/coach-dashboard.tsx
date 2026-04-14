@@ -83,6 +83,8 @@ export default function CoachDashboard() {
   };
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showOverdueAlert, setShowOverdueAlert] = useState(false);
+  const [calendarNavDate, setCalendarNavDate] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: notifList = [] } = useQuery<Notification[]>({
@@ -114,6 +116,20 @@ export default function CoachDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
     },
   });
+
+  const { data: overdueTasks = [] } = useQuery<{ date: string; totalSlots: number; checkedInSlots: number; contactBookSlots: number }[]>({
+    queryKey: ["/api/coach/overdue-tasks"],
+    enabled: !!userData,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (overdueTasks.length === 0) return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const seenKey = `overdue-alert-seen-${todayStr}`;
+    if (sessionStorage.getItem(seenKey)) return;
+    setShowOverdueAlert(true);
+  }, [overdueTasks]);
 
   if (isLoading) {
     return (
@@ -264,7 +280,7 @@ export default function CoachDashboard() {
           ))}
         </div>
 
-        {activeTab === "calendar" && <CalendarTab coachId={userData.coach?.id} />}
+        {activeTab === "calendar" && <CalendarTab coachId={userData.coach?.id} initialDate={calendarNavDate} onInitialDateConsumed={() => setCalendarNavDate(null)} />}
         {activeTab === "students" && <StudentsTab coachId={userData.coach?.id} />}
         {activeTab === "materials" && <MaterialsTab />}
         {activeTab === "profile" && <ProfileTab />}
@@ -289,16 +305,83 @@ export default function CoachDashboard() {
           </Button>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showOverdueAlert} onOpenChange={(open) => {
+        if (!open) {
+          const todayStr = new Date().toISOString().slice(0, 10);
+          sessionStorage.setItem(`overdue-alert-seen-${todayStr}`, "1");
+          setShowOverdueAlert(false);
+        }
+      }}>
+        <DialogContent className="max-w-sm" data-testid="dialog-overdue-alert">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+              有過去未完成的課堂紀錄
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-1">以下日期的點名或聯絡簿尚未完成，請點擊日期補填：</p>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {overdueTasks.map((t) => {
+              const needsCheckIn = t.checkedInSlots < t.totalSlots;
+              const needsContactBook = t.contactBookSlots < t.totalSlots;
+              const [, mo, d] = t.date.split("-").map(Number);
+              const label = `${mo} 月 ${d} 日`;
+              return (
+                <button
+                  key={t.date}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors text-left"
+                  data-testid={`button-overdue-date-${t.date}`}
+                  onClick={() => {
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    sessionStorage.setItem(`overdue-alert-seen-${todayStr}`, "1");
+                    setShowOverdueAlert(false);
+                    setCalendarNavDate(t.date);
+                    setActiveTab("calendar");
+                  }}
+                >
+                  <span className="text-sm font-medium text-amber-900">{label}</span>
+                  <div className="flex gap-1.5">
+                    {needsCheckIn && <span className="text-[11px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">點名未完成</span>}
+                    {needsContactBook && <span className="text-[11px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">聯絡簿未完成</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <Button
+            className="w-full"
+            variant="outline"
+            onClick={() => {
+              const todayStr = new Date().toISOString().slice(0, 10);
+              sessionStorage.setItem(`overdue-alert-seen-${todayStr}`, "1");
+              setShowOverdueAlert(false);
+            }}
+            data-testid="button-overdue-alert-dismiss"
+          >
+            我知道了
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function CalendarTab({ coachId }: { coachId: number }) {
+function CalendarTab({ coachId, initialDate, onInitialDateConsumed }: { coachId: number; initialDate?: string | null; onInitialDateConsumed?: () => void }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [contactBookSlot, setContactBookSlot] = useState<any>(null);
+
+  useEffect(() => {
+    if (!initialDate) return;
+    const [y, m] = initialDate.split("-").map(Number);
+    setYear(y);
+    setMonth(m);
+    setSelectedDate(initialDate);
+    onInitialDateConsumed?.();
+  }, [initialDate]);
 
   const { data: slots = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/coach/calendar", year, month],
