@@ -2500,7 +2500,7 @@ function TimeSlotsTab() {
   const [studentsSlot, setStudentsSlot] = useState<TimeSlot | null>(null);
 
   const { data: slotStudents = [], isLoading: studentsLoading } = useQuery<{
-    id: number; childId: number; childName: string; childGrade: string; status: string;
+    id: number; childId: number; childName: string; childGrade: string; status: string; childSchool?: string | null;
   }[]>({
     queryKey: ["/api/franchise-admin/time-slots", studentsSlot?.id, "students"],
     enabled: !!studentsSlot,
