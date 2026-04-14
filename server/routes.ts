@@ -2034,7 +2034,6 @@ export async function registerRoutes(
   app.get("/api/coach/overdue-tasks", isCoach, async (req: any, res) => {
     try {
       const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       const results: any[] = [];
       for (let i = 1; i <= 14; i++) {
         const d = new Date(today);

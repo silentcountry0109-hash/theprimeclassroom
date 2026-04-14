@@ -123,10 +123,14 @@ export default function CoachDashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const localDateStr = () => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  };
+
   useEffect(() => {
     if (overdueTasks.length === 0) return;
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const seenKey = `overdue-alert-seen-${todayStr}`;
+    const seenKey = `overdue-alert-seen-${localDateStr()}`;
     if (sessionStorage.getItem(seenKey)) return;
     setShowOverdueAlert(true);
   }, [overdueTasks]);
@@ -308,8 +312,7 @@ export default function CoachDashboard() {
 
       <Dialog open={showOverdueAlert} onOpenChange={(open) => {
         if (!open) {
-          const todayStr = new Date().toISOString().slice(0, 10);
-          sessionStorage.setItem(`overdue-alert-seen-${todayStr}`, "1");
+          sessionStorage.setItem(`overdue-alert-seen-${localDateStr()}`, "1");
           setShowOverdueAlert(false);
         }
       }}>
@@ -333,8 +336,7 @@ export default function CoachDashboard() {
                   className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors text-left"
                   data-testid={`button-overdue-date-${t.date}`}
                   onClick={() => {
-                    const todayStr = new Date().toISOString().slice(0, 10);
-                    sessionStorage.setItem(`overdue-alert-seen-${todayStr}`, "1");
+                    sessionStorage.setItem(`overdue-alert-seen-${localDateStr()}`, "1");
                     setShowOverdueAlert(false);
                     setCalendarNavDate(t.date);
                     setActiveTab("calendar");
@@ -353,8 +355,7 @@ export default function CoachDashboard() {
             className="w-full"
             variant="outline"
             onClick={() => {
-              const todayStr = new Date().toISOString().slice(0, 10);
-              sessionStorage.setItem(`overdue-alert-seen-${todayStr}`, "1");
+              sessionStorage.setItem(`overdue-alert-seen-${localDateStr()}`, "1");
               setShowOverdueAlert(false);
             }}
             data-testid="button-overdue-alert-dismiss"
