@@ -214,6 +214,7 @@ export interface IStorage {
     childId?: number;
     walkInName?: string;
     walkInGrade?: number;
+    walkInSchool?: string;
     overrideCapacity?: boolean;
   }): Promise<any>;
 
@@ -922,9 +923,10 @@ export class DatabaseStorage implements IStorage {
     childId?: number;
     walkInName?: string;
     walkInGrade?: number;
+    walkInSchool?: string;
     overrideCapacity?: boolean;
   }): Promise<any> {
-    const { slotId, franchiseId, childId, walkInName, walkInGrade, overrideCapacity } = params;
+    const { slotId, franchiseId, childId, walkInName, walkInGrade, walkInSchool, overrideCapacity } = params;
 
     const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, slotId));
     if (!slot) throw new Error("時段不存在");
@@ -943,6 +945,7 @@ export class DatabaseStorage implements IStorage {
         parentId: null,
         name: walkInName.trim(),
         grade: walkInGrade,
+        school: walkInSchool?.trim() || null,
       }).returning();
       child = created as any;
       const existing = await db.select().from(franchiseStudents)

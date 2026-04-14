@@ -2569,19 +2569,20 @@ function TimeSlotsTab() {
   const [mbSelected, setMbSelected] = useState<any | null>(null);
   const [mbWalkInName, setMbWalkInName] = useState("");
   const [mbWalkInGrade, setMbWalkInGrade] = useState("1");
+  const [mbWalkInSchool, setMbWalkInSchool] = useState("");
   const [mbOverride, setMbOverride] = useState(false);
 
   const closeMb = () => {
     setMbOpen(false); setMbStep(1); setMbSlot(null); setMbSearch("");
-    setMbMode("search"); setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbOverride(false);
+    setMbMode("search"); setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchool(""); setMbOverride(false);
   };
   const openMbFromSlot = (slot: TimeSlot) => {
     setMbSlot(slot); setMbStep(2); setMbSearch(""); setMbMode("search");
-    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbOverride(false); setMbOpen(true);
+    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchool(""); setMbOverride(false); setMbOpen(true);
   };
   const openMbGlobal = () => {
     setMbSlot(null); setMbStep(1); setMbSearch(""); setMbMode("search");
-    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbOverride(false); setMbOpen(true);
+    setMbSelected(null); setMbWalkInName(""); setMbWalkInGrade("1"); setMbWalkInSchool(""); setMbOverride(false); setMbOpen(true);
   };
 
   const { data: availableStudents = [] } = useQuery<{ id: number; name: string; grade: number; school: string | null; parentId: string | null }[]>({
@@ -2594,7 +2595,7 @@ function TimeSlotsTab() {
   });
 
   const manualBookMutation = useMutation({
-    mutationFn: async (params: { slotId: number; childId?: number; walkInName?: string; walkInGrade?: number; overrideCapacity?: boolean }) => {
+    mutationFn: async (params: { slotId: number; childId?: number; walkInName?: string; walkInGrade?: number; walkInSchool?: string; overrideCapacity?: boolean }) => {
       const res = await apiRequest("POST", "/api/franchise-admin/manual-booking", params);
       return res.json();
     },
@@ -3373,10 +3374,19 @@ function TimeSlotsTab() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label className="text-xs">學校（選填）</Label>
+                    <Input
+                      placeholder="例：中正國小"
+                      value={mbWalkInSchool}
+                      onChange={(e) => setMbWalkInSchool(e.target.value)}
+                      data-testid="input-mb-walkin-school"
+                    />
+                  </div>
                   <Button
                     className="w-full"
                     disabled={!mbWalkInName.trim()}
-                    onClick={() => { setMbSelected({ name: mbWalkInName.trim(), grade: parseInt(mbWalkInGrade), type: "walkin" }); setMbStep(3); }}
+                    onClick={() => { setMbSelected({ name: mbWalkInName.trim(), grade: parseInt(mbWalkInGrade), school: mbWalkInSchool.trim() || null, type: "walkin" }); setMbStep(3); }}
                     data-testid="button-mb-walkin-next"
                   >
                     <ChevronRight className="w-4 h-4 mr-1" />繼續
@@ -3408,9 +3418,9 @@ function TimeSlotsTab() {
                 <hr />
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">學生</p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{mbSelected.name}</span>
-                    <span className="text-xs text-muted-foreground">{mbSelected.grade}年級</span>
+                    <span className="text-xs text-muted-foreground">{mbSelected.grade}年級{mbSelected.school ? ` · ${mbSelected.school}` : ""}</span>
                     {mbSelected.type === "walkin" && (
                       <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">臨時學生</span>
                     )}
@@ -3453,6 +3463,7 @@ function TimeSlotsTab() {
                     } else {
                       params.walkInName = mbSelected.name;
                       params.walkInGrade = mbSelected.grade;
+                      if (mbSelected.school) params.walkInSchool = mbSelected.school;
                     }
                     manualBookMutation.mutate(params);
                   }}
