@@ -1130,11 +1130,8 @@ export async function registerRoutes(
         const now = new Date();
         const slotStart = new Date(`${slotForCheck.date}T${slotForCheck.startTime}:00+08:00`);
         const slotEnd = new Date(`${slotForCheck.date}T${slotForCheck.endTime}:00+08:00`);
-        if (now >= slotStart && now <= slotEnd) {
-          return res.status(403).json({ message: "課程進行中，無法刪除" });
-        }
-        if (now > slotEnd) {
-          return res.status(403).json({ message: "課程已結束，無法刪除" });
+        if (now >= slotStart) {
+          return res.status(403).json({ message: "課程已開始或結束，無法刪除" });
         }
       }
 
@@ -1644,12 +1641,8 @@ export async function registerRoutes(
 
       const now = new Date();
       const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
-      const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
-      if (now >= slotStart && now <= slotEnd) {
-        return res.status(403).json({ message: "課程進行中，無法刪除" });
-      }
-      if (now > slotEnd) {
-        return res.status(403).json({ message: "課程已結束，無法刪除" });
+      if (now >= slotStart) {
+        return res.status(403).json({ message: "課程已開始或結束，無法刪除" });
       }
 
       const activeBookings = await storage.getSlotBookings(slotId);

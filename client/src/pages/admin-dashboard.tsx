@@ -1418,20 +1418,20 @@ function TimeSlotsTab() {
                     <span className="text-sm text-tiffany font-medium">{slot.startTime} - {slot.endTime}</span>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{coachName}</span>
                     <span className="text-xs text-muted-foreground">已預約 {slot.bookedSeats}/{slot.maxSeats}</span>
-                    {getSlotStatus(slot) === "in_progress" && (
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">進行中</span>
-                    )}
-                    {getSlotStatus(slot) === "completed" && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">已上完課</span>
-                    )}
+                    {(() => {
+                      const st = getSlotStatus(slot);
+                      if (st === "upcoming") return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">尚未開始</span>;
+                      if (st === "in_progress") return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">進行中</span>;
+                      return <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">已上完課</span>;
+                    })()}
                   </div>
                 </div>
                 {(() => {
                   const status = getSlotStatus(slot);
                   const cantDelete = status === "in_progress" || status === "completed";
-                  const tipMsg = status === "in_progress" ? "課程進行中，無法刪除" : status === "completed" ? "課程已結束，無法刪除" : "";
+                  const tipMsg = cantDelete ? "課程已開始或結束，無法刪除" : undefined;
                   return (
-                    <span title={cantDelete ? tipMsg : undefined}>
+                    <span title={tipMsg}>
                       <Button variant="outline" size="icon" onClick={() => { if (confirm("確定刪除此時段？")) deleteSlotMutation.mutate(slot.id); }} disabled={cantDelete} data-testid={`button-delete-slot-${slot.id}`} className={cantDelete ? "opacity-40 cursor-not-allowed" : ""}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
