@@ -498,18 +498,6 @@ function OverviewTab() {
     },
   });
 
-  const { data: earningsStats, isLoading: earningsLoading } = useQuery<CoachEarningsStats>({
-    queryKey: ["/api/franchise-admin/coach-earnings", startDate, endDate],
-    queryFn: async () => {
-      const headers: Record<string, string> = { };
-      const fid = getActiveFranchiseId();
-      if (fid) headers["X-Franchise-Id"] = String(fid);
-      const res = await fetch(`/api/franchise-admin/coach-earnings?startDate=${startDate}&endDate=${endDate}`, { credentials: "include", headers });
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    },
-  });
-
   const maxDailySeats = rangeStats?.dailyStats ? Math.max(...rangeStats.dailyStats.map((d) => d.totalSeats), 1) : 1;
 
   const todayDateLabel = todayStats?.date
@@ -797,63 +785,6 @@ function OverviewTab() {
           )}
         </>
       ) : null}
-
-      <div className="bg-white rounded-md border border-gray-100 p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Percent className="w-4 h-4 text-tiffany" />老師薪酬
-        </h3>
-        {earningsLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}
-          </div>
-        ) : earningsStats ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-gray-50 rounded-md p-4" data-testid="earnings-total-lessons">
-                <p className="text-2xl font-bold text-foreground">{earningsStats.totalLessons}</p>
-                <p className="text-xs text-muted-foreground">總課消堂數</p>
-              </div>
-              <div className="bg-gray-50 rounded-md p-4" data-testid="earnings-total-revenue">
-                <p className="text-2xl font-bold text-foreground">${earningsStats.totalNetRevenue.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">總實收金額</p>
-              </div>
-              <div className="bg-gray-50 rounded-md p-4" data-testid="earnings-total-pay">
-                <p className="text-2xl font-bold text-foreground">${earningsStats.totalCoachPay.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">總老師薪酬支出</p>
-              </div>
-            </div>
-
-            {earningsStats.coachStats.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="earnings-coach-table">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-left">
-                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground">老師</th>
-                      <th className="py-2 pr-4 text-xs font-medium text-muted-foreground text-center">課消堂數</th>
-                      <th className="py-2 text-xs font-medium text-muted-foreground text-center">實收金額</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {earningsStats.coachStats.map((coach) => (
-                      <tr key={coach.coachId} className="border-b border-gray-50" data-testid={`earnings-coach-${coach.coachId}`}>
-                        <td className="py-3 pr-4 font-medium text-foreground whitespace-nowrap">{coach.coachName}</td>
-                        <td className="py-3 pr-4 text-center text-muted-foreground">{coach.totalLessons}</td>
-                        <td className="py-3 text-center text-muted-foreground">${coach.totalNetRevenue.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {earningsStats.coachStats.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">此時間區間尚無薪酬資料</p>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">無法載入薪酬資料</p>
-        )}
-      </div>
     </div>
   );
 }
@@ -870,19 +801,6 @@ interface DateRangeStats {
   occupancyRate: number;
   dailyStats: Array<{ date: string; slots: number; bookings: number; bookedSeats: number; totalSeats: number }>;
   coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; confirmedBookings: number; cancelledBookings: number; completedBookings: number; bookedSeats: number }>;
-}
-
-interface CoachEarningsStats {
-  totalLessons: number;
-  totalNetRevenue: number;
-  totalCoachPay: number;
-  coachStats: Array<{
-    coachId: number;
-    coachName: string;
-    totalLessons: number;
-    totalNetRevenue: number;
-    coachEarnings: number;
-  }>;
 }
 
 function FranchiseInfoTab() {
