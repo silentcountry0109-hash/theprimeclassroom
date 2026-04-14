@@ -193,6 +193,7 @@ export interface IStorage {
   deleteClassroom(id: number): Promise<void>;
 
   getSlotBookings(slotId: number): Promise<any[]>;
+  getSlotStudentList(slotId: number): Promise<any[]>;
   cancelSlotBookingsAndNotify(slotId: number): Promise<void>;
 
   createNotification(data: InsertNotification): Promise<Notification>;
@@ -2221,6 +2222,23 @@ export class DatabaseStorage implements IStorage {
       .from(bookings)
       .leftJoin(children, eq(bookings.childId, children.id))
       .where(and(eq(bookings.slotId, slotId), inArray(bookings.status, ["confirmed", "checked_in"])));
+    return rows;
+  }
+
+  async getSlotStudentList(slotId: number): Promise<any[]> {
+    const rows = await db
+      .select({
+        id: bookings.id,
+        slotId: bookings.slotId,
+        childId: bookings.childId,
+        parentId: bookings.parentId,
+        status: bookings.status,
+        childName: children.name,
+        childGrade: children.grade,
+      })
+      .from(bookings)
+      .leftJoin(children, eq(bookings.childId, children.id))
+      .where(eq(bookings.slotId, slotId));
     return rows;
   }
 

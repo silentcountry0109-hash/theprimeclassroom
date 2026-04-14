@@ -2496,6 +2496,14 @@ function TimeSlotsTab() {
   const [batchDeleteMode, setBatchDeleteMode] = useState(false);
   const [selectedSlotIds, setSelectedSlotIds] = useState<Set<number>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [studentsSlot, setStudentsSlot] = useState<TimeSlot | null>(null);
+
+  const { data: slotStudents = [], isLoading: studentsLoading } = useQuery<{
+    id: number; childId: number; childName: string; childGrade: string; status: string;
+  }[]>({
+    queryKey: ["/api/franchise-admin/time-slots", studentsSlot?.id, "students"],
+    enabled: !!studentsSlot,
+  });
 
   const toggleSlotSelection = (id: number) => {
     setSelectedSlotIds((prev) => {
@@ -2809,6 +2817,11 @@ function TimeSlotsTab() {
                 </div>
                 {!batchDeleteMode && (
                   <div className="flex items-center gap-1">
+                    {slot.bookedSeats > 0 && (
+                      <Button variant="outline" size="icon" onClick={() => setStudentsSlot(slot)} data-testid={`button-view-students-${slot.id}`} title="查看已預約學生">
+                        <Users className="w-4 h-4 text-tiffany" />
+                      </Button>
+                    )}
                     {!isSlotExpired(slot) && (
                       <Button variant="outline" size="icon" onClick={() => openMbFromSlot(slot)} data-testid={`button-manual-book-${slot.id}`} title="臨時加課">
                         <UserPlus className="w-4 h-4 text-tiffany" />
@@ -3448,6 +3461,43 @@ function TimeSlotsTab() {
                   {manualBookMutation.isPending ? "加排中..." : "確認加排"}
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Students Dialog */}
+      <Dialog open={!!studentsSlot} onOpenChange={(open) => { if (!open) setStudentsSlot(null); }}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto" data-testid="dialog-slot-students">
+          <DialogHeader>
+            <DialogTitle data-testid="text-students-dialog-title">
+              {studentsSlot ? `${studentsSlot.date} ${studentsSlot.startTime}-${studentsSlot.endTime} 已預約學生` : "已預約學生"}
+            </DialogTitle>
+          </DialogHeader>
+          {studentsLoading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">載入中...</div>
+          ) : slotStudents.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">尚無預約學生</div>
+          ) : (
+            <div className="divide-y">
+              {slotStudents.map((s) => {
+                const statusMap: Record<string, { label: string; color: string }> = {
+                  confirmed: { label: "已確認", color: "bg-tiffany/10 text-tiffany" },
+                  checked_in: { label: "已簽到", color: "bg-orange-50 text-orange-600" },
+                  cancelled: { label: "已取消", color: "bg-gray-100 text-gray-500" },
+                  completed: { label: "已完成", color: "bg-amber-100 text-amber-700" },
+                };
+                const st = statusMap[s.status] || { label: s.status, color: "bg-gray-100 text-gray-600" };
+                return (
+                  <div key={s.id} className="flex items-center justify-between py-3" data-testid={`row-student-${s.id}`}>
+                    <div>
+                      <span className="text-sm font-medium" data-testid={`text-student-name-${s.id}`}>{s.childName}</span>
+                      <span className="text-xs text-muted-foreground ml-2" data-testid={`text-student-grade-${s.id}`}>{s.childGrade}年級</span>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.color}`} data-testid={`status-student-${s.id}`}>{st.label}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </DialogContent>

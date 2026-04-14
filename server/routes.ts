@@ -1620,6 +1620,19 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/franchise-admin/time-slots/:slotId/students", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const slotId = parseInt(req.params.slotId);
+      const slotList = await storage.getSlotsByFranchise(req.franchiseId);
+      const slot = slotList.find((s) => s.id === slotId);
+      if (!slot) return res.status(403).json({ message: "Forbidden" });
+      const students = await storage.getSlotStudentList(slotId);
+      res.json(students);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch slot students" });
+    }
+  });
+
   app.delete("/api/franchise-admin/time-slots/:id", isFranchiseAdmin, async (req: any, res) => {
     try {
       const slotId = parseInt(req.params.id);
