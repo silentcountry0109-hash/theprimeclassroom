@@ -2163,7 +2163,7 @@ function CoachesTab() {
               <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="老師姓名" data-testid="input-franchise-coach-name" />
             </div>
             <div>
-              <Label>手機號碼</Label>
+              <Label>手機號碼 *</Label>
               <Input
                 value={formData.phone}
                 onChange={(e) => {
@@ -2230,7 +2230,7 @@ function CoachesTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { resetForm(); setShowDialog(false); }}>取消</Button>
-            <Button onClick={() => saveMutation.mutate(formData)} disabled={!formData.name || saveMutation.isPending} data-testid="button-submit-franchise-coach">
+            <Button onClick={() => saveMutation.mutate(formData)} disabled={!formData.name || !formData.phone?.trim() || saveMutation.isPending} data-testid="button-submit-franchise-coach">
               {saveMutation.isPending ? "儲存中..." : editingCoach ? "更新" : "新增"}
             </Button>
           </DialogFooter>

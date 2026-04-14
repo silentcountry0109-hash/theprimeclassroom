@@ -1464,6 +1464,8 @@ export async function registerRoutes(
   app.post("/api/franchise-admin/coaches", isFranchiseAdmin, async (req: any, res) => {
     try {
       const { compensationType, compensationAmount, ...rest } = req.body;
+      if (!rest.name || !String(rest.name).trim()) return res.status(400).json({ message: "老師姓名為必填" });
+      if (!rest.phone || !String(rest.phone).trim()) return res.status(400).json({ message: "手機號碼為必填" });
       const data: any = { ...rest, franchiseId: req.franchiseId };
       if (compensationType !== undefined) {
         if (!["fixed", "percentage", "hourly"].includes(compensationType)) return res.status(400).json({ message: "薪酬類型必須是 fixed、percentage 或 hourly" });
