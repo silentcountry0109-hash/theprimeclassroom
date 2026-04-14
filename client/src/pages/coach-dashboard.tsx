@@ -1354,7 +1354,7 @@ function StudentsTab({ coachId }: { coachId: number }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-foreground">{s.name}</p>
-            <p className="text-xs text-muted-foreground">{s.grade}年級 · {s.bookingCount} 堂課</p>
+            <p className="text-xs text-muted-foreground">{s.grade}年級 · {s.bookingCount} 堂課{s.school ? ` · ${s.school}` : ""}</p>
             {s.franchiseNames && s.franchiseNames.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {s.franchiseNames.map((fname: string) => (
