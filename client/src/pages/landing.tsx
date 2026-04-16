@@ -77,6 +77,12 @@ import deco3 from "@assets/輔助圖文-3_1776327482727.png";
 import deco4 from "@assets/輔助圖文-4_1776327482727.png";
 import deco5 from "@assets/輔助圖文-5_1776327482727.png";
 import deco6 from "@assets/輔助圖文-6_1776327482727.png";
+import heroLogoImg from "@assets/未命名設計_(1)_1776335056205.png";
+import subtitleGif from "@assets/Adobe_Express_-_國小個別指導眼睛_1776335060502.gif";
+import teachImg1 from "@assets/螺旋式課程_1776335067651.png";
+import teachImg2 from "@assets/階梯式教學_1776335069419.png";
+import teachImg3 from "@assets/單元評測_1776335072659.png";
+import teachImg4 from "@assets/個別指導・個別進度_1776335074228.png";
 import studentBoy1 from "@assets/student_boy_1.png";
 import studentBoy2 from "@assets/student_boy_2.png";
 import studentGirl1 from "@assets/student_girl_1.png";
@@ -266,7 +272,6 @@ function SplashScreen() {
 }
 
 function HeroSection() {
-  const heroSubtitle = useSiteContent("hero.subtitle", "國小數學個別指導");
   const heroTagline = useSiteContent("hero.tagline", "讓教學回歸「1 位老師」對「1 位學生」的學習體驗");
   const heroSearchHint = useSiteContent("hero.searchHint", "找到最適合孩子的數學老師，立即預約免費診斷");
   const heroSocialProof = useSiteContent("hero.socialProof", "200+ 位家長推薦");
@@ -313,8 +318,6 @@ function HeroSection() {
     return parts.length > 0 ? parts.join(" · ") : "";
   };
 
-  const titleChars = ["質", "數", "教", "室"];
-
   return (
     <section
       className="relative min-h-screen flex flex-col items-center justify-center px-4 pt-16 md:pt-20 pb-12 md:pb-16"
@@ -346,32 +349,23 @@ function HeroSection() {
         }}
       />
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        <img src={deco1} alt="" className="absolute top-[10%] left-[5%] w-16 md:w-24 h-auto opacity-30 rotate-[-12deg]" />
-        <img src={deco2} alt="" className="absolute top-[18%] right-[8%] w-14 md:w-20 h-auto opacity-30 rotate-[18deg]" />
-        <img src={deco3} alt="" className="absolute bottom-[32%] left-[10%] w-14 md:w-20 h-auto opacity-25 rotate-[8deg] hidden sm:block" />
-        <img src={deco4} alt="" className="absolute bottom-[15%] right-[5%] w-20 md:w-28 h-auto opacity-25 rotate-[-6deg]" />
-        <img src={deco5} alt="" className="absolute top-[58%] right-[4%] w-14 md:w-20 h-auto opacity-25 rotate-[-18deg] hidden sm:block" />
-        <img src={deco6} alt="" className="absolute top-[38%] right-[22%] w-12 md:w-16 h-auto opacity-20 rotate-[12deg] hidden md:block" />
+        <img src={deco1} alt="" className="absolute top-[10%] left-[5%] w-16 md:w-24 h-auto opacity-30" style={{ transform: 'rotate(-12deg)' }} />
+        <img src={deco2} alt="" className="absolute top-[18%] right-[8%] w-14 md:w-20 h-auto opacity-30" style={{ transform: 'rotate(18deg)' }} />
+        <img src={deco3} alt="" className="absolute bottom-[32%] left-[10%] w-14 md:w-20 h-auto opacity-25 hidden sm:block" style={{ transform: 'rotate(8deg)' }} />
+        <img src={deco4} alt="" className="absolute bottom-[15%] right-[5%] w-20 md:w-28 h-auto opacity-25" style={{ transform: 'rotate(-6deg)' }} />
+        <img src={deco5} alt="" className="absolute top-[58%] right-[4%] w-14 md:w-20 h-auto opacity-25 hidden sm:block" style={{ transform: 'rotate(-18deg)' }} />
+        <img src={deco6} alt="" className="absolute top-[38%] right-[22%] w-12 md:w-16 h-auto opacity-20 hidden md:block" style={{ transform: 'rotate(12deg)' }} />
       </div>
 
       <div className="text-center max-w-4xl mx-auto z-10 px-2">
-        <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-[0.1em] sm:tracking-[0.15em] text-foreground mb-4 overflow-hidden">
-          {titleChars.map((char, i) => (
-            <motion.span
-              key={i}
-              className="inline-block"
-              initial={{ opacity: 0, y: 40, rotateX: -90 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0 }}
-              transition={{
-                duration: 0.7,
-                delay: 0.15 + i * 0.12,
-                ease: [0.215, 0.61, 0.355, 1],
-              }}
-            >
-              {char}
-            </motion.span>
-          ))}
-        </h1>
+        <motion.div
+          className="flex justify-center mb-2"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.15, ease: [0.215, 0.61, 0.355, 1] }}
+        >
+          <img src={heroLogoImg} alt="質數教室" className="h-20 md:h-28 w-auto object-contain" />
+        </motion.div>
         <motion.p
           className="text-lg md:text-xl text-tiffany font-medium tracking-[0.1em] mb-3"
           initial={{ opacity: 0, letterSpacing: "0.4em" }}
@@ -380,20 +374,14 @@ function HeroSection() {
         >
           The Prime
         </motion.p>
-        <motion.p
-          className="text-base md:text-lg text-muted-foreground mb-2 tracking-wide relative inline-block"
+        <motion.div
+          className="flex justify-center mb-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          <span className="relative">
-            {heroSubtitle}
-            <span
-              className="absolute h-[6px] rounded-full"
-              style={{ backgroundColor: '#81D8D0', bottom: '2px', zIndex: -1, left: '-8px', right: '-8px' }}
-            />
-          </span>
-        </motion.p>
+          <img src={subtitleGif} alt="國小數學個別指導" className="h-8 md:h-10 w-auto object-contain" />
+        </motion.div>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
           initial={{ opacity: 0 }}
@@ -659,10 +647,10 @@ function TeachingMethodSection() {
   const teach4Desc = useSiteContent("teaching.method4.desc", "每位孩子都有專屬的學習計畫與進度，老師依據評測結果量身打造最適合的學習路徑，讓吸收效率最大化。");
 
   const methods = [
-    { icon: Repeat, title: teach1Title, description: teach1Desc, color: "tiffany" },
-    { icon: Layers, title: teach2Title, description: teach2Desc, color: "coral" },
-    { icon: BarChart3, title: teach3Title, description: teach3Desc, color: "tiffany" },
-    { icon: Users, title: teach4Title, description: teach4Desc, color: "coral" },
+    { img: teachImg1, title: teach1Title, description: teach1Desc },
+    { img: teachImg2, title: teach2Title, description: teach2Desc },
+    { img: teachImg3, title: teach3Title, description: teach3Desc },
+    { img: teachImg4, title: teach4Title, description: teach4Desc },
   ];
 
   return (
@@ -689,9 +677,11 @@ function TeachingMethodSection() {
               data-testid={`card-teaching-method-${i}`}
             >
               <div className="flex items-start gap-4 md:gap-5">
-                <div className={`w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 ${method.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
-                  <method.icon className={`w-6 h-6 md:w-7 md:h-7 ${method.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
-                </div>
+                <img
+                  src={method.img}
+                  alt={method.title}
+                  className="w-16 h-16 md:w-20 md:h-20 object-contain flex-shrink-0"
+                />
                 <div className="flex-1">
                   <h3 className="font-serif text-lg md:text-xl tracking-wide text-foreground mb-1.5 md:mb-2">{method.title}</h3>
                   <p className="text-muted-foreground leading-relaxed text-sm">{method.description}</p>

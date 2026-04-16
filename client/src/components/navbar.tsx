@@ -50,7 +50,7 @@ export default function Navbar() {
             }
           }}
         >
-          <img src={primeLogoImg} alt="質數教室 The Prime" className="h-9 md:h-11 w-auto object-contain" />
+          <img src={primeLogoImg} alt="質數教室 The Prime" className="h-12 md:h-16 w-auto object-contain" />
         </span>
 
         <div className="hidden md:flex items-center gap-8">
