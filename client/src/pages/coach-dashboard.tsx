@@ -389,6 +389,7 @@ function CalendarTab({ coachId, initialDate, onInitialDateConsumed }: { coachId:
     enabled: !!coachId,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -543,6 +544,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
     staleTime: 0,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const { canCheckIn, isSlotEnded, minutesUntilCheckIn } = useCheckInAvailability(
@@ -1028,6 +1030,7 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     staleTime: 0,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const { data: existingBooks = [] } = useQuery<any[]>({
