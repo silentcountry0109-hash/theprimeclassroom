@@ -70,6 +70,13 @@ import teacher3Img from "@assets/teacher_3.png";
 import teacher4Img from "@assets/teacher_4.png";
 import teacher5Img from "@assets/teacher_5.png";
 import teacher6Img from "@assets/teacher_6.png";
+import splashGif from "@assets/質數教室_1776327427705.gif";
+import deco1 from "@assets/輔助圖文-1_1776327482726.png";
+import deco2 from "@assets/輔助圖文-2_1776327482727.png";
+import deco3 from "@assets/輔助圖文-3_1776327482727.png";
+import deco4 from "@assets/輔助圖文-4_1776327482727.png";
+import deco5 from "@assets/輔助圖文-5_1776327482727.png";
+import deco6 from "@assets/輔助圖文-6_1776327482727.png";
 import studentBoy1 from "@assets/student_boy_1.png";
 import studentBoy2 from "@assets/student_boy_2.png";
 import studentGirl1 from "@assets/student_girl_1.png";
@@ -219,6 +226,45 @@ function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string 
   );
 }
 
+function SplashScreen() {
+  const [visible, setVisible] = useState(() => {
+    try {
+      return !sessionStorage.getItem("prime_splash_shown");
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (!visible) return;
+    const timer = setTimeout(() => {
+      setVisible(false);
+      try { sessionStorage.setItem("prime_splash_shown", "1"); } catch {}
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"
+          style={{ backgroundColor: "#FAF9F6" }}
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+          <img
+            src={splashGif}
+            alt="質數教室"
+            className="max-w-xs md:max-w-sm w-[60vw] h-auto object-contain"
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function HeroSection() {
   const heroSubtitle = useSiteContent("hero.subtitle", "國小數學個別指導");
   const heroTagline = useSiteContent("hero.tagline", "讓教學回歸「1 位老師」對「1 位學生」的學習體驗");
@@ -300,14 +346,12 @@ function HeroSection() {
         }}
       />
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        <span className="absolute top-[12%] left-[6%] text-6xl md:text-8xl text-tiffany/[0.14] font-serif rotate-[-15deg]">+</span>
-        <span className="absolute top-[22%] right-[10%] text-5xl md:text-7xl text-coral/[0.18] font-serif rotate-[20deg]">×</span>
-        <span className="absolute bottom-[35%] left-[12%] text-5xl md:text-6xl text-tiffany/[0.12] font-serif rotate-[10deg] hidden sm:block">÷</span>
-        <span className="absolute bottom-[18%] right-[6%] text-7xl md:text-9xl text-tiffany/[0.12] font-serif rotate-[-8deg]">−</span>
-        <span className="absolute top-[50%] left-[3%] text-4xl md:text-5xl text-coral/[0.14] font-serif rotate-[25deg] hidden sm:block">∑</span>
-        <span className="absolute top-[65%] right-[4%] text-5xl md:text-6xl text-tiffany/[0.10] font-serif rotate-[-20deg] hidden sm:block">π</span>
-        <span className="absolute top-[35%] right-[25%] text-3xl md:text-4xl text-tiffany/[0.12] font-serif rotate-[15deg] hidden md:block">∞</span>
-        <span className="absolute bottom-[45%] left-[30%] text-4xl md:text-5xl text-coral/[0.12] font-serif rotate-[-10deg] hidden md:block">√</span>
+        <img src={deco1} alt="" className="absolute top-[10%] left-[5%] w-16 md:w-24 h-auto opacity-30 rotate-[-12deg]" />
+        <img src={deco2} alt="" className="absolute top-[18%] right-[8%] w-14 md:w-20 h-auto opacity-30 rotate-[18deg]" />
+        <img src={deco3} alt="" className="absolute bottom-[32%] left-[10%] w-14 md:w-20 h-auto opacity-25 rotate-[8deg] hidden sm:block" />
+        <img src={deco4} alt="" className="absolute bottom-[15%] right-[5%] w-20 md:w-28 h-auto opacity-25 rotate-[-6deg]" />
+        <img src={deco5} alt="" className="absolute top-[58%] right-[4%] w-14 md:w-20 h-auto opacity-25 rotate-[-18deg] hidden sm:block" />
+        <img src={deco6} alt="" className="absolute top-[38%] right-[22%] w-12 md:w-16 h-auto opacity-20 rotate-[12deg] hidden md:block" />
       </div>
 
       <div className="text-center max-w-4xl mx-auto z-10 px-2">
@@ -1837,6 +1881,7 @@ export default function LandingPage() {
 
   return (
     <SiteContentContext.Provider value={siteContentData}>
+      <SplashScreen />
       <div className="min-h-screen">
         <Navbar />
         <HeroSection />

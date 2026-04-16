@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import primeLogoImg from "@assets/質數logo-1_1776327363321.png";
 
 const NAV_LINKS = [
   { label: "認識質數", href: "#about" },
@@ -39,7 +40,7 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto h-full flex items-center justify-between gap-4 px-4 md:px-6">
         <span
-          className="font-serif text-xl md:text-2xl tracking-[0.15em] text-foreground cursor-pointer"
+          className="cursor-pointer flex items-center"
           data-testid="link-home"
           onClick={() => {
             if (window.location.pathname === "/") {
@@ -49,7 +50,7 @@ export default function Navbar() {
             }
           }}
         >
-          質數教室
+          <img src={primeLogoImg} alt="質數教室 The Prime" className="h-9 md:h-11 w-auto object-contain" />
         </span>
 
         <div className="hidden md:flex items-center gap-8">
