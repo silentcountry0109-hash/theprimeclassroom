@@ -387,6 +387,8 @@ function CalendarTab({ coachId, initialDate, onInitialDateConsumed }: { coachId:
   const { data: slots = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/coach/calendar", year, month],
     enabled: !!coachId,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -538,6 +540,9 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
   const { toast } = useToast();
   const { data: students = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/coach/slots", slot.id, "students"],
+    staleTime: 0,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const { canCheckIn, isSlotEnded, minutesUntilCheckIn } = useCheckInAvailability(
@@ -1020,6 +1025,9 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
 
   const { data: students = [] } = useQuery<any[]>({
     queryKey: ["/api/coach/slots", slot.id, "students"],
+    staleTime: 0,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: existingBooks = [] } = useQuery<any[]>({
