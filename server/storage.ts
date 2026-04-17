@@ -1294,7 +1294,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFranchiseStats(franchiseId: number) {
-    const [coachCount] = await db.select({ count: sql<number>`count(*)` }).from(coaches).where(eq(coaches.franchiseId, franchiseId));
+    const [coachCount] = await db.select({ count: sql<number>`count(*)` }).from(coaches).where(and(eq(coaches.franchiseId, franchiseId), eq(coaches.isActive, true)));
     const [slotCount] = await db.select({ count: sql<number>`count(*)` }).from(timeSlots).where(eq(timeSlots.franchiseId, franchiseId));
 
     const franchiseSlots = await db.select({ id: timeSlots.id }).from(timeSlots).where(eq(timeSlots.franchiseId, franchiseId));
