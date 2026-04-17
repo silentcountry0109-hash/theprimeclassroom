@@ -152,7 +152,6 @@ function PingPongGif({ src, className, alt }: { src: string; className?: string;
         const resp = await fetch(src);
         const buffer = await resp.arrayBuffer();
         const uint8 = new Uint8Array(buffer);
-        // @ts-ignore
         const { GifReader } = await import("omggif");
         const gr = new GifReader(uint8);
         const frames = gr.numFrames();
@@ -1969,6 +1968,7 @@ export default function LandingPage() {
         <HeroSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <BrandPhilosophySection />
+        <WaveDivider from="#F0FBFA" to="#ffffff" />
         <TeachingMethodSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <LearningMapSection />
