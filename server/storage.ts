@@ -1234,13 +1234,23 @@ export class DatabaseStorage implements IStorage {
 
   async getAdminStats() {
     const [studentCount] = await db.select({ count: sql<number>`count(*)` }).from(children);
-    const [coachCount] = await db.select({ count: sql<number>`count(*)` }).from(coaches);
-    const [franchiseCount] = await db.select({ count: sql<number>`count(*)` }).from(franchises);
+    const [franchiseCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(franchises)
+      .where(eq(franchises.isActive, true));
     const [bookingCount] = await db.select({ count: sql<number>`count(*)` }).from(bookings);
+
+    const activeCoaches = await db
+      .select({ id: coaches.id, userId: coaches.userId })
+      .from(coaches)
+      .where(eq(coaches.isActive, true));
+    const uniqueCoachCount = new Set(
+      activeCoaches.map((c) => c.userId ?? `id:${c.id}`)
+    ).size;
 
     return {
       totalStudents: Number(studentCount.count),
-      totalCoaches: Number(coachCount.count),
+      totalCoaches: uniqueCoachCount,
       totalFranchises: Number(franchiseCount.count),
       totalBookings: Number(bookingCount.count),
     };
