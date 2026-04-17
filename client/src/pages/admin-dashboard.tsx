@@ -680,6 +680,7 @@ function FranchisesTab() {
   const [schoolInput, setSchoolInput] = useState("");
   const [filterCity, setFilterCity] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [searchKeyword, setSearchKeyword] = useState("");
 
   const { data: franchises = [], isLoading } = useQuery<Franchise[]>({
     queryKey: ["/api/admin/franchises"],
@@ -801,6 +802,7 @@ function FranchisesTab() {
     if (filterCity !== "all" && f.city !== filterCity) return false;
     if (filterStatus === "active" && !f.isActive) return false;
     if (filterStatus === "inactive" && f.isActive) return false;
+    if (searchKeyword.trim() && !f.name.toLowerCase().includes(searchKeyword.trim().toLowerCase())) return false;
     return true;
   });
 
@@ -817,6 +819,16 @@ function FranchisesTab() {
       </div>
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="relative">
+          <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="搜尋分校名稱…"
+            className="h-8 text-xs pl-7 w-44"
+            data-testid="input-franchise-search"
+          />
+        </div>
         <Select value={filterCity} onValueChange={setFilterCity}>
           <SelectTrigger className="h-8 text-xs w-32" data-testid="select-franchise-filter-city">
             <SelectValue placeholder="全部縣市" />
@@ -838,7 +850,7 @@ function FranchisesTab() {
             <SelectItem value="inactive">已停用</SelectItem>
           </SelectContent>
         </Select>
-        {(filterCity !== "all" || filterStatus !== "all") && (
+        {(filterCity !== "all" || filterStatus !== "all" || searchKeyword.trim()) && (
           <span className="text-xs text-muted-foreground">
             共 {filteredFranchises.length} 間
           </span>
