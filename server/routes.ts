@@ -1631,9 +1631,30 @@ export async function registerRoutes(
 
       if (classroomId) {
         const allClassrooms = await storage.getClassroomsByFranchise(franchiseId);
-        if (!allClassrooms.find((c) => c.id === classroomId)) {
+        const cr = allClassrooms.find((c) => c.id === classroomId);
+        if (!cr) {
           return res.status(400).json({ message: "教室不屬於此分校" });
         }
+
+        const roomConflicts = await storage.getClassroomOverlappingSlots(classroomId, slot.date, slot.startTime, slot.endTime, slotId);
+        if (roomConflicts.length > 0) {
+          const detail = roomConflicts.map((s) => `${s.startTime}-${s.endTime}`).join("、");
+          return res.status(409).json({
+            message: `教室「${cr.name}」時段衝突：${slot.date} 已有時段 ${detail} 與此時段重疊`,
+            type: "room_conflict",
+            conflicts: roomConflicts,
+          });
+        }
+      }
+
+      const coachConflicts = await storage.getCoachOverlappingSlots(coachId, slot.date, slot.startTime, slot.endTime, slotId);
+      if (coachConflicts.length > 0) {
+        const detail = coachConflicts.map((s) => `${s.franchiseName} ${s.startTime}-${s.endTime}`).join("、");
+        return res.status(409).json({
+          message: `老師排課衝突：${slot.date} 老師已在 ${detail} 有排課`,
+          type: "coach_conflict",
+          conflicts: coachConflicts,
+        });
       }
 
       const previousCoachId = slot.coachId;
