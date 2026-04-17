@@ -2433,6 +2433,11 @@ function TimeSlotsTab() {
         body: JSON.stringify(payload),
         credentials: "include",
       });
+      if (res.status === 409) {
+        const data = await res.json();
+        const conflictType = data.type === "room_conflict" || data.type === "coach_conflict" ? data.type : "room_conflict";
+        throw new ConflictError(data.message || "排課衝突", conflictType);
+      }
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "新增時段失敗");
@@ -2444,10 +2449,15 @@ function TimeSlotsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
       setShowAdd(false);
+      setAddConflictError(null);
       setSlotForm({ date: "", startTime: "", endTime: "", coachId: 0, maxSeats: 5 });
     },
     onError: (error: Error) => {
-      toast({ title: "排課衝突", description: error.message, variant: "destructive" });
+      if (error instanceof ConflictError) {
+        setAddConflictError({ type: error.conflictType, message: error.message });
+      } else {
+        toast({ title: "新增失敗", description: error.message, variant: "destructive" });
+      }
     },
   });
 
@@ -2511,6 +2521,7 @@ function TimeSlotsTab() {
   const [editCoachId, setEditCoachId] = useState<string>("");
   const [editClassroomId, setEditClassroomId] = useState<string>("");
   const [editConflictError, setEditConflictError] = useState<{ type: "room_conflict" | "coach_conflict"; message: string } | null>(null);
+  const [addConflictError, setAddConflictError] = useState<{ type: "room_conflict" | "coach_conflict"; message: string } | null>(null);
 
   const editSlotMutation = useMutation({
     mutationFn: async ({ id, coachId, classroomId }: { id: number; coachId: number; classroomId: number | null }) => {
@@ -3050,7 +3061,7 @@ function TimeSlotsTab() {
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={(open) => { setShowAdd(open); if (!open) setBatchMode(false); }}>
+      <Dialog open={showAdd} onOpenChange={(open) => { setShowAdd(open); if (!open) { setBatchMode(false); setAddConflictError(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>新增時段</DialogTitle>
@@ -3121,7 +3132,7 @@ function TimeSlotsTab() {
                 })()}
                 <div>
                   <Label>上課教室 {classroomsList.length > 0 && "*"}</Label>
-                  <Select value={slotForm.classroomId ? slotForm.classroomId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, classroomId: parseInt(v) || 0 })}>
+                  <Select value={slotForm.classroomId ? slotForm.classroomId.toString() : ""} onValueChange={(v) => { setSlotForm({ ...slotForm, classroomId: parseInt(v) || 0 }); setAddConflictError(null); }}>
                     <SelectTrigger data-testid="select-franchise-slot-classroom"><SelectValue placeholder={classroomsList.length > 0 ? "選擇教室" : "尚未建立教室"} /></SelectTrigger>
                     <SelectContent>
                       {classroomsList.map((cr) => <SelectItem key={cr.id} value={cr.id.toString()}>{cr.name}</SelectItem>)}
@@ -3130,16 +3141,22 @@ function TimeSlotsTab() {
                 </div>
                 <div>
                   <Label>指派老師 *</Label>
-                  <Select value={slotForm.coachId ? slotForm.coachId.toString() : ""} onValueChange={(v) => setSlotForm({ ...slotForm, coachId: parseInt(v) || 0 })}>
+                  <Select value={slotForm.coachId ? slotForm.coachId.toString() : ""} onValueChange={(v) => { setSlotForm({ ...slotForm, coachId: parseInt(v) || 0 }); setAddConflictError(null); }}>
                     <SelectTrigger data-testid="select-franchise-slot-coach"><SelectValue placeholder="選擇老師" /></SelectTrigger>
                     <SelectContent>
                       {coaches.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
+                {addConflictError && (
+                  <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive" data-testid="alert-add-slot-conflict">
+                    <span className="mt-0.5 shrink-0">⚠</span>
+                    <span>{addConflictError.message}</span>
+                  </div>
+                )}
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
+                <Button variant="outline" onClick={() => { setShowAdd(false); setAddConflictError(null); }}>取消</Button>
                 <Button
                   onClick={() => addSlotMutation.mutate(slotForm)}
                   disabled={!slotForm.date || !slotForm.startTime || !slotForm.coachId || (classroomsList.length > 0 && !slotForm.classroomId) || addSlotMutation.isPending || isDayClosed(slotForm.date) || (() => {
