@@ -366,27 +366,27 @@ function OverviewTab() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "coaches" ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50"}`}>
+                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "coaches" ? "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:ring-blue-700" : "bg-gray-50 dark:bg-gray-800/50"}`}>
                       <p className={`text-lg font-bold ${sortBy === "coaches" ? "text-blue-700" : "text-foreground"}`} data-testid={`text-coaches-${f.franchiseId}`}>{f.totalCoaches}</p>
                       <p className={`text-[10px] ${sortBy === "coaches" ? "text-blue-500 font-semibold" : "text-muted-foreground"}`}>老師 ({f.certifiedCoaches} 認證)</p>
                     </div>
-                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "students" ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50"}`}>
+                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "students" ? "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:ring-blue-700" : "bg-gray-50 dark:bg-gray-800/50"}`}>
                       <p className={`text-lg font-bold ${sortBy === "students" ? "text-blue-700" : "text-foreground"}`} data-testid={`text-students-${f.franchiseId}`}>{f.uniqueStudents}</p>
                       <p className={`text-[10px] ${sortBy === "students" ? "text-blue-500 font-semibold" : "text-muted-foreground"}`}>學生數</p>
                     </div>
-                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "bookings" ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50"}`}>
+                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "bookings" ? "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:ring-blue-700" : "bg-gray-50 dark:bg-gray-800/50"}`}>
                       <p className={`text-lg font-bold ${sortBy === "bookings" ? "text-blue-700" : "text-foreground"}`} data-testid={`text-bookings-${f.franchiseId}`}>{f.totalBookings}</p>
                       <p className={`text-[10px] ${sortBy === "bookings" ? "text-blue-500 font-semibold" : "text-muted-foreground"}`}>總預約</p>
                     </div>
-                    <div className="text-center p-2 rounded bg-gray-50">
+                    <div className="text-center p-2 rounded bg-gray-50 dark:bg-gray-800/50">
                       <p className="text-lg font-bold text-tiffany" data-testid={`text-confirmed-${f.franchiseId}`}>{f.confirmedBookings}</p>
                       <p className="text-[10px] text-muted-foreground">已確認</p>
                     </div>
-                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "month" ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50"}`}>
+                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "month" ? "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:ring-blue-700" : "bg-gray-50 dark:bg-gray-800/50"}`}>
                       <p className={`text-lg font-bold ${sortBy === "month" ? "text-blue-700" : "text-foreground"}`} data-testid={`text-this-month-${f.franchiseId}`}>{f.thisMonthBookings}</p>
                       <p className={`text-[10px] ${sortBy === "month" ? "text-blue-500 font-semibold" : "text-muted-foreground"}`}>本月預約</p>
                     </div>
-                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "newStudents" ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50"}`}>
+                    <div className={`text-center p-2 rounded transition-colors ${sortBy === "newStudents" ? "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:ring-blue-700" : "bg-gray-50 dark:bg-gray-800/50"}`}>
                       <p className={`text-lg font-bold ${sortBy === "newStudents" ? "text-blue-700" : "text-green-600"}`} data-testid={`text-new-students-${f.franchiseId}`}>{f.newStudents}</p>
                       <p className={`text-[10px] ${sortBy === "newStudents" ? "text-blue-500 font-semibold" : "text-muted-foreground"}`}>本月新生</p>
                     </div>
