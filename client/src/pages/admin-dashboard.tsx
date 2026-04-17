@@ -1175,6 +1175,40 @@ function CoachesTab() {
     return franchiseList.find((f) => f.id === fId)?.name || "未知分校";
   };
 
+  type CoachGroup = {
+    key: string;
+    coaches: Coach[];
+    name: string;
+    isCertified: boolean;
+    rating: number | null;
+    reviewCount: number;
+    specialties: string[];
+    bio: string;
+  };
+
+  const groupedCoaches: CoachGroup[] = (() => {
+    const groups: Map<string, Coach[]> = new Map();
+    coaches.forEach((coach) => {
+      const key = coach.userId ? `user:${coach.userId}` : `id:${coach.id}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(coach);
+    });
+    return Array.from(groups.entries()).map(([key, group]) => {
+      const first = group[0];
+      const ratedCoach = group.find((c) => c.rating != null && c.rating > 0) ?? null;
+      return {
+        key,
+        coaches: group,
+        name: first.name,
+        isCertified: group.some((c) => c.isCertified),
+        rating: ratedCoach ? ratedCoach.rating : null,
+        reviewCount: ratedCoach ? (ratedCoach.reviewCount ?? 0) : 0,
+        specialties: first.specialties || [],
+        bio: first.bio || "",
+      };
+    });
+  })();
+
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
@@ -1196,36 +1230,59 @@ function CoachesTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {coaches.map((coach) => (
-            <div key={coach.id} className="bg-white rounded-md border border-gray-100 p-4 flex items-center gap-4" data-testid={`admin-coach-${coach.id}`}>
-              <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center">
-                <span className="text-lg font-serif text-tiffany">{coach.name[0]}</span>
+          {groupedCoaches.map((group) => (
+            <div key={group.key} className="bg-white rounded-md border border-gray-100 p-4 flex items-start gap-4" data-testid={group.coaches.length === 1 ? `admin-coach-${group.coaches[0].id}` : `admin-coach-group-${group.key}`}>
+              <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center shrink-0">
+                <span className="text-lg font-serif text-tiffany">{group.name[0]}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-medium text-foreground">{coach.name}</p>
-                  {coach.isCertified && <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">已認證</span>}
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{getFranchiseName(coach.franchiseId)}</span>
+                  <p className="text-sm font-medium text-foreground">{group.name}</p>
+                  {group.isCertified && <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">已認證</span>}
+                  {group.coaches.map((c) => (
+                    <span key={c.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{getFranchiseName(c.franchiseId)}</span>
+                  ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{coach.specialties?.join(" · ") || "一般數學教學"}</p>
-                {coach.bio && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{coach.bio}</p>}
+                <p className="text-xs text-muted-foreground mt-0.5">{group.specialties.join(" · ") || "一般數學教學"}</p>
+                {group.bio && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{group.bio}</p>}
+                {group.coaches.length > 1 && (
+                  <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+                    {group.coaches.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between gap-2" data-testid={`admin-coach-${c.id}`}>
+                        <span className="text-xs text-muted-foreground">{getFranchiseName(c.franchiseId)}</span>
+                        <div className="flex items-center gap-1">
+                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => openEdit(c)} data-testid={`button-edit-coach-${c.id}`}>
+                            <Edit className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => { if (confirm("確定要刪除此老師？")) deleteMutation.mutate(c.id); }} data-testid={`button-delete-coach-${c.id}`}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {coach.rating != null && coach.rating > 0 && (
+                {group.rating != null && group.rating > 0 && (
                   <div className="text-right mr-2">
                     <div className="flex items-center gap-1">
                       <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <span className="text-sm font-medium">{Number(coach.rating).toFixed(1)}</span>
+                      <span className="text-sm font-medium">{Number(group.rating).toFixed(1)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">{coach.reviewCount} 則</p>
+                    <p className="text-xs text-muted-foreground">{group.reviewCount} 則</p>
                   </div>
                 )}
-                <Button variant="outline" size="icon" onClick={() => openEdit(coach)} data-testid={`button-edit-coach-${coach.id}`}>
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => { if (confirm("確定要刪除此老師？")) deleteMutation.mutate(coach.id); }} data-testid={`button-delete-coach-${coach.id}`}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {group.coaches.length === 1 && (
+                  <>
+                    <Button variant="outline" size="icon" onClick={() => openEdit(group.coaches[0])} data-testid={`button-edit-coach-${group.coaches[0].id}`}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => { if (confirm("確定要刪除此老師？")) deleteMutation.mutate(group.coaches[0].id); }} data-testid={`button-delete-coach-${group.coaches[0].id}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ))}
