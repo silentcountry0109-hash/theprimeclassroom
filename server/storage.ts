@@ -83,6 +83,7 @@ export interface IStorage {
   getSlot(id: number): Promise<TimeSlot | undefined>;
   findSlot(franchiseId: number, coachId: number | null, date: string, startTime: string, endTime: string): Promise<TimeSlot | undefined>;
   createSlot(slot: InsertTimeSlot): Promise<TimeSlot>;
+  updateTimeSlotCoachAndClassroom(slotId: number, franchiseId: number, coachId: number, classroomId: number | null): Promise<TimeSlot>;
   deleteSlot(id: number): Promise<void>;
 
   getBooking(id: number): Promise<any | undefined>;
@@ -618,6 +619,15 @@ export class DatabaseStorage implements IStorage {
   async createSlot(slot: InsertTimeSlot): Promise<TimeSlot> {
     const [created] = await db.insert(timeSlots).values(slot).returning();
     return created;
+  }
+
+  async updateTimeSlotCoachAndClassroom(slotId: number, franchiseId: number, coachId: number, classroomId: number | null): Promise<TimeSlot> {
+    const [updated] = await db
+      .update(timeSlots)
+      .set({ coachId, classroomId })
+      .where(and(eq(timeSlots.id, slotId), eq(timeSlots.franchiseId, franchiseId)))
+      .returning();
+    return updated;
   }
 
   async deleteSlot(id: number): Promise<void> {

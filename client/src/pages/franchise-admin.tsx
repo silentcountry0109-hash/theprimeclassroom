@@ -2499,6 +2499,24 @@ function TimeSlotsTab() {
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [studentsSlot, setStudentsSlot] = useState<TimeSlot | null>(null);
 
+  const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
+  const [editCoachId, setEditCoachId] = useState<string>("");
+  const [editClassroomId, setEditClassroomId] = useState<string>("");
+
+  const editSlotMutation = useMutation({
+    mutationFn: async ({ id, coachId, classroomId }: { id: number; coachId: number; classroomId: number | null }) => {
+      return apiRequest("PATCH", `/api/franchise-admin/time-slots/${id}`, { coachId, classroomId });
+    },
+    onSuccess: () => {
+      toast({ title: "時段已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
+      setEditingSlot(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
   const { data: slotStudents = [], isLoading: studentsLoading } = useQuery<{
     id: number; childId: number; childName: string; childGrade: string; status: string; childSchool?: string | null;
   }[]>({
@@ -2839,6 +2857,19 @@ function TimeSlotsTab() {
                         <UserPlus className="w-4 h-4 text-tiffany" />
                       </Button>
                     )}
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      title="編輯教室與老師"
+                      data-testid={`button-edit-slot-${slot.id}`}
+                      onClick={() => {
+                        setEditingSlot(slot);
+                        setEditCoachId(slot.coachId ? String(slot.coachId) : "");
+                        setEditClassroomId(slot.classroomId ? String(slot.classroomId) : "");
+                      }}
+                    >
+                      <Edit className="w-4 h-4 text-tiffany" />
+                    </Button>
                     {(() => {
                       const status = getSlotStatus(slot);
                       const cantDelete = status === "in_progress" || status === "completed";
@@ -3543,6 +3574,64 @@ function TimeSlotsTab() {
               })}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingSlot} onOpenChange={(open) => { if (!open) setEditingSlot(null); }}>
+        <DialogContent className="max-w-sm" data-testid="dialog-edit-slot">
+          <DialogHeader>
+            <DialogTitle>編輯時段</DialogTitle>
+          </DialogHeader>
+          {editingSlot && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-md px-3 py-2 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{editingSlot.date}</span>
+                <span className="mx-1">·</span>
+                <span>{editingSlot.startTime} - {editingSlot.endTime}</span>
+              </div>
+              <div className="space-y-1.5">
+                <Label>負責老師 *</Label>
+                <Select value={editCoachId} onValueChange={setEditCoachId}>
+                  <SelectTrigger data-testid="select-edit-slot-coach">
+                    <SelectValue placeholder="選擇老師" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {coaches.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>上課教室</Label>
+                <Select value={editClassroomId} onValueChange={setEditClassroomId}>
+                  <SelectTrigger data-testid="select-edit-slot-classroom">
+                    <SelectValue placeholder="無教室" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">無教室</SelectItem>
+                    {classroomsList.map((cr) => (
+                      <SelectItem key={cr.id} value={String(cr.id)}>{cr.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditingSlot(null)} data-testid="button-cancel-edit-slot">取消</Button>
+            <Button
+              disabled={!editCoachId || editSlotMutation.isPending}
+              onClick={() => {
+                if (!editingSlot || !editCoachId) return;
+                const classroomIdNum = editClassroomId && editClassroomId !== "0" ? parseInt(editClassroomId) : null;
+                editSlotMutation.mutate({ id: editingSlot.id, coachId: parseInt(editCoachId), classroomId: classroomIdNum });
+              }}
+              data-testid="button-confirm-edit-slot"
+            >
+              {editSlotMutation.isPending ? "儲存中..." : "儲存"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

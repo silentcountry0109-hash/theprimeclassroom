@@ -1610,6 +1610,39 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/franchise-admin/time-slots/:id", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const slotId = parseInt(req.params.id);
+      const franchiseId = req.franchiseId;
+      const { coachId, classroomId } = req.body;
+
+      if (!coachId) {
+        return res.status(400).json({ message: "請指派老師" });
+      }
+
+      const slotList = await storage.getSlotsByFranchise(franchiseId);
+      const slot = slotList.find((s) => s.id === slotId);
+      if (!slot) return res.status(403).json({ message: "Forbidden" });
+
+      const franchiseCoaches = await storage.getCoachesByFranchise(franchiseId);
+      if (!franchiseCoaches.find((c) => c.id === coachId)) {
+        return res.status(400).json({ message: "老師不屬於此分校" });
+      }
+
+      if (classroomId) {
+        const allClassrooms = await storage.getClassroomsByFranchise(franchiseId);
+        if (!allClassrooms.find((c) => c.id === classroomId)) {
+          return res.status(400).json({ message: "教室不屬於此分校" });
+        }
+      }
+
+      const updated = await storage.updateTimeSlotCoachAndClassroom(slotId, franchiseId, coachId, classroomId ?? null);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "更新時段失敗" });
+    }
+  });
+
   app.get("/api/franchise-admin/coaches/:id/schedule", isFranchiseAdmin, async (req: any, res) => {
     try {
       const coachId = parseInt(req.params.id);
