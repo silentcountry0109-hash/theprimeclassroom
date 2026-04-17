@@ -245,6 +245,7 @@ function OverviewTab() {
       case "students": return b.uniqueStudents - a.uniqueStudents;
       case "coaches": return b.totalCoaches - a.totalCoaches;
       case "month": return b.thisMonthBookings - a.thisMonthBookings;
+      case "newStudents": return b.newStudents - a.newStudents;
       default: return 0;
     }
   });
@@ -322,6 +323,7 @@ function OverviewTab() {
                 <SelectItem value="students">學生數排序</SelectItem>
                 <SelectItem value="coaches">師資數排序</SelectItem>
                 <SelectItem value="month">本月預約排序</SelectItem>
+                <SelectItem value="newStudents">本月新生排序</SelectItem>
               </SelectContent>
             </Select>
           </div>
