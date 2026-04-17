@@ -1857,6 +1857,32 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/franchise-admin/students/:childId", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const childId = parseInt(req.params.childId);
+      const franchiseStudents = await storage.getFranchiseStudents(req.franchiseId);
+      const belongs = franchiseStudents.some((s: any) => s.id === childId);
+      if (!belongs) return res.status(403).json({ message: "學生不屬於此分校" });
+      const { name, grade, school, notes } = req.body;
+      const updateData: Record<string, any> = {};
+      if (name !== undefined) {
+        if (!name.trim()) return res.status(400).json({ message: "姓名不得為空" });
+        updateData.name = name.trim();
+      }
+      if (grade !== undefined) {
+        const g = parseInt(grade);
+        if (isNaN(g) || g < 1 || g > 6) return res.status(400).json({ message: "年級必須是 1-6" });
+        updateData.grade = g;
+      }
+      if (school !== undefined) updateData.school = school.trim() || null;
+      if (notes !== undefined) updateData.notes = notes.trim() || null;
+      const updated = await storage.updateChild(childId, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update student" });
+    }
+  });
+
   app.delete("/api/franchise-admin/students/:childId", isFranchiseAdmin, async (req: any, res) => {
     try {
       const childId = parseInt(req.params.childId);

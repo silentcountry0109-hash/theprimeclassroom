@@ -77,6 +77,7 @@ import {
   Bell,
   Sparkles,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -3821,6 +3822,11 @@ function StudentsTab() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentGrade, setNewStudentGrade] = useState("1");
+  const [editingStudent, setEditingStudent] = useState<any | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editGrade, setEditGrade] = useState("1");
+  const [editSchool, setEditSchool] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const { toast } = useToast();
 
   const { data: students = [], isLoading } = useQuery<any[]>({
@@ -3844,6 +3850,34 @@ function StudentsTab() {
       toast({ title: "新增失敗", description: err.message, variant: "destructive" });
     },
   });
+
+  const editStudentMutation = useMutation({
+    mutationFn: async (data: { id: number; name: string; grade: number; school: string; notes: string }) => {
+      const res = await apiRequest("PATCH", `/api/franchise-admin/students/${data.id}`, {
+        name: data.name,
+        grade: data.grade,
+        school: data.school,
+        notes: data.notes,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/students"] });
+      toast({ title: "學生資料已更新" });
+      setEditingStudent(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "更新失敗", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const openEdit = (student: any) => {
+    setEditingStudent(student);
+    setEditName(student.name || "");
+    setEditGrade(String(student.grade || "1"));
+    setEditSchool(student.school || "");
+    setEditNotes(student.notes || "");
+  };
 
   const schools = [...new Set(students.map((s: any) => s.school).filter(Boolean))].sort();
 
@@ -3910,6 +3944,72 @@ function StudentsTab() {
               data-testid="button-submit-new-student"
             >
               {addStudentMutation.isPending ? "新增中..." : "新增"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingStudent} onOpenChange={(open) => { if (!open) setEditingStudent(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>編輯學生資料</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>姓名</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="學生姓名"
+                data-testid="input-edit-student-name"
+              />
+            </div>
+            <div>
+              <Label>年級</Label>
+              <Select value={editGrade} onValueChange={setEditGrade}>
+                <SelectTrigger data-testid="select-edit-student-grade">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6].map((g) => (
+                    <SelectItem key={g} value={g.toString()}>{g}年級</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>就讀學校</Label>
+              <Input
+                value={editSchool}
+                onChange={(e) => setEditSchool(e.target.value)}
+                placeholder="例：台南市北區文元國小"
+                data-testid="input-edit-student-school"
+              />
+            </div>
+            <div>
+              <Label>備註</Label>
+              <Input
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="其他備註（選填）"
+                data-testid="input-edit-student-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingStudent(null)}>取消</Button>
+            <Button
+              onClick={() => editStudentMutation.mutate({
+                id: editingStudent.id,
+                name: editName,
+                grade: parseInt(editGrade),
+                school: editSchool,
+                notes: editNotes,
+              })}
+              disabled={!editName.trim() || editStudentMutation.isPending}
+              data-testid="button-submit-edit-student"
+            >
+              {editStudentMutation.isPending ? "儲存中..." : "儲存"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3991,8 +4091,19 @@ function StudentsTab() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-muted-foreground">{student.bookingCount} 次預約</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="p-1.5 rounded hover:bg-tiffany/10 text-muted-foreground hover:text-tiffany transition-colors"
+                      onClick={(e) => { e.stopPropagation(); openEdit(student); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); openEdit(student); } }}
+                      data-testid={`button-edit-student-${student.id}`}
+                      aria-label="編輯學生資料"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </span>
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === student.id ? "rotate-180" : ""}`} />
                   </div>
                 </div>
