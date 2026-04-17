@@ -678,6 +678,8 @@ function FranchisesTab() {
   });
   const [tagInput, setTagInput] = useState("");
   const [schoolInput, setSchoolInput] = useState("");
+  const [filterCity, setFilterCity] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   const { data: franchises = [], isLoading } = useQuery<Franchise[]>({
     queryKey: ["/api/admin/franchises"],
@@ -794,6 +796,13 @@ function FranchisesTab() {
   });
 
   const districts = formData.city ? (TAIWAN_DISTRICTS[formData.city] || []) : [];
+  const franchiseCities = [...new Set(franchises.map((f) => f.city).filter(Boolean))].sort();
+  const filteredFranchises = franchises.filter((f) => {
+    if (filterCity !== "all" && f.city !== filterCity) return false;
+    if (filterStatus === "active" && !f.isActive) return false;
+    if (filterStatus === "inactive" && f.isActive) return false;
+    return true;
+  });
 
   return (
     <div className="max-w-4xl">
@@ -807,16 +816,45 @@ function FranchisesTab() {
         </Button>
       </div>
 
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <Select value={filterCity} onValueChange={setFilterCity}>
+          <SelectTrigger className="h-8 text-xs w-32" data-testid="select-franchise-filter-city">
+            <SelectValue placeholder="全部縣市" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部縣市</SelectItem>
+            {franchiseCities.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="h-8 text-xs w-28" data-testid="select-franchise-filter-status">
+            <SelectValue placeholder="全部狀態" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部狀態</SelectItem>
+            <SelectItem value="active">已啟用</SelectItem>
+            <SelectItem value="inactive">已停用</SelectItem>
+          </SelectContent>
+        </Select>
+        {(filterCity !== "all" || filterStatus !== "all") && (
+          <span className="text-xs text-muted-foreground">
+            共 {filteredFranchises.length} 間
+          </span>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-md" />)}</div>
-      ) : franchises.length === 0 ? (
+      ) : filteredFranchises.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-md border border-gray-100">
           <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">尚無分校資料</p>
+          <p className="text-sm text-muted-foreground">{franchises.length === 0 ? "尚無分校資料" : "沒有符合條件的分校"}</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {franchises.map((f) => (
+          {filteredFranchises.map((f) => (
             <div key={f.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`admin-franchise-${f.id}`}>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-tiffany/10 flex items-center justify-center shrink-0">
