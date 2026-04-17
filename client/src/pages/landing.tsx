@@ -463,7 +463,7 @@ function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.215, 0.61, 0.355, 1] }}
         >
-          <img src={heroLogoImg} alt="質數教室" className="h-20 md:h-28 w-auto object-contain" />
+          <img src={heroLogoImg} alt="質數教室" className="h-20 md:h-28 w-auto object-contain mix-blend-multiply" />
         </motion.div>
         <motion.p
           className="text-lg md:text-xl text-tiffany font-medium tracking-[0.1em] mb-3"
