@@ -253,7 +253,6 @@ function OverviewTab() {
     ? Math.round(analytics.reduce((s, a) => s + a.occupancyRate, 0) / analytics.length)
     : 0;
   const totalUniqueStudents = analytics.reduce((s, a) => s + a.uniqueStudents, 0);
-  const totalNewStudents = analytics.reduce((s, a) => s + a.newStudents, 0);
   const totalThisMonth = analytics.reduce((s, a) => s + a.thisMonthBookings, 0);
 
   const statCards = [
