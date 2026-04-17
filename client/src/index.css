@@ -325,3 +325,35 @@ html, body, #root {
     inset: -1px;
   }
 }
+
+@keyframes deco-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-deco-cw-slow {
+  animation: deco-spin 24s linear infinite;
+}
+.animate-deco-ccw-med {
+  animation: deco-spin 16s linear infinite reverse;
+}
+.animate-deco-cw-vslow {
+  animation: deco-spin 32s linear infinite;
+}
+.animate-deco-ccw-slow {
+  animation: deco-spin 22s linear infinite reverse;
+}
+.animate-deco-cw-med {
+  animation: deco-spin 18s linear infinite;
+}
+.animate-deco-ccw-vslow {
+  animation: deco-spin 28s linear infinite reverse;
+}
+
+@keyframes wave-drift {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-wave-drift {
+  animation: wave-drift 12s linear infinite;
+}

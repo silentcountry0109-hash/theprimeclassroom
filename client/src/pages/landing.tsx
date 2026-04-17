@@ -124,6 +124,98 @@ const fadeInUp = {
   transition: { duration: 0.6, ease: "easeOut" },
 };
 
+function WaveDivider({ from, to }: { from: string; to: string }) {
+  return (
+    <div className="relative overflow-hidden" style={{ height: 72, backgroundColor: to }}>
+      <svg
+        className="absolute top-0 left-0 h-full animate-wave-drift"
+        style={{ width: "200%", fill: from }}
+        viewBox="0 0 2880 72"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <path d="M0,36 C240,72 480,0 720,36 C960,72 1200,0 1440,36 C1680,72 1920,0 2160,36 C2400,72 2640,0 2880,36 L2880,72 L0,72 Z" />
+      </svg>
+    </div>
+  );
+}
+
+function PingPongGif({ src, className, alt }: { src: string; className?: string; alt?: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    let animHandle: number;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const resp = await fetch(src);
+        const buffer = await resp.arrayBuffer();
+        const uint8 = new Uint8Array(buffer);
+        // @ts-ignore
+        const { GifReader } = await import("omggif");
+        const gr = new GifReader(uint8);
+        const frames = gr.numFrames();
+        const w = gr.width;
+        const h = gr.height;
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const frameData: { pixels: Uint8ClampedArray; delay: number }[] = [];
+        let prevPixels = new Uint8ClampedArray(w * h * 4);
+        for (let i = 0; i < frames; i++) {
+          const info = gr.frameInfo(i);
+          const pixels = info.disposal === 2
+            ? new Uint8ClampedArray(w * h * 4)
+            : prevPixels.slice();
+          gr.decodeAndBlitFrameRGBA(i, pixels);
+          frameData.push({ pixels, delay: (info.delay || 10) * 10 });
+          prevPixels = pixels.slice();
+        }
+
+        const backward = frameData.slice(1, -1).reverse();
+        const sequence = [...frameData, ...backward];
+        let idx = 0;
+        let lastTime = 0;
+
+        const tick = (now: number) => {
+          if (cancelled) return;
+          const frame = sequence[idx];
+          if (now - lastTime >= frame.delay) {
+            ctx.putImageData(new ImageData(frame.pixels.slice(), w, h), 0, 0);
+            idx = (idx + 1) % sequence.length;
+            lastTime = now;
+          }
+          animHandle = requestAnimationFrame(tick);
+        };
+        animHandle = requestAnimationFrame(tick);
+      } catch {
+        // Fallback: render as static image
+        const img = document.createElement("img");
+        img.src = src;
+        img.onload = () => {
+          const canvas = canvasRef.current;
+          if (!canvas || cancelled) return;
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext("2d")?.drawImage(img, 0, 0);
+        };
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(animHandle);
+    };
+  }, [src]);
+
+  return <canvas ref={canvasRef} className={className} aria-label={alt} />;
+}
+
 function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -349,12 +441,12 @@ function HeroSection() {
         }}
       />
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        <img src={deco1} alt="" className="absolute top-[10%] left-[5%] w-16 md:w-24 h-auto opacity-30" style={{ transform: 'rotate(-12deg)' }} />
-        <img src={deco2} alt="" className="absolute top-[18%] right-[8%] w-14 md:w-20 h-auto opacity-30" style={{ transform: 'rotate(18deg)' }} />
-        <img src={deco3} alt="" className="absolute bottom-[32%] left-[10%] w-14 md:w-20 h-auto opacity-25 hidden sm:block" style={{ transform: 'rotate(8deg)' }} />
-        <img src={deco4} alt="" className="absolute bottom-[15%] right-[5%] w-20 md:w-28 h-auto opacity-25" style={{ transform: 'rotate(-6deg)' }} />
-        <img src={deco5} alt="" className="absolute top-[58%] right-[4%] w-14 md:w-20 h-auto opacity-25 hidden sm:block" style={{ transform: 'rotate(-18deg)' }} />
-        <img src={deco6} alt="" className="absolute top-[38%] right-[22%] w-12 md:w-16 h-auto opacity-20 hidden md:block" style={{ transform: 'rotate(12deg)' }} />
+        <img src={deco1} alt="" className="absolute top-[10%] left-[5%] w-16 md:w-24 h-auto opacity-30 animate-deco-cw-slow" />
+        <img src={deco2} alt="" className="absolute top-[18%] right-[8%] w-14 md:w-20 h-auto opacity-30 animate-deco-ccw-med" />
+        <img src={deco3} alt="" className="absolute bottom-[32%] left-[10%] w-14 md:w-20 h-auto opacity-25 hidden sm:block animate-deco-cw-vslow" />
+        <img src={deco4} alt="" className="absolute bottom-[15%] right-[5%] w-20 md:w-28 h-auto opacity-25 animate-deco-ccw-slow" />
+        <img src={deco5} alt="" className="absolute top-[58%] right-[4%] w-14 md:w-20 h-auto opacity-25 hidden sm:block animate-deco-cw-med" />
+        <img src={deco6} alt="" className="absolute top-[38%] right-[22%] w-12 md:w-16 h-auto opacity-20 hidden md:block animate-deco-ccw-vslow" />
       </div>
 
       <div className="text-center max-w-4xl mx-auto z-10 px-2">
@@ -380,7 +472,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          <img src={subtitleGif} alt="國小數學個別指導" className="h-8 md:h-10 w-auto object-contain" />
+          <PingPongGif src={subtitleGif} alt="國小數學個別指導" className="h-8 md:h-10 w-auto object-contain" />
         </motion.div>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
@@ -1875,16 +1967,25 @@ export default function LandingPage() {
       <div className="min-h-screen">
         <Navbar />
         <HeroSection />
+        <WaveDivider from="#FAF9F6" to="#ffffff" />
         <BrandPhilosophySection />
         <TeachingMethodSection />
+        <WaveDivider from="#ffffff" to="#FAF9F6" />
         <LearningMapSection />
         <TextbookSection />
+        <WaveDivider from="#FAF9F6" to="#ffffff" />
         <FeaturesSection />
+        <WaveDivider from="#ffffff" to="#FAF9F6" />
         <CoachesSection />
+        <WaveDivider from="#FAF9F6" to="#ffffff" />
         <ProcessSection />
+        <WaveDivider from="#ffffff" to="#FAF9F6" />
         <TestimonialsSection />
+        <WaveDivider from="#FAF9F6" to="#ffffff" />
         <FAQSection />
+        <WaveDivider from="#ffffff" to="#FAF9F6" />
         <CTASection />
+        <WaveDivider from="#FAF9F6" to="hsl(var(--foreground))" />
         <FooterSection />
       </div>
     </SiteContentContext.Provider>
