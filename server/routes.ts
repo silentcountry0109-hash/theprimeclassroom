@@ -1636,7 +1636,23 @@ export async function registerRoutes(
         }
       }
 
+      const previousCoachId = slot.coachId;
       const updated = await storage.updateTimeSlotCoachAndClassroom(slotId, franchiseId, coachId, classroomId ?? null);
+
+      if (coachId !== previousCoachId) {
+        const coach = await storage.getCoach(coachId);
+        if (coach?.userId) {
+          const franchise = await storage.getFranchise(franchiseId);
+          await storage.createNotification({
+            userId: coach.userId,
+            type: "slot_assigned",
+            title: "新排課通知",
+            message: `您在 ${updated.date} ${updated.startTime}-${updated.endTime}（${franchise?.name || "教室"}）有新的排課。`,
+            isRead: false,
+          });
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "更新時段失敗" });
