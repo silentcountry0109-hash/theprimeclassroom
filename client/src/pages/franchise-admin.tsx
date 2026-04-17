@@ -2309,6 +2309,7 @@ function TimeSlotsTab() {
     startTimes: ["09:00"] as string[], coachId: 0, classroomId: 0,
   });
   const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [batchResult, setBatchResult] = useState<{ created: number; skipped: number; conflicts: string[] } | null>(null);
 
   const { data: slots = [], isLoading } = useQuery<TimeSlot[]>({ queryKey: ["/api/franchise-admin/time-slots"] });
   const { data: coaches = [] } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
@@ -2362,6 +2363,7 @@ function TimeSlotsTab() {
     const { startDate, endDate, weekdays, startTimes, coachId, classroomId } = batchForm;
     if (!startDate || !endDate || weekdays.length === 0 || startTimes.length === 0) return;
     setBatchSubmitting(true);
+    setBatchResult(null);
     const dates: string[] = [];
     const cur = new Date(startDate + "T00:00:00");
     const end = new Date(endDate + "T00:00:00");
@@ -2407,20 +2409,10 @@ function TimeSlotsTab() {
     setBatchSubmitting(false);
     queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
     queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
-    const parts: string[] = [];
-    if (created > 0) parts.push(`成功 ${created} 堂`);
-    if (skipped > 0) parts.push(`略過 ${skipped} 堂（非營業）`);
-    if (conflicts.length > 0) parts.push(`失敗 ${conflicts.length} 堂（衝堂/其他）`);
-    if (parts.length > 0) {
-      const hasError = conflicts.length > 0;
-      toast({
-        title: parts.join("，"),
-        description: conflicts.length > 0 ? conflicts.slice(0, 3).join("\n") : undefined,
-        variant: hasError ? "destructive" : "default",
-      });
-    }
-    if (conflicts.length === 0) {
+    if (conflicts.length === 0 && created > 0) {
       setShowAdd(false);
+    } else {
+      setBatchResult({ created, skipped, conflicts });
     }
   };
 
@@ -2836,7 +2828,7 @@ function TimeSlotsTab() {
               <Button variant="outline" size="sm" onClick={openMbGlobal} className="rounded-full border-tiffany/40 text-tiffany hover:bg-tiffany/5" data-testid="button-walk-in-booking">
                 <UserPlus className="w-4 h-4 mr-1.5" />臨時加課
               </Button>
-              <Button onClick={() => setShowAdd(true)} className="rounded-full" data-testid="button-add-franchise-slot">
+              <Button onClick={() => { setShowAdd(true); setBatchResult(null); }} className="rounded-full" data-testid="button-add-franchise-slot">
                 <Plus className="w-4 h-4 mr-1.5" />新增時段
               </Button>
             </>
@@ -3287,6 +3279,24 @@ function TimeSlotsTab() {
                   </div>
                 )}
               </div>
+              {batchResult && (
+                <div className={`mx-1 mb-2 rounded-md border p-3 text-sm ${batchResult.conflicts.length > 0 ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"}`} data-testid="batch-result-summary">
+                  <div className="font-medium mb-1">
+                    {[
+                      batchResult.created > 0 && `成功 ${batchResult.created} 堂`,
+                      batchResult.skipped > 0 && `略過 ${batchResult.skipped} 堂（非營業）`,
+                      batchResult.conflicts.length > 0 && `失敗 ${batchResult.conflicts.length} 堂（衝堂/其他）`,
+                    ].filter(Boolean).join("，")}
+                  </div>
+                  {batchResult.conflicts.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto" data-testid="batch-conflict-list">
+                      {batchResult.conflicts.map((msg, i) => (
+                        <li key={i} className="text-xs opacity-90">{msg}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowAdd(false)}>取消</Button>
                 <Button
