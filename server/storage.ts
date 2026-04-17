@@ -783,17 +783,14 @@ export class DatabaseStorage implements IStorage {
 
   async addFranchiseStudent(franchiseId: number, name: string, grade: number): Promise<any> {
     const placeholderParentId = `franchise-${franchiseId}-parent-placeholder`;
-    const existingParent = await db.select().from(users).where(eq(users.id, placeholderParentId));
-    if (existingParent.length === 0) {
-      await db.insert(users).values({
-        id: placeholderParentId,
-        username: `franchise-${franchiseId}-parent`,
-        passwordHash: "nologin",
-        role: "parent",
-        firstName: "教室學生",
-        lastName: "",
-      });
-    }
+    await db.insert(users).values({
+      id: placeholderParentId,
+      username: `franchise-${franchiseId}-parent`,
+      passwordHash: "nologin",
+      role: "parent",
+      firstName: "教室學生",
+      lastName: "",
+    }).onConflictDoNothing();
     const child = await this.createChild({ parentId: placeholderParentId, name, grade });
     await db.insert(franchiseStudents).values({ franchiseId, childId: child.id });
     return child;
