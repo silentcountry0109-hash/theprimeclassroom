@@ -224,6 +224,14 @@ function TimeSelect({ value, onChange, disabled, "data-testid": testId }: { valu
   );
 }
 
+class ConflictError extends Error {
+  conflictType: "room_conflict" | "coach_conflict";
+  constructor(message: string, conflictType: "room_conflict" | "coach_conflict") {
+    super(message);
+    this.conflictType = conflictType;
+  }
+}
+
 export default function FranchiseAdminDashboard() {
   const { user, isLoading: authLoading, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
@@ -2502,18 +2510,43 @@ function TimeSlotsTab() {
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
   const [editCoachId, setEditCoachId] = useState<string>("");
   const [editClassroomId, setEditClassroomId] = useState<string>("");
+  const [editConflictError, setEditConflictError] = useState<{ type: "room_conflict" | "coach_conflict"; message: string } | null>(null);
 
   const editSlotMutation = useMutation({
     mutationFn: async ({ id, coachId, classroomId }: { id: number; coachId: number; classroomId: number | null }) => {
-      return apiRequest("PATCH", `/api/franchise-admin/time-slots/${id}`, { coachId, classroomId });
+      const franchiseId = getActiveFranchiseId();
+      const res = await fetch(`/api/franchise-admin/time-slots/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(franchiseId ? { "X-Franchise-Id": String(franchiseId) } : {}),
+        },
+        body: JSON.stringify({ coachId, classroomId }),
+        credentials: "include",
+      });
+      if (res.status === 409) {
+        const data = await res.json();
+        const conflictType = data.type === "room_conflict" || data.type === "coach_conflict" ? data.type : "room_conflict";
+        throw new ConflictError(data.message || "排課衝突", conflictType);
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "更新時段失敗");
+      }
+      return res.json();
     },
     onSuccess: () => {
       toast({ title: "時段已更新" });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/time-slots"] });
       setEditingSlot(null);
+      setEditConflictError(null);
     },
     onError: (error: Error) => {
-      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+      if (error instanceof ConflictError) {
+        setEditConflictError({ type: error.conflictType, message: error.message });
+      } else {
+        toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+      }
     },
   });
 
@@ -3577,7 +3610,7 @@ function TimeSlotsTab() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingSlot} onOpenChange={(open) => { if (!open) setEditingSlot(null); }}>
+      <Dialog open={!!editingSlot} onOpenChange={(open) => { if (!open) { setEditingSlot(null); setEditConflictError(null); } }}>
         <DialogContent className="max-w-sm" data-testid="dialog-edit-slot">
           <DialogHeader>
             <DialogTitle>編輯時段</DialogTitle>
@@ -3589,9 +3622,15 @@ function TimeSlotsTab() {
                 <span className="mx-1">·</span>
                 <span>{editingSlot.startTime} - {editingSlot.endTime}</span>
               </div>
+              {editConflictError && (
+                <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive" data-testid="alert-edit-slot-conflict">
+                  <span className="mt-0.5 shrink-0">⚠</span>
+                  <span>{editConflictError.message}</span>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>負責老師 *</Label>
-                <Select value={editCoachId} onValueChange={setEditCoachId}>
+                <Select value={editCoachId} onValueChange={(v) => { setEditCoachId(v); setEditConflictError(null); }}>
                   <SelectTrigger data-testid="select-edit-slot-coach">
                     <SelectValue placeholder="選擇老師" />
                   </SelectTrigger>
@@ -3604,7 +3643,7 @@ function TimeSlotsTab() {
               </div>
               <div className="space-y-1.5">
                 <Label>上課教室</Label>
-                <Select value={editClassroomId} onValueChange={setEditClassroomId}>
+                <Select value={editClassroomId} onValueChange={(v) => { setEditClassroomId(v); setEditConflictError(null); }}>
                   <SelectTrigger data-testid="select-edit-slot-classroom">
                     <SelectValue placeholder="無教室" />
                   </SelectTrigger>
@@ -3619,7 +3658,7 @@ function TimeSlotsTab() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditingSlot(null)} data-testid="button-cancel-edit-slot">取消</Button>
+            <Button variant="outline" onClick={() => { setEditingSlot(null); setEditConflictError(null); }} data-testid="button-cancel-edit-slot">取消</Button>
             <Button
               disabled={!editCoachId || editSlotMutation.isPending}
               onClick={() => {
