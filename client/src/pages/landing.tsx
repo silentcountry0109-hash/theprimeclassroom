@@ -1985,8 +1985,8 @@ export default function LandingPage() {
           <WaveDivider from="#F0FBFA" to="#ffffff" />
           <img
             src={ip2Img}
-            alt="機器人"
-            className="absolute right-8 md:right-20 -bottom-10 md:-bottom-12 w-20 md:w-28 pointer-events-none select-none z-10 animate-float-ip drop-shadow-lg"
+            alt=""
+            className="absolute right-8 md:right-20 -bottom-10 md:-bottom-12 w-28 md:w-36 pointer-events-none select-none z-10 animate-float-ip drop-shadow-lg"
             aria-hidden="true"
           />
         </div>
@@ -2002,8 +2002,8 @@ export default function LandingPage() {
           <WaveDivider from="#FAF9F6" to="#ffffff" />
           <img
             src={ip12Img}
-            alt="蛋殼小孩"
-            className="absolute left-6 md:left-20 -bottom-12 md:-bottom-16 w-20 md:w-28 pointer-events-none select-none z-10 animate-float-ip-alt drop-shadow-lg"
+            alt=""
+            className="absolute left-6 md:left-20 -bottom-12 md:-bottom-16 w-28 md:w-36 pointer-events-none select-none z-10 animate-float-ip-alt drop-shadow-lg"
             aria-hidden="true"
           />
         </div>
@@ -2016,8 +2016,8 @@ export default function LandingPage() {
           <WaveDivider from="#ffffff" to="#FAF9F6" />
           <img
             src={ip13Img}
-            alt="快樂機器人"
-            className="absolute right-12 md:right-28 -bottom-10 md:-bottom-12 w-20 md:w-28 pointer-events-none select-none z-10 animate-float-ip-slow drop-shadow-lg"
+            alt=""
+            className="absolute right-12 md:right-28 -bottom-10 md:-bottom-12 w-28 md:w-36 pointer-events-none select-none z-10 animate-float-ip-slow drop-shadow-lg"
             aria-hidden="true"
           />
         </div>
