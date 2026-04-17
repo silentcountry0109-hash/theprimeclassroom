@@ -357,3 +357,35 @@ html, body, #root {
 .animate-wave-drift {
   animation: wave-drift 12s linear infinite;
 }
+
+@keyframes float-ip {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-16px); }
+}
+.animate-float-ip {
+  animation: float-ip 3.2s ease-in-out infinite;
+}
+.animate-float-ip-alt {
+  animation: float-ip 3.8s ease-in-out infinite 0.6s;
+}
+.animate-float-ip-slow {
+  animation: float-ip 4.5s ease-in-out infinite 1.2s;
+}
+
+@keyframes float-deco {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(4deg); }
+}
+@keyframes float-deco-rev {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(-4deg); }
+}
+.animate-float-deco {
+  animation: float-deco 6s ease-in-out infinite;
+}
+.animate-float-deco-rev {
+  animation: float-deco-rev 7s ease-in-out infinite 1s;
+}
+.animate-float-deco-slow {
+  animation: float-deco 8.5s ease-in-out infinite 2s;
+}

@@ -77,7 +77,15 @@ import deco3 from "@assets/輔助圖文-3_1776327482727.png";
 import deco4 from "@assets/輔助圖文-4_1776327482727.png";
 import deco5 from "@assets/輔助圖文-5_1776327482727.png";
 import deco6 from "@assets/輔助圖文-6_1776327482727.png";
-import heroLogoImg from "@assets/未命名設計_(1)_1776335056205.png";
+import heroLogoImg from "@assets/工作區域_25_1776422059113.png";
+import ip2Img from "@assets/工作區域_2_1776423698455.png";
+import ip12Img from "@assets/工作區域_12_1776423698455.png";
+import ip13Img from "@assets/工作區域_13_1776423698455.png";
+import deco14Img from "@assets/工作區域_14_1776423698455.png";
+import deco15Img from "@assets/工作區域_15_1776423698456.png";
+import deco10Img from "@assets/工作區域_10_1776423709223.png";
+import deco6Img from "@assets/工作區域_6_1776423712973.png";
+import deco5Img from "@assets/工作區域_5_1776423714787.png";
 import subtitleGif from "@assets/Adobe_Express_-_國小個別指導眼睛_1776335060502.gif";
 import teachImg1 from "@assets/螺旋式課程_1776335067651.png";
 import teachImg2 from "@assets/階梯式教學_1776335069419.png";
@@ -126,15 +134,15 @@ const fadeInUp = {
 
 function WaveDivider({ from, to }: { from: string; to: string }) {
   return (
-    <div className="relative overflow-hidden" style={{ height: 72, backgroundColor: to }}>
+    <div className="relative overflow-hidden" style={{ height: 72, backgroundColor: from }}>
       <svg
-        className="absolute top-0 left-0 h-full animate-wave-drift"
-        style={{ width: "200%", fill: from }}
+        className="absolute bottom-0 left-0 h-full animate-wave-drift"
+        style={{ width: "200%", fill: to }}
         viewBox="0 0 2880 72"
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <path d="M0,36 C240,72 480,0 720,36 C960,72 1200,0 1440,36 C1680,72 1920,0 2160,36 C2400,72 2640,0 2880,36 L2880,72 L0,72 Z" />
+        <path d="M0,36 C240,0 480,72 720,36 C960,0 1200,72 1440,36 C1680,0 1920,72 2160,36 C2400,0 2640,72 2880,36 L2880,0 L0,0 Z" />
       </svg>
     </div>
   );
@@ -693,7 +701,7 @@ function BrandPhilosophySection() {
           {philosophies.map((item, i) => (
             <motion.div
               key={item.title}
-              className="text-center p-5 md:p-6 rounded-2xl bg-washi border border-transparent hover:border-tiffany/15 transition-colors"
+              className="text-center p-5 md:p-6 rounded-2xl bg-washi border border-transparent hover:border-tiffany/20 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -745,7 +753,8 @@ function TeachingMethodSection() {
   ];
 
   return (
-    <section id="teaching" className="py-14 md:py-24 px-4 md:px-6 bg-white">
+    <section id="teaching" className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
+      <img src={deco10Img} alt="" className="absolute bottom-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco-rev" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
@@ -760,7 +769,7 @@ function TeachingMethodSection() {
           {methods.map((method, i) => (
             <motion.div
               key={method.title}
-              className="group relative bg-washi rounded-2xl p-5 md:p-8 border border-transparent hover:border-tiffany/20 transition-all duration-300"
+              className="group relative bg-washi rounded-2xl p-5 md:p-8 border border-transparent hover:border-tiffany/20 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -771,7 +780,7 @@ function TeachingMethodSection() {
                 <img
                   src={method.img}
                   alt={method.title}
-                  className="w-16 h-16 md:w-20 md:h-20 object-contain flex-shrink-0"
+                  className="w-16 h-16 md:w-20 md:h-20 object-contain flex-shrink-0 group-hover:scale-110 transition-transform duration-300"
                 />
                 <div className="flex-1">
                   <h3 className="font-serif text-lg md:text-xl tracking-wide text-foreground mb-1.5 md:mb-2">{method.title}</h3>
@@ -991,7 +1000,8 @@ function LearningMapSection() {
   ];
 
   return (
-    <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
+    <section className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-washi">
+      <img src={deco15Img} alt="" className="absolute bottom-6 left-4 md:left-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco-slow" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
           <motion.div
@@ -1192,7 +1202,8 @@ function TextbookSection() {
   ];
 
   return (
-    <section id="textbook" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
+    <section id="textbook" className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-washi">
+      <img src={deco6Img} alt="" className="absolute top-6 left-4 md:left-10 w-20 md:w-32 pointer-events-none select-none opacity-[0.12] animate-float-deco" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-textbook-title">
@@ -1318,7 +1329,8 @@ function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="py-14 md:py-24 px-4 md:px-6 bg-white">
+    <section id="features" className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
+      <img src={deco5Img} alt="" className="absolute top-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
@@ -1333,7 +1345,7 @@ function FeaturesSection() {
           {features.map((feature, i) => (
             <motion.div
               key={feature.title}
-              className="rounded-md border border-gray-100 bg-washi/50"
+              className="rounded-md border border-gray-100 bg-washi/50 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -1523,7 +1535,8 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="py-14 md:py-24 px-4 md:px-6 bg-white">
+    <section className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
+      <img src={deco14Img} alt="" className="absolute top-6 right-6 md:right-16 w-24 md:w-36 pointer-events-none select-none opacity-[0.13] animate-float-deco" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
@@ -1968,7 +1981,15 @@ export default function LandingPage() {
         <HeroSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <BrandPhilosophySection />
-        <WaveDivider from="#F0FBFA" to="#ffffff" />
+        <div className="relative overflow-visible">
+          <WaveDivider from="#F0FBFA" to="#ffffff" />
+          <img
+            src={ip2Img}
+            alt="機器人"
+            className="absolute right-8 md:right-20 -bottom-10 md:-bottom-12 w-20 md:w-28 pointer-events-none select-none z-10 animate-float-ip drop-shadow-lg"
+            aria-hidden="true"
+          />
+        </div>
         <TeachingMethodSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <LearningMapSection />
@@ -1977,13 +1998,29 @@ export default function LandingPage() {
         <FeaturesSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <CoachesSection />
-        <WaveDivider from="#FAF9F6" to="#ffffff" />
+        <div className="relative overflow-visible">
+          <WaveDivider from="#FAF9F6" to="#ffffff" />
+          <img
+            src={ip12Img}
+            alt="蛋殼小孩"
+            className="absolute left-6 md:left-20 -bottom-12 md:-bottom-16 w-20 md:w-28 pointer-events-none select-none z-10 animate-float-ip-alt drop-shadow-lg"
+            aria-hidden="true"
+          />
+        </div>
         <ProcessSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <TestimonialsSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <FAQSection />
-        <WaveDivider from="#ffffff" to="#FAF9F6" />
+        <div className="relative overflow-visible">
+          <WaveDivider from="#ffffff" to="#FAF9F6" />
+          <img
+            src={ip13Img}
+            alt="快樂機器人"
+            className="absolute right-12 md:right-28 -bottom-10 md:-bottom-12 w-20 md:w-28 pointer-events-none select-none z-10 animate-float-ip-slow drop-shadow-lg"
+            aria-hidden="true"
+          />
+        </div>
         <CTASection />
         <WaveDivider from="#FAF9F6" to="hsl(var(--foreground))" />
         <FooterSection />
