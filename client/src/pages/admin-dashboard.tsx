@@ -208,11 +208,11 @@ interface FranchiseAnalytics {
   totalCoaches: number;
   certifiedCoaches: number;
   totalSlots: number;
-  upcomingSlots: number;
   totalBookings: number;
   confirmedBookings: number;
   cancelledBookings: number;
   thisMonthBookings: number;
+  newStudents: number;
   totalSeats: number;
   bookedSeats: number;
   occupancyRate: number;
@@ -253,7 +253,7 @@ function OverviewTab() {
     ? Math.round(analytics.reduce((s, a) => s + a.occupancyRate, 0) / analytics.length)
     : 0;
   const totalUniqueStudents = analytics.reduce((s, a) => s + a.uniqueStudents, 0);
-  const totalUpcoming = analytics.reduce((s, a) => s + a.upcomingSlots, 0);
+  const totalNewStudents = analytics.reduce((s, a) => s + a.newStudents, 0);
   const totalThisMonth = analytics.reduce((s, a) => s + a.thisMonthBookings, 0);
 
   const statCards = [
@@ -386,8 +386,8 @@ function OverviewTab() {
                       <p className="text-[10px] text-muted-foreground">本月預約</p>
                     </div>
                     <div className="text-center p-2 rounded bg-gray-50">
-                      <p className="text-lg font-bold text-foreground" data-testid={`text-upcoming-${f.franchiseId}`}>{f.upcomingSlots}</p>
-                      <p className="text-[10px] text-muted-foreground">即將開課</p>
+                      <p className="text-lg font-bold text-green-600" data-testid={`text-new-students-${f.franchiseId}`}>{f.newStudents}</p>
+                      <p className="text-[10px] text-muted-foreground">本月新生</p>
                     </div>
                   </div>
 

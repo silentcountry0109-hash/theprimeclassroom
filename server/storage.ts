@@ -2165,6 +2165,7 @@ export class DatabaseStorage implements IStorage {
     const allBookingsData = await db.select().from(bookings);
     const allCoachesData = await db.select().from(coaches);
     const allChildrenData = await db.select().from(children);
+    const allFranchiseStudents = await db.select().from(franchiseStudents);
 
     const slotsByFranchise = new Map<number, typeof allSlots>();
     for (const slot of allSlots) {
@@ -2181,6 +2182,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const today = new Date().toISOString().split("T")[0];
+    const thisMonth = today.substring(0, 7);
 
     return allFranchises.map(f => {
       const fSlots = slotsByFranchise.get(f.id) || [];
@@ -2196,12 +2198,15 @@ export class DatabaseStorage implements IStorage {
       const uniqueChildIds = new Set(fBookings.map(b => b.childId));
       const uniqueParentIds = new Set(fBookings.map(b => b.parentId));
 
-      const upcomingSlots = fSlots.filter(s => s.date >= today && s.isActive).length;
-
-      const thisMonth = today.substring(0, 7);
       const thisMonthBookings = fBookings.filter(b => {
         const slot = fSlots.find(s => s.id === b.slotId);
         return slot && slot.date.startsWith(thisMonth);
+      }).length;
+
+      const newStudents = allFranchiseStudents.filter(fs => {
+        if (fs.franchiseId !== f.id) return false;
+        if (!fs.createdAt) return false;
+        return new Date(fs.createdAt).toISOString().substring(0, 7) === thisMonth;
       }).length;
 
       return {
@@ -2213,11 +2218,11 @@ export class DatabaseStorage implements IStorage {
         totalCoaches: fCoaches.length,
         certifiedCoaches: fCoaches.filter(c => c.isCertified).length,
         totalSlots: fSlots.length,
-        upcomingSlots,
         totalBookings: fBookings.length,
         confirmedBookings,
         cancelledBookings,
         thisMonthBookings,
+        newStudents,
         totalSeats,
         bookedSeats,
         occupancyRate,
