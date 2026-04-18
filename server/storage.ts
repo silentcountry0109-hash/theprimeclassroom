@@ -1777,7 +1777,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(bookings.slotId, slotId),
-          inArray(bookings.status, ["confirmed", "checked_in", "absent"])
+          inArray(bookings.status, ["confirmed", "checked_in", "absent", "completed"])
         )
       );
 
@@ -1797,21 +1797,17 @@ export class DatabaseStorage implements IStorage {
   async checkInBooking(id: number, coachId: number): Promise<void> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) throw new Error("預約不存在");
-    if (booking.status !== "confirmed") throw new Error("只有已確認的預約可以點名");
+    if (!["confirmed", "completed"].includes(booking.status)) throw new Error("此預約狀態無法點名");
     const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
     if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
 
     const now = new Date();
     const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
-    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
     const earliestCheckIn = new Date(slotStart.getTime() - 15 * 60 * 1000);
 
     if (now < earliestCheckIn) {
       const startTimeStr = slot.startTime;
       throw new Error(`尚未到點名時間，請於 ${startTimeStr} 前 15 分鐘再進行點名`);
-    }
-    if (now > slotEnd) {
-      throw new Error("課程已結束，無法點名");
     }
 
     await db.update(bookings).set({ status: "checked_in" }).where(eq(bookings.id, id));
@@ -1820,21 +1816,17 @@ export class DatabaseStorage implements IStorage {
   async markAbsentBooking(id: number, coachId: number): Promise<void> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) throw new Error("預約不存在");
-    if (booking.status !== "confirmed") throw new Error("只有已確認的預約可以標記未到");
+    if (!["confirmed", "completed"].includes(booking.status)) throw new Error("此預約狀態無法標記未到");
     const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
     if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
 
     const now = new Date();
     const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
-    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
     const earliestCheckIn = new Date(slotStart.getTime() - 15 * 60 * 1000);
 
     if (now < earliestCheckIn) {
       const startTimeStr = slot.startTime;
       throw new Error(`尚未到點名時間，請於 ${startTimeStr} 前 15 分鐘再進行點名`);
-    }
-    if (now > slotEnd) {
-      throw new Error("課程已結束，無法標記未到");
     }
 
     await db.update(bookings).set({ status: "absent" }).where(eq(bookings.id, id));
@@ -1846,12 +1838,6 @@ export class DatabaseStorage implements IStorage {
     if (booking.status !== "checked_in" && booking.status !== "absent") throw new Error("只有已點名或已標記未到的預約可以取消");
     const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
     if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
-
-    const now = new Date();
-    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
-    if (now > slotEnd) {
-      throw new Error("課程已結束，無法取消點名");
-    }
 
     await db.update(bookings).set({ status: "confirmed" }).where(eq(bookings.id, id));
   }

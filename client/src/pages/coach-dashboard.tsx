@@ -521,7 +521,7 @@ function useCheckInAvailability(slotDate: string, slotStartTime: string, slotEnd
       const earliest = new Date(slotStart.getTime() - 15 * 60 * 1000);
 
       setIsSlotEnded(now > slotEnd);
-      setCanCheckIn(now >= earliest && now <= slotEnd);
+      setCanCheckIn(now >= earliest);
       if (now < earliest) {
         setMinutesUntilCheckIn(Math.ceil((earliest.getTime() - now.getTime()) / 60000));
       } else {
@@ -645,36 +645,34 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
                       <CheckCircle className="w-3 h-3" />
                       已到
                     </span>
-                    {!isSlotEnded && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <button
-                            className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
-                            data-testid={`button-uncheck-${s.bookingId}`}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
+                          data-testid={`button-uncheck-${s.bookingId}`}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>確定要取消點名嗎？</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {s.childName} 的出席狀態將恢復為「待點名」，請確認是否為誤點。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>返回</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => uncheckInMutation.mutate(s.bookingId)}
+                            className="bg-red-500 hover:bg-red-600"
+                            data-testid={`button-confirm-uncheck-${s.bookingId}`}
                           >
-                            <XCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>確定要取消點名嗎？</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {s.childName} 的出席狀態將恢復為「待點名」，請確認是否為誤點。
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>返回</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => uncheckInMutation.mutate(s.bookingId)}
-                              className="bg-red-500 hover:bg-red-600"
-                              data-testid={`button-confirm-uncheck-${s.bookingId}`}
-                            >
-                              確認取消點名
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
+                            確認取消點名
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </>
                 ) : s.status === "absent" ? (
                   <>
@@ -682,36 +680,34 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
                       <UserX className="w-3 h-3" />
                       未到
                     </span>
-                    {!isSlotEnded && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <button
-                            className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
-                            data-testid={`button-unmark-absent-${s.bookingId}`}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
+                          data-testid={`button-unmark-absent-${s.bookingId}`}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>確定要取消未到標記嗎？</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {s.childName} 的狀態將恢復為「待點名」，請確認是否為誤標。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>返回</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => uncheckInMutation.mutate(s.bookingId)}
+                            className="bg-red-500 hover:bg-red-600"
+                            data-testid={`button-confirm-unmark-absent-${s.bookingId}`}
                           >
-                            <XCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>確定要取消未到標記嗎？</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {s.childName} 的狀態將恢復為「待點名」，請確認是否為誤標。
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>返回</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => uncheckInMutation.mutate(s.bookingId)}
-                              className="bg-red-500 hover:bg-red-600"
-                              data-testid={`button-confirm-unmark-absent-${s.bookingId}`}
-                            >
-                              確認取消
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
+                            確認取消
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </>
                 ) : (
                   <div className="flex items-center gap-1">
