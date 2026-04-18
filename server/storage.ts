@@ -1709,7 +1709,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           inArray(bookings.slotId, slotIds),
-          eq(bookings.status, "confirmed")
+          inArray(bookings.status, ["confirmed", "checked_in", "absent", "completed"])
         )
       );
 
@@ -2048,7 +2048,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           inArray(bookings.slotId, slotIds),
-          eq(bookings.status, "confirmed")
+          inArray(bookings.status, ["confirmed", "checked_in", "absent", "completed"])
         )
       )
       .groupBy(children.id);
