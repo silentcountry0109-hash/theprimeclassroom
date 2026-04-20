@@ -6,6 +6,9 @@ import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { getDefaultClassroomImage } from "@/lib/default-images";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion } from "framer-motion";
+import ip13Img from "@assets/工作區域_13_1776423698455.png";
+import deco14Img from "@assets/工作區域_14_1776423698455.png";
 import {
   Select,
   SelectContent,
@@ -99,10 +102,17 @@ export default function SearchResults() {
   };
 
   return (
-    <div className="min-h-screen bg-washi">
+    <div className="min-h-screen bg-washi relative overflow-x-hidden">
+      <img src={deco14Img} alt="" className="fixed top-24 right-4 md:right-10 w-20 md:w-28 pointer-events-none select-none opacity-[0.08] animate-float-deco" aria-hidden="true" />
       <Navbar />
       <div className="pt-20 md:pt-24 pb-12 md:pb-16 px-4 md:px-6 max-w-6xl mx-auto">
-        <div className="mb-6">
+        <motion.div
+          className="mb-6 relative overflow-visible"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <img src={ip13Img} alt="" className="absolute -top-6 -left-4 md:-left-10 w-12 md:w-14 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
           <Link href="/">
             <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer mb-4 block" data-testid="link-back-home">
               <ArrowLeft className="w-4 h-4" />
@@ -121,7 +131,7 @@ export default function SearchResults() {
               <span>— 找到 {results.length} 間教室</span>
             )}
           </p>
-        </div>
+        </motion.div>
 
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="lg:w-64 flex-shrink-0">
@@ -237,14 +247,17 @@ export default function SearchResults() {
               </div>
             ) : (
               <div className="space-y-4">
-                {results.map((result) => {
+                {results.map((result, idx) => {
                   const f = result.franchise;
                   return (
-                    <div
+                    <motion.div
                       key={f.id}
-                      className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-tiffany/20 transition-all cursor-pointer group"
+                      className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-tiffany/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
                       onClick={() => navigate(`/classroom/${f.id}`)}
                       data-testid={`franchise-card-${f.id}`}
+                      initial={{ opacity: 0, y: 24 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.45, delay: idx * 0.08 }}
                     >
                       {(() => {
                         const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null) || getDefaultClassroomImage(f.id);
@@ -356,7 +369,7 @@ export default function SearchResults() {
                         </div>
                       </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>

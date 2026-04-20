@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import Navbar from "@/components/navbar";
+import { motion } from "framer-motion";
+import ip2Img from "@assets/工作區域_2_1776423698455.png";
+import deco10Img from "@assets/工作區域_10_1776423709223.png";
 import { Button } from "@/components/ui/button";
 import { getCoachPhoto, getDefaultClassroomImage } from "@/lib/default-images";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -188,7 +191,8 @@ export default function ClassroomDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-washi">
+    <div className="min-h-screen bg-washi relative overflow-x-hidden">
+      <img src={deco10Img} alt="" className="fixed bottom-8 right-4 md:right-10 w-20 md:w-28 pointer-events-none select-none opacity-[0.08] animate-float-deco-rev" aria-hidden="true" />
       <Navbar />
       <div className="pt-20 md:pt-24 pb-12 md:pb-16 px-4 md:px-6 max-w-5xl mx-auto">
         <Link href="/search">
@@ -198,7 +202,12 @@ export default function ClassroomDetail() {
           </span>
         </Link>
 
-        <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
+        <motion.div
+          className="bg-white rounded-xl border border-gray-100 p-6 mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-1">
               <div className="flex items-start gap-3 mb-3">
@@ -255,7 +264,7 @@ export default function ClassroomDetail() {
               )}
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {f.photos && f.photos.length > 0 ? (
           <PhotoCarousel photos={f.photos} />
@@ -270,13 +279,28 @@ export default function ClassroomDetail() {
         )}
 
         {coachList.length > 0 && (
-          <div className="mb-6">
-            <h2 className="font-serif text-lg tracking-[0.08em] text-foreground mb-3" data-testid="text-coaches-title">
-              教學老師
-            </h2>
+          <motion.div
+            className="mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+          >
+            <div className="relative overflow-visible mb-3">
+              <img src={ip2Img} alt="" className="absolute -top-6 -left-4 w-12 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+              <h2 className="font-serif text-lg tracking-[0.08em] text-foreground" data-testid="text-coaches-title">
+                教學老師
+              </h2>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {coachList.map((coach) => (
-                <div key={coach.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-start gap-3" data-testid={`coach-card-${coach.id}`}>
+              {coachList.map((coach, i) => (
+                <motion.div
+                  key={coach.id}
+                  className="bg-white rounded-xl border border-gray-100 p-4 flex items-start gap-3 hover:border-tiffany/20 hover:-translate-y-1 hover:shadow-md transition-all duration-300"
+                  data-testid={`coach-card-${coach.id}`}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.2 + i * 0.07 }}
+                >
                   <img
                     src={getCoachPhoto(coach.name, coach.id, coach.photoUrl)}
                     alt={coach.name}
@@ -310,10 +334,10 @@ export default function ClassroomDetail() {
                       </div>
                     )}
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
         <div>

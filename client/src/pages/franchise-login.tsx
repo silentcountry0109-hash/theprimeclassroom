@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Lock, User, ArrowLeft, Building2, ShieldCheck, GraduationCap, BookOpen, Eye, EyeOff, KeyRound } from "lucide-react";
+import { motion } from "framer-motion";
+import ip12Img from "@assets/工作區域_12_1776423698455.png";
 
 type LoginMode = "franchise" | "coach";
 
@@ -108,8 +110,14 @@ export default function FranchiseLogin() {
       </div>
 
       <div className="relative z-10 flex-1 flex items-center justify-center px-4 pb-20">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
+        <motion.div
+          className="w-full max-w-sm"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="text-center mb-8 relative overflow-visible">
+            <img src={ip12Img} alt="" className="absolute -top-8 -right-4 w-12 h-auto object-contain pointer-events-none select-none opacity-50 animate-float-ip-alt" aria-hidden="true" />
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-tiffany/10 border border-tiffany/20 mb-4">
               {isFranchise
                 ? <Building2 className="w-7 h-7 text-tiffany" />
@@ -238,7 +246,7 @@ export default function FranchiseLogin() {
               : "如需開通帳號，請聯繫分校主任"
             }
           </p>
-        </div>
+        </motion.div>
       </div>
 
       <Dialog open={showChangePassword} onOpenChange={() => {}}>

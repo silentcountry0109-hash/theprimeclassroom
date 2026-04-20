@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Lock, User, ArrowLeft, Mail, UserPlus, Phone, MapPin, CheckCircle2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { motion } from "framer-motion";
+import ip13Img from "@assets/工作區域_13_1776423698455.png";
+import deco15Img from "@assets/工作區域_15_1776423698456.png";
 
 const REFERRAL_OPTIONS = [
   "網路搜尋（Google、Yahoo 等）",
@@ -193,7 +196,8 @@ export default function ParentLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-washi flex flex-col">
+    <div className="min-h-screen bg-washi flex flex-col relative overflow-hidden">
+      <img src={deco15Img} alt="" className="absolute bottom-8 left-4 md:left-10 w-24 md:w-32 pointer-events-none select-none opacity-[0.08] animate-float-deco-slow" aria-hidden="true" />
       <div className="p-6">
         <Link href="/">
           <span className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer" data-testid="link-back-home">
@@ -204,8 +208,14 @@ export default function ParentLogin() {
       </div>
 
       <div className="flex-1 flex items-center justify-center px-4 pb-20">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
+        <motion.div
+          className="w-full max-w-sm"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="text-center mb-8 relative overflow-visible">
+            <img src={ip13Img} alt="" className="absolute -top-8 -left-4 w-12 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
             <h1 className="font-serif text-2xl tracking-[0.15em] text-foreground mb-2">
               質數教室
             </h1>
@@ -482,7 +492,7 @@ export default function ParentLogin() {
           <p className="text-center text-xs text-muted-foreground mt-6">
             註冊即表示您同意我們的服務條款與隱私政策
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
