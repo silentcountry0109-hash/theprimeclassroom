@@ -286,7 +286,7 @@ export default function ClassroomDetail() {
             transition={{ duration: 0.5, delay: 0.15 }}
           >
             <div className="relative overflow-visible mb-3">
-              <img src={ip2Img} alt="" className="absolute -top-6 -left-4 w-12 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+              <img src={ip2Img} alt="" className="absolute -top-8 -left-2 w-20 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
               <h2 className="font-serif text-lg tracking-[0.08em] text-foreground" data-testid="text-coaches-title">
                 教學老師
               </h2>

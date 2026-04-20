@@ -144,7 +144,7 @@ function WaveDivider({ from, to }: { from: string; to: string }) {
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <path d="M0,36 C240,0 480,72 720,36 C960,0 1200,72 1440,36 C1680,0 1920,72 2160,36 C2400,0 2640,72 2880,36 L2880,0 L0,0 Z" />
+        <path d="M0,36 C240,72 480,0 720,36 C960,72 1200,0 1440,36 C1680,72 1920,0 2160,36 C2400,72 2640,0 2880,36 L2880,72 L0,72 Z" />
       </svg>
     </div>
   );
@@ -465,9 +465,9 @@ function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.215, 0.61, 0.355, 1] }}
         >
-          <img src={heroLogoImg} alt="質數教室" className="h-12 md:h-16 w-auto object-contain mix-blend-multiply" />
+          <img src={heroLogoImg} alt="質數教室" className="h-16 md:h-24 w-auto object-contain mix-blend-multiply" />
           <motion.span
-            className="text-2xl md:text-4xl text-tiffany font-medium tracking-[0.08em]"
+            className="text-lg md:text-2xl text-tiffany font-medium tracking-[0.08em]"
             initial={{ opacity: 0, letterSpacing: "0.4em" }}
             animate={{ opacity: 1, letterSpacing: "0.08em" }}
             transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
@@ -481,7 +481,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          <PingPongGif src={subtitleGif} alt="國小數學個別指導" className="w-full max-w-lg mx-auto h-auto object-contain" />
+          <img src={subtitleGif} alt="國小數學個別指導" className="w-full max-w-lg mx-auto h-auto object-contain" />
         </motion.div>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
@@ -747,7 +747,7 @@ function TeachingMethodSection() {
       <img src={deco10Img} alt="" className="absolute bottom-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco-rev" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip2Img} alt="" className="absolute -top-6 -left-4 md:-left-10 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+          <img src={ip2Img} alt="" className="absolute -top-8 -left-2 md:-left-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
             {teachTitle}
           </h2>
@@ -1414,7 +1414,7 @@ function CoachesSection() {
     <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip12Img} alt="" className="absolute -top-6 -right-4 md:-right-10 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
+          <img src={ip12Img} alt="" className="absolute -top-8 -right-2 md:-right-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             推薦師資
           </h2>
@@ -1800,7 +1800,7 @@ function FAQSection() {
     <section id="faq" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-3xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip13Img} alt="" className="absolute -top-6 -left-4 md:-left-10 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+          <img src={ip13Img} alt="" className="absolute -top-8 -left-2 md:-left-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             常見問題
           </h2>

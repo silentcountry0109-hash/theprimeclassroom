@@ -112,7 +112,7 @@ export default function SearchResults() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <img src={ip13Img} alt="" className="absolute -top-6 -left-4 md:-left-10 w-12 md:w-14 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+          <img src={ip13Img} alt="" className="absolute -top-8 -left-2 md:-left-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
           <Link href="/">
             <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer mb-4 block" data-testid="link-back-home">
               <ArrowLeft className="w-4 h-4" />
