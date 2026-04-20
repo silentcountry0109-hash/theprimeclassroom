@@ -747,7 +747,7 @@ function TeachingMethodSection() {
       <img src={deco10Img} alt="" className="absolute bottom-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco-rev" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip2Img} alt="" className="absolute -top-4 -left-2 md:-left-8 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+          <img src={ip2Img} alt="" className="absolute -top-6 -left-4 md:-left-10 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
             {teachTitle}
           </h2>
@@ -1414,7 +1414,7 @@ function CoachesSection() {
     <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip12Img} alt="" className="absolute -top-4 -right-2 md:-right-8 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
+          <img src={ip12Img} alt="" className="absolute -top-6 -right-4 md:-right-10 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             推薦師資
           </h2>
@@ -1536,10 +1536,18 @@ function ProcessSection() {
 
   useEffect(() => {
     if (!isInView) return;
-    const timer = setInterval(() => {
-      setActiveStep(prev => (prev + 1) % 4);
-    }, 2500);
-    return () => clearInterval(timer);
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const advance = (current: number) => {
+      const isLast = current === 3;
+      const delay = isLast ? 1000 : 2500;
+      timeoutId = setTimeout(() => {
+        const next = isLast ? 0 : current + 1;
+        setActiveStep(next);
+        advance(next);
+      }, delay);
+    };
+    advance(activeStep);
+    return () => clearTimeout(timeoutId);
   }, [isInView]);
 
   const steps = [
@@ -1792,7 +1800,7 @@ function FAQSection() {
     <section id="faq" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-3xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip13Img} alt="" className="absolute -top-4 -left-2 md:-left-8 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+          <img src={ip13Img} alt="" className="absolute -top-6 -left-4 md:-left-10 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             常見問題
           </h2>
