@@ -12,3 +12,9 @@ id = "kgkUmae0fppyuhxMmwJjl"
 uri = "file://docs/加盟主教育訓練手冊.pdf"
 type = "pdf"
 title = "加盟主教育訓練手冊 v1.0 (PDF)"
+
+[[outputs]]
+id = "sf2_kORDDq_4LkaAyJP4U"
+uri = "file://質數教室_專案計劃書.docx"
+type = "word_document"
+title = "質數教室 專案計劃書 v1.0"
