@@ -364,7 +364,7 @@ function SplashScreen() {
           <img
             src={splashGif}
             alt="質數教室"
-            className="max-w-xs md:max-w-sm w-[60vw] h-auto object-contain"
+            className="absolute inset-0 w-full h-full object-cover"
           />
         </motion.div>
       )}
@@ -465,9 +465,9 @@ function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.215, 0.61, 0.355, 1] }}
         >
-          <img src={heroLogoImg} alt="質數教室" className="h-16 md:h-24 w-auto object-contain mix-blend-multiply" />
+          <img src={heroLogoImg} alt="質數教室" className="h-12 md:h-16 w-auto object-contain mix-blend-multiply" />
           <motion.span
-            className="text-3xl md:text-5xl text-tiffany font-medium tracking-[0.08em]"
+            className="text-2xl md:text-4xl text-tiffany font-medium tracking-[0.08em]"
             initial={{ opacity: 0, letterSpacing: "0.4em" }}
             animate={{ opacity: 1, letterSpacing: "0.08em" }}
             transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
@@ -481,7 +481,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          <PingPongGif src={subtitleGif} alt="國小數學個別指導" className="h-16 md:h-24 w-auto object-contain" />
+          <PingPongGif src={subtitleGif} alt="國小數學個別指導" className="w-full max-w-lg mx-auto h-auto object-contain" />
         </motion.div>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
@@ -674,7 +674,7 @@ function BrandPhilosophySection() {
         </motion.div>
 
         <motion.div
-          className="relative rounded-2xl overflow-hidden mb-10 md:mb-14"
+          className="rounded-2xl overflow-hidden mb-10 md:mb-14"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -683,20 +683,8 @@ function BrandPhilosophySection() {
           <img
             src={brandHeroImage || newBrandImg}
             alt="質數教室的溫暖教學環境"
-            className="w-full h-[220px] sm:h-[300px] md:h-[400px] object-cover"
+            className="w-full h-auto object-contain"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="text-white font-medium text-sm md:text-base">國小數學個別指導</p>
-                <p className="text-white/70 text-xs">小一到小六・完整課程規劃</p>
-              </div>
-            </div>
-          </div>
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10 md:mb-14">
@@ -758,9 +746,9 @@ function TeachingMethodSection() {
     <section id="teaching" className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
       <img src={deco10Img} alt="" className="absolute bottom-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco-rev" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
-        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3" data-testid="text-teaching-title">
-            <img src={ip2Img} alt="" className="w-16 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+        <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
+          <img src={ip2Img} alt="" className="absolute -top-4 -left-2 md:-left-8 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
             {teachTitle}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -783,7 +771,7 @@ function TeachingMethodSection() {
                 <img
                   src={method.img}
                   alt={method.title}
-                  className="w-16 h-16 md:w-20 md:h-20 object-contain flex-shrink-0 group-hover:scale-110 transition-transform duration-300"
+                  className="w-20 h-20 md:w-28 md:h-28 object-contain flex-shrink-0 group-hover:scale-125 group-hover:-translate-y-3 group-hover:drop-shadow-lg transition-all duration-300"
                 />
                 <div className="flex-1">
                   <h3 className="font-serif text-lg md:text-xl tracking-wide text-foreground mb-1.5 md:mb-2">{method.title}</h3>
@@ -1425,10 +1413,10 @@ function CoachesSection() {
   return (
     <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
-        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3">
+        <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
+          <img src={ip12Img} alt="" className="absolute -top-4 -right-2 md:-right-8 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             推薦師資
-            <img src={ip12Img} alt="" className="w-16 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             經過嚴格培訓與認證的專業老師團隊
@@ -1531,6 +1519,29 @@ function ProcessSection() {
   const proc4Title = useSiteContent("process.step4.title", "開始學習");
   const proc4Desc = useSiteContent("process.step4.desc", "孩子享受專業的數學個別指導");
 
+  const [activeStep, setActiveStep] = useState(0);
+  const [isInView, setIsInView] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsInView(entry.isIntersecting),
+      { threshold: 0.3 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isInView) return;
+    const timer = setInterval(() => {
+      setActiveStep(prev => (prev + 1) % 4);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [isInView]);
+
   const steps = [
     { icon: Search, number: "01", title: proc1Title, description: proc1Desc },
     { icon: Users, number: "02", title: proc2Title, description: proc2Desc },
@@ -1539,7 +1550,7 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
+    <section ref={sectionRef} className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
       <img src={deco14Img} alt="" className="absolute top-6 right-6 md:right-16 w-24 md:w-36 pointer-events-none select-none opacity-[0.13] animate-float-deco" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
@@ -1552,33 +1563,64 @@ function ProcessSection() {
         </motion.div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-          {steps.map((step, i) => (
-            <motion.div
-              key={step.title}
-              className="text-center relative"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.15 }}
-            >
-              {i < steps.length - 1 && (
-                <div className="hidden md:block absolute top-10 left-[60%] w-[80%] h-px border-t-2 border-dashed border-tiffany/20" />
-              )}
-              <div className="relative z-10">
-                <span className="text-xs font-bold text-tiffany tracking-widest mb-3 block">
-                  {step.number}
-                </span>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-tiffany/10 mb-5">
-                  <step.icon className="w-7 h-7 text-tiffany" />
+          {steps.map((step, i) => {
+            const isActive = i === activeStep;
+            const isPast = i < activeStep;
+            return (
+              <motion.div
+                key={step.title}
+                className="text-center relative"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: i * 0.15 }}
+              >
+                {i < steps.length - 1 && (
+                  <div className="hidden md:block absolute top-8 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
+                    <div
+                      className="h-full bg-tiffany/50 rounded-full transition-all duration-700 ease-in-out"
+                      style={{ width: isPast ? "100%" : isActive ? "50%" : "0%" }}
+                    />
+                  </div>
+                )}
+                <div className="relative z-10">
+                  <span className={`text-xs font-bold tracking-widest mb-3 block transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/40"}`}>
+                    {step.number}
+                  </span>
+                  <div
+                    className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-5 transition-all duration-500 ${
+                      isActive
+                        ? "bg-tiffany/25 scale-125 shadow-lg ring-2 ring-tiffany/40 -translate-y-2"
+                        : isPast
+                        ? "bg-tiffany/20 scale-100"
+                        : "bg-tiffany/10 scale-100"
+                    }`}
+                  >
+                    <step.icon className={`w-7 h-7 transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/50"}`} />
+                  </div>
+                  <h3 className={`text-base font-semibold mb-2 transition-colors duration-500 ${isActive ? "text-foreground" : "text-foreground/50"}`}>
+                    {step.title}
+                  </h3>
+                  <p className={`text-sm leading-relaxed transition-colors duration-500 ${isActive ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
+                    {step.description}
+                  </p>
                 </div>
-                <h3 className="text-base font-semibold text-foreground mb-2">
-                  {step.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {step.description}
-                </p>
-              </div>
-            </motion.div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mt-10">
+          {steps.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveStep(i)}
+              className={`rounded-full transition-all duration-500 ${
+                i === activeStep ? "w-6 h-2 bg-tiffany" : "w-2 h-2 bg-tiffany/30"
+              }`}
+              aria-label={`步驟 ${i + 1}`}
+              data-testid={`btn-process-step-${i}`}
+            />
           ))}
         </div>
       </div>
@@ -1749,9 +1791,9 @@ function FAQSection() {
   return (
     <section id="faq" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-3xl mx-auto">
-        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3">
-            <img src={ip13Img} alt="" className="w-16 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+        <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
+          <img src={ip13Img} alt="" className="absolute -top-4 -left-2 md:-left-8 w-14 md:w-16 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             常見問題
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
