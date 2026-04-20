@@ -117,7 +117,7 @@ export default function FranchiseLogin() {
           transition={{ duration: 0.5 }}
         >
           <div className="text-center mb-8 relative overflow-visible">
-            <img src={ip12Img} alt="" className="absolute -top-8 -right-4 w-12 h-auto object-contain pointer-events-none select-none opacity-50 animate-float-ip-alt" aria-hidden="true" />
+            <img src={ip12Img} alt="" className="absolute -top-8 -right-2 md:-right-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none opacity-60 animate-float-ip-alt" aria-hidden="true" />
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-tiffany/10 border border-tiffany/20 mb-4">
               {isFranchise
                 ? <Building2 className="w-7 h-7 text-tiffany" />

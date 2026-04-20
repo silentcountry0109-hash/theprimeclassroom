@@ -215,7 +215,7 @@ export default function ParentLogin() {
           transition={{ duration: 0.5 }}
         >
           <div className="text-center mb-8 relative overflow-visible">
-            <img src={ip13Img} alt="" className="absolute -top-8 -left-4 w-12 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+            <img src={ip13Img} alt="" className="absolute -top-8 -left-2 md:-left-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
             <h1 className="font-serif text-2xl tracking-[0.15em] text-foreground mb-2">
               質數教室
             </h1>
