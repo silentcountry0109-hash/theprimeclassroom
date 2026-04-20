@@ -96,6 +96,8 @@ import studentBoy2 from "@assets/student_boy_2.png";
 import studentGirl1 from "@assets/student_girl_1.png";
 import studentBoy3 from "@assets/student_boy_3.png";
 import studentGirl2 from "@assets/student_girl_2.png";
+import newTextbookImg from "@assets/Gemini_Generated_Image_xth2anxth2anxth2_1776664904973.png";
+import newBrandImg from "@assets/工作區域_6_1776664958904.png";
 
 const TEACHER_PHOTOS: Record<string, string> = {
   "林佳慧": teacher1Img,
@@ -458,28 +460,28 @@ function HeroSection() {
 
       <div className="text-center max-w-4xl mx-auto z-10 px-2">
         <motion.div
-          className="flex justify-center mb-2"
+          className="flex items-center justify-center gap-3 md:gap-5 mb-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.215, 0.61, 0.355, 1] }}
         >
-          <img src={heroLogoImg} alt="質數教室" className="h-20 md:h-28 w-auto object-contain mix-blend-multiply" />
+          <img src={heroLogoImg} alt="質數教室" className="h-16 md:h-24 w-auto object-contain mix-blend-multiply" />
+          <motion.span
+            className="text-3xl md:text-5xl text-tiffany font-medium tracking-[0.08em]"
+            initial={{ opacity: 0, letterSpacing: "0.4em" }}
+            animate={{ opacity: 1, letterSpacing: "0.08em" }}
+            transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
+          >
+            The Prime
+          </motion.span>
         </motion.div>
-        <motion.p
-          className="text-lg md:text-xl text-tiffany font-medium tracking-[0.1em] mb-3"
-          initial={{ opacity: 0, letterSpacing: "0.4em" }}
-          animate={{ opacity: 1, letterSpacing: "0.1em" }}
-          transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
-        >
-          The Prime
-        </motion.p>
         <motion.div
           className="flex justify-center mb-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          <PingPongGif src={subtitleGif} alt="國小數學個別指導" className="h-8 md:h-10 w-auto object-contain" />
+          <PingPongGif src={subtitleGif} alt="國小數學個別指導" className="h-16 md:h-24 w-auto object-contain" />
         </motion.div>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
@@ -679,11 +681,11 @@ function BrandPhilosophySection() {
           transition={{ duration: 0.7 }}
         >
           <img
-            src={brandHeroImage || brandPhilosophyImg}
+            src={brandHeroImage || newBrandImg}
             alt="質數教室的溫暖教學環境"
             className="w-full h-[220px] sm:h-[300px] md:h-[400px] object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-5 md:p-8">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
@@ -757,7 +759,8 @@ function TeachingMethodSection() {
       <img src={deco10Img} alt="" className="absolute bottom-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco-rev" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3" data-testid="text-teaching-title">
+            <img src={ip2Img} alt="" className="w-14 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
             {teachTitle}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -1222,7 +1225,7 @@ function TextbookSection() {
           transition={{ duration: 0.7 }}
         >
           <img
-            src={textbookDisplayImg}
+            src={newTextbookImg}
             alt="質數教室教材展示"
             className="w-full h-[200px] sm:h-[280px] md:h-[360px] object-cover rounded-2xl"
           />
@@ -1423,8 +1426,9 @@ function CoachesSection() {
     <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3">
             推薦師資
+            <img src={ip12Img} alt="" className="w-14 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             經過嚴格培訓與認證的專業老師團隊
@@ -1746,7 +1750,8 @@ function FAQSection() {
     <section id="faq" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-3xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3">
+            <img src={ip13Img} alt="" className="w-14 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
             常見問題
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -1981,15 +1986,7 @@ export default function LandingPage() {
         <HeroSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <BrandPhilosophySection />
-        <div className="relative overflow-visible">
-          <WaveDivider from="#F0FBFA" to="#ffffff" />
-          <img
-            src={ip2Img}
-            alt=""
-            className="absolute right-8 md:right-20 -bottom-10 md:-bottom-12 w-28 md:w-36 pointer-events-none select-none z-10 animate-float-ip drop-shadow-lg"
-            aria-hidden="true"
-          />
-        </div>
+        <WaveDivider from="#F0FBFA" to="#ffffff" />
         <TeachingMethodSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <LearningMapSection />
@@ -1998,29 +1995,13 @@ export default function LandingPage() {
         <FeaturesSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <CoachesSection />
-        <div className="relative overflow-visible">
-          <WaveDivider from="#FAF9F6" to="#ffffff" />
-          <img
-            src={ip12Img}
-            alt=""
-            className="absolute left-6 md:left-20 -bottom-12 md:-bottom-16 w-28 md:w-36 pointer-events-none select-none z-10 animate-float-ip-alt drop-shadow-lg"
-            aria-hidden="true"
-          />
-        </div>
+        <WaveDivider from="#FAF9F6" to="#ffffff" />
         <ProcessSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <TestimonialsSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <FAQSection />
-        <div className="relative overflow-visible">
-          <WaveDivider from="#ffffff" to="#FAF9F6" />
-          <img
-            src={ip13Img}
-            alt=""
-            className="absolute right-12 md:right-28 -bottom-10 md:-bottom-12 w-28 md:w-36 pointer-events-none select-none z-10 animate-float-ip-slow drop-shadow-lg"
-            aria-hidden="true"
-          />
-        </div>
+        <WaveDivider from="#ffffff" to="#FAF9F6" />
         <CTASection />
         <WaveDivider from="#FAF9F6" to="hsl(var(--foreground))" />
         <FooterSection />
