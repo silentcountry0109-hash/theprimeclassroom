@@ -760,7 +760,7 @@ function TeachingMethodSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3" data-testid="text-teaching-title">
-            <img src={ip2Img} alt="" className="w-14 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+            <img src={ip2Img} alt="" className="w-16 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
             {teachTitle}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -1428,7 +1428,7 @@ function CoachesSection() {
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3">
             推薦師資
-            <img src={ip12Img} alt="" className="w-14 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
+            <img src={ip12Img} alt="" className="w-16 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             經過嚴格培訓與認證的專業老師團隊
@@ -1751,7 +1751,7 @@ function FAQSection() {
       <div className="max-w-3xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4 flex items-center justify-center gap-3">
-            <img src={ip13Img} alt="" className="w-14 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+            <img src={ip13Img} alt="" className="w-16 md:w-20 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
             常見問題
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
