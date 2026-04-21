@@ -5,9 +5,10 @@ import { authStorage } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { users } from "@shared/models/auth";
 import { coaches, franchises, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
 import path from "path";
@@ -67,6 +68,34 @@ async function sendMitakeSms(phone: string, body: string): Promise<void> {
     throw new Error("簡訊發送失敗，請稍後再試");
   }
 }
+async function sendLineMessage(lineUserId: string, message: string): Promise<void> {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token || !lineUserId) return;
+  try {
+    await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ to: lineUserId, messages: [{ type: "text", text: message }] }),
+    });
+  } catch (err) {
+    console.error("[LINE Push] Failed:", err);
+  }
+}
+
+async function sendLineReply(replyToken: string, message: string): Promise<void> {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) return;
+  try {
+    await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ replyToken, messages: [{ type: "text", text: message }] }),
+    });
+  } catch (err) {
+    console.error("[LINE Reply] Failed:", err);
+  }
+}
+
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const curriculumDir = path.join(uploadsDir, "curriculum");
@@ -635,12 +664,17 @@ export async function registerRoutes(
         const slotTime = `${slot.startTime}–${slot.endTime}`;
         const [directorUser] = await db.select().from(users).where(and(eq(users.franchiseId, slot.franchiseId), eq(users.role, "franchise_admin")));
         if (directorUser) {
+          const msg = `【質數教室】新生預約通知\n${childName} 已預約 ${slotDate} ${slotTime} 的課程，請確認安排。`;
           await storage.createNotification({ userId: directorUser.id, type: "new_booking", title: "新生預約通知", message: `${childName} 已預約 ${slotDate} ${slotTime} 的課程，請確認安排。` });
+          if (directorUser.lineUserId) await sendLineMessage(directorUser.lineUserId, msg);
         }
         if (slot.coachId) {
           const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, slot.coachId));
           if (coachRec?.userId) {
+            const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
+            const msg = `【質數教室】新課程預約\n新學生 ${childName} 將在 ${slotDate} ${slotTime} 出席您的課程。`;
             await storage.createNotification({ userId: coachRec.userId, type: "new_booking", title: "新課程預約", message: `新學生 ${childName} 將在 ${slotDate} ${slotTime} 出席您的課程。` });
+            if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, msg);
           }
         }
       } catch (_) {}
@@ -817,6 +851,62 @@ export async function registerRoutes(
       res.send(lines.join("\r\n"));
     } catch (error) {
       res.status(500).json({ message: "Failed to generate calendar" });
+    }
+  });
+
+  app.post("/api/line/webhook", async (req: any, res) => {
+    try {
+      const channelSecret = process.env.LINE_CHANNEL_SECRET;
+      if (channelSecret) {
+        const signature = req.headers["x-line-signature"] as string;
+        const rawBody = req.rawBody as Buffer | undefined;
+        if (rawBody && signature) {
+          const hmac = crypto.createHmac("sha256", channelSecret);
+          hmac.update(rawBody);
+          const expected = hmac.digest("base64");
+          if (signature !== expected) {
+            return res.status(401).json({ message: "Invalid signature" });
+          }
+        }
+      }
+      const events: any[] = req.body?.events || [];
+      for (const event of events) {
+        if (event.type !== "message" || event.message?.type !== "text") continue;
+        const lineUserId: string = event.source?.userId;
+        const replyToken: string = event.replyToken;
+        const text: string = (event.message.text || "").trim();
+        if (!lineUserId) continue;
+        const normalized = text.replace(/[\s\-\(\)]/g, "");
+        const phoneRegex = /^09[0-9]{8}$/;
+        if (!phoneRegex.test(normalized)) {
+          await sendLineReply(replyToken, "您好！請傳送您的手機號碼（格式：0912345678）以完成質數教室 LINE 通知綁定。");
+          continue;
+        }
+        const [alreadyBound] = await db.select().from(users).where(eq(users.lineUserId, lineUserId)).limit(1);
+        if (alreadyBound) {
+          const name = alreadyBound.firstName || alreadyBound.username || "";
+          await sendLineReply(replyToken, `${name ? name + " 您好！" : ""}您已完成 LINE 綁定，無需重複操作 ✅`);
+          continue;
+        }
+        const [matchUser] = await db.select().from(users).where(
+          and(eq(users.phone, normalized), or(eq(users.role, "coach"), eq(users.role, "franchise_admin")))
+        ).limit(1);
+        if (!matchUser) {
+          await sendLineReply(replyToken, `查無手機號碼「${normalized}」對應的老師或分校主任帳號，請確認號碼是否正確，或聯絡分校主任協助。`);
+          continue;
+        }
+        if (matchUser.lineUserId) {
+          await sendLineReply(replyToken, `此手機號碼已完成 LINE 綁定。若需重新綁定，請聯絡分校主任協助解除後再操作。`);
+          continue;
+        }
+        await storage.updateUserLineUserId(matchUser.id, lineUserId);
+        const name = matchUser.firstName || matchUser.username || "老師";
+        await sendLineReply(replyToken, `✅ 綁定成功！${name} 您好，往後課程排班通知、新生預約等重要訊息將直接傳送到這裡。`);
+      }
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("[LINE Webhook] Error:", error);
+      res.status(500).json({ message: "Webhook error" });
     }
   });
 
@@ -1106,13 +1196,10 @@ export async function registerRoutes(
         const coach = await storage.getCoach(slot.coachId);
         if (coach?.userId) {
           const franchise = await storage.getFranchise(slot.franchiseId);
-          await storage.createNotification({
-            userId: coach.userId,
-            type: "slot_assigned",
-            title: "新排課通知",
-            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）有新的排課。`,
-            isRead: false,
-          });
+          const notifMsg = `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）有新的排課。`;
+          await storage.createNotification({ userId: coach.userId, type: "slot_assigned", title: "新排課通知", message: notifMsg, isRead: false });
+          const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coach.userId));
+          if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, `【質數教室】新排課通知\n${notifMsg}`);
         }
       }
       res.json(slot);
@@ -1169,13 +1256,10 @@ export async function registerRoutes(
         const coach = await storage.getCoach(slot.coachId);
         if (coach?.userId) {
           const franchise = await storage.getFranchise(slot.franchiseId);
-          await storage.createNotification({
-            userId: coach.userId,
-            type: "slot_removed",
-            title: "排課已取消",
-            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）的排課已被取消。`,
-            isRead: false,
-          });
+          const notifMsg = `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）的排課已被取消。`;
+          await storage.createNotification({ userId: coach.userId, type: "slot_removed", title: "排課已取消", message: notifMsg, isRead: false });
+          const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coach.userId));
+          if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, `【質數教室】排課取消通知\n${notifMsg}`);
         }
       }
 
@@ -1411,10 +1495,10 @@ export async function registerRoutes(
       const coachList = await storage.getCoachesByFranchise(req.franchiseId);
       const enriched = await Promise.all(coachList.map(async (coach) => {
         if (coach.userId) {
-          const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, coach.userId));
-          return { ...coach, accountUsername: user?.username || null };
+          const [user] = await db.select({ username: users.username, lineUserId: users.lineUserId }).from(users).where(eq(users.id, coach.userId));
+          return { ...coach, accountUsername: user?.username || null, lineUserId: user?.lineUserId || null };
         }
-        return { ...coach, accountUsername: null };
+        return { ...coach, accountUsername: null, lineUserId: null };
       }));
       res.json(enriched);
     } catch (error) {
@@ -1595,13 +1679,10 @@ export async function registerRoutes(
         const coach = await storage.getCoach(slot.coachId);
         if (coach?.userId) {
           const franchise = await storage.getFranchise(franchiseId);
-          await storage.createNotification({
-            userId: coach.userId,
-            type: "slot_assigned",
-            title: "新排課通知",
-            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）有新的排課。`,
-            isRead: false,
-          });
+          const notifMsg = `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）有新的排課。`;
+          await storage.createNotification({ userId: coach.userId, type: "slot_assigned", title: "新排課通知", message: notifMsg, isRead: false });
+          const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coach.userId));
+          if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, `【質數教室】新排課通知\n${notifMsg}`);
         }
       }
       res.json(slot);
@@ -1664,13 +1745,10 @@ export async function registerRoutes(
         const coach = await storage.getCoach(coachId);
         if (coach?.userId) {
           const franchise = await storage.getFranchise(franchiseId);
-          await storage.createNotification({
-            userId: coach.userId,
-            type: "slot_assigned",
-            title: "新排課通知",
-            message: `您在 ${updated.date} ${updated.startTime}-${updated.endTime}（${franchise?.name || "教室"}）有新的排課。`,
-            isRead: false,
-          });
+          const notifMsg = `您在 ${updated.date} ${updated.startTime}-${updated.endTime}（${franchise?.name || "教室"}）有新的排課。`;
+          await storage.createNotification({ userId: coach.userId, type: "slot_assigned", title: "新排課通知", message: notifMsg, isRead: false });
+          const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coach.userId));
+          if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, `【質數教室】新排課通知\n${notifMsg}`);
         }
       }
 
@@ -1750,13 +1828,10 @@ export async function registerRoutes(
         const coach = await storage.getCoach(slot.coachId);
         if (coach?.userId) {
           const franchise = await storage.getFranchise(slot.franchiseId);
-          await storage.createNotification({
-            userId: coach.userId,
-            type: "slot_removed",
-            title: "排課已取消",
-            message: `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）的排課已被取消。`,
-            isRead: false,
-          });
+          const notifMsg = `您在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchise?.name || "教室"}）的排課已被取消。`;
+          await storage.createNotification({ userId: coach.userId, type: "slot_removed", title: "排課已取消", message: notifMsg, isRead: false });
+          const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coach.userId));
+          if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, `【質數教室】排課取消通知\n${notifMsg}`);
         }
       }
 
@@ -1995,6 +2070,19 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "解除連結失敗" });
+    }
+  });
+
+  app.delete("/api/franchise-admin/coaches/:id/line", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coachId = parseInt(req.params.id);
+      const coach = await storage.getCoach(coachId);
+      if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
+      if (!coach.userId) return res.status(400).json({ message: "此老師尚未連結帳號" });
+      await storage.updateUserLineUserId(coach.userId, null);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "解除 LINE 綁定失敗" });
     }
   });
 

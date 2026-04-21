@@ -119,6 +119,8 @@ export interface IStorage {
 
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: string, role: string, franchiseId: number | null): Promise<User>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  updateUserLineUserId(userId: string, lineUserId: string | null): Promise<void>;
   getBookingsByFranchise(franchiseId: number): Promise<any[]>;
   getFranchiseStats(franchiseId: number): Promise<{
     totalCoaches: number;
@@ -1263,6 +1265,15 @@ export class DatabaseStorage implements IStorage {
   async updateUserRole(id: string, role: string, franchiseId: number | null): Promise<User> {
     const [updated] = await db.update(users).set({ role, franchiseId, updatedAt: new Date() }).where(eq(users.id, id)).returning();
     return updated;
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+    return user;
+  }
+
+  async updateUserLineUserId(userId: string, lineUserId: string | null): Promise<void> {
+    await db.update(users).set({ lineUserId, updatedAt: new Date() }).where(eq(users.id, userId));
   }
 
   async getBookingsByFranchise(franchiseId: number): Promise<any[]> {

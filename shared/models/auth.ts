@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   referralSource: text("referral_source").array(),
   managedFranchiseIds: integer("managed_franchise_ids").array(),
   mustChangePassword: boolean("must_change_password").default(false),
+  lineUserId: varchar("line_user_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

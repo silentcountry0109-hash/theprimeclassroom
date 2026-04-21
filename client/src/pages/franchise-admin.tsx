@@ -78,6 +78,7 @@ import {
   Sparkles,
   Loader2,
   Pencil,
+  MessageSquare,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -2005,6 +2006,24 @@ function CoachesTab() {
     },
   });
 
+  const unlinkLineMutation = useMutation({
+    mutationFn: async (coachId: number) => {
+      const res = await apiRequest("DELETE", `/api/franchise-admin/coaches/${coachId}/line`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "解除 LINE 綁定失敗");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "LINE 綁定已解除", description: "老師需重新在 LINE 官方帳號傳送手機號碼完成綁定" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "解除失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
@@ -2101,6 +2120,15 @@ function CoachesTab() {
                       未建立帳號
                     </span>
                   )}
+                  {(coach as any).lineUserId ? (
+                    <span className="text-xs bg-[#06C755]/10 text-[#06C755] px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-line-status-${coach.id}`}>
+                      <MessageSquare className="w-3 h-3" />LINE 已綁定
+                    </span>
+                  ) : (
+                    <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-line-status-${coach.id}`}>
+                      <MessageSquare className="w-3 h-3" />LINE 未綁定
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">{coach.specialties?.join(" · ") || "一般數學教學"}</p>
                 {coach.phone && (
@@ -2145,6 +2173,21 @@ function CoachesTab() {
                     >
                       <Unlink className="w-4 h-4" />
                     </Button>
+                    {(coach as any).lineUserId && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="text-[#06C755] hover:text-[#05a847] hover:border-green-300"
+                        title="解除 LINE 綁定"
+                        data-testid={`button-unlink-line-coach-${coach.id}`}
+                        onClick={() => {
+                          if (!confirm(`確定要解除「${coach.name}」的 LINE 綁定嗎？\n\n解除後老師將不再收到 LINE 推播通知，需重新綁定。`)) return;
+                          unlinkLineMutation.mutate(coach.id);
+                        }}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => openCreateAccount(coach)} data-testid={`button-create-account-coach-${coach.id}`}>
