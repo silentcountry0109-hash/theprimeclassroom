@@ -171,6 +171,8 @@ function PingPongGif({ src, className, alt }: { src: string; className?: string;
         if (!canvas || cancelled) return;
         canvas.width = w;
         canvas.height = h;
+        canvas.style.width = "100%";
+        canvas.style.height = "auto";
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
@@ -748,7 +750,7 @@ function TeachingMethodSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
           <div className="relative inline-block">
-            <img src={ip2Img} alt="" className="absolute -top-8 -left-10 md:-left-14 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+            <img src={ip2Img} alt="" className="absolute -top-8 -left-28 md:-left-36 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
             <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
               {teachTitle}
             </h2>
@@ -773,7 +775,7 @@ function TeachingMethodSection() {
                 <img
                   src={method.img}
                   alt={method.title}
-                  className="w-24 h-24 md:w-36 md:h-36 object-contain flex-shrink-0 group-hover:scale-150 group-hover:-translate-y-4 group-hover:drop-shadow-2xl transition-all duration-300"
+                  className="w-32 h-32 md:w-36 md:h-36 object-contain flex-shrink-0 group-hover:scale-150 group-hover:-translate-y-4 group-hover:drop-shadow-2xl transition-all duration-300"
                 />
                 <div className="flex-1">
                   <h3 className="font-serif text-lg md:text-xl tracking-wide text-foreground mb-1.5 md:mb-2">{method.title}</h3>
@@ -1417,7 +1419,7 @@ function CoachesSection() {
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
           <div className="relative inline-block">
-            <img src={ip12Img} alt="" className="absolute -top-8 -right-10 md:-right-14 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
+            <img src={ip12Img} alt="" className="absolute -top-8 -right-28 md:-right-36 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
             <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
               推薦師資
             </h2>
@@ -1590,6 +1592,10 @@ function ProcessSection() {
                 transform="rotate(-90 120 120)"
                 style={{ transition: "stroke-dasharray 0.7s ease-in-out" }}
               />
+              <circle cx="120" cy="30" r="26" fill="white" />
+              <circle cx="210" cy="120" r="26" fill="white" />
+              <circle cx="120" cy="210" r="26" fill="white" />
+              <circle cx="30" cy="120" r="26" fill="white" />
             </svg>
 
             {steps.map((step, i) => {
@@ -1604,7 +1610,7 @@ function ProcessSection() {
               return (
                 <button
                   key={step.title}
-                  className={`absolute z-10 flex items-center gap-0.5 ${i === 2 ? "flex-col-reverse" : "flex-col"}`}
+                  className={`absolute z-20 flex items-center gap-0.5 ${i === 2 ? "flex-col-reverse" : "flex-col"}`}
                   style={nodeStyle}
                   onClick={() => setActiveStep(i)}
                   data-testid={`btn-process-step-${i}`}
@@ -1675,7 +1681,7 @@ function ProcessSection() {
                 transition={{ duration: 0.6, delay: i * 0.15 }}
               >
                 {i < steps.length - 1 && (
-                  <div className="absolute top-8 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
+                  <div className="absolute top-14 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
                     <div
                       className="h-full bg-tiffany/50 rounded-full transition-all duration-700 ease-in-out"
                       style={{ width: isPast ? "100%" : isActive ? "50%" : "0%" }}
@@ -1892,7 +1898,7 @@ function FAQSection() {
       <div className="max-w-3xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
           <div className="relative inline-block">
-            <img src={ip13Img} alt="" className="absolute -top-8 -left-10 md:-left-14 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+            <img src={ip13Img} alt="" className="absolute -top-8 -left-28 md:-left-36 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
             <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
               常見問題
             </h2>
