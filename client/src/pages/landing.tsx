@@ -481,7 +481,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          <img src={subtitleGif} alt="國小數學個別指導" className="w-full max-w-lg mx-auto h-auto object-contain" />
+          <PingPongGif src={subtitleGif} alt="國小數學個別指導" className="w-full max-w-lg mx-auto h-auto object-contain" />
         </motion.div>
         <motion.p
           className="text-sm text-muted-foreground/70 max-w-lg mx-auto mb-8 md:mb-14 leading-relaxed px-4"
@@ -747,10 +747,12 @@ function TeachingMethodSection() {
       <img src={deco10Img} alt="" className="absolute bottom-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco-rev" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip2Img} alt="" className="absolute -top-8 -left-2 md:-left-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
-            {teachTitle}
-          </h2>
+          <div className="relative inline-block">
+            <img src={ip2Img} alt="" className="absolute -top-8 -left-10 md:-left-14 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip" aria-hidden="true" />
+            <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-teaching-title">
+              {teachTitle}
+            </h2>
+          </div>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             {teachDesc}
           </p>
@@ -771,7 +773,7 @@ function TeachingMethodSection() {
                 <img
                   src={method.img}
                   alt={method.title}
-                  className="w-20 h-20 md:w-28 md:h-28 object-contain flex-shrink-0 group-hover:scale-125 group-hover:-translate-y-3 group-hover:drop-shadow-lg transition-all duration-300"
+                  className="w-24 h-24 md:w-36 md:h-36 object-contain flex-shrink-0 group-hover:scale-150 group-hover:-translate-y-4 group-hover:drop-shadow-2xl transition-all duration-300"
                 />
                 <div className="flex-1">
                   <h3 className="font-serif text-lg md:text-xl tracking-wide text-foreground mb-1.5 md:mb-2">{method.title}</h3>
@@ -1414,10 +1416,12 @@ function CoachesSection() {
     <section className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip12Img} alt="" className="absolute -top-8 -right-2 md:-right-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
-            推薦師資
-          </h2>
+          <div className="relative inline-block">
+            <img src={ip12Img} alt="" className="absolute -top-8 -right-10 md:-right-14 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip-alt" aria-hidden="true" />
+            <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
+              推薦師資
+            </h2>
+          </div>
           <p className="text-muted-foreground max-w-xl mx-auto">
             經過嚴格培訓與認證的專業老師團隊
           </p>
@@ -1557,6 +1561,8 @@ function ProcessSection() {
     { icon: GraduationCap, number: "04", title: proc4Title, description: proc4Desc },
   ];
 
+  const circumference = 2 * Math.PI * 90;
+
   return (
     <section ref={sectionRef} className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
       <img src={deco14Img} alt="" className="absolute top-6 right-6 md:right-16 w-24 md:w-36 pointer-events-none select-none opacity-[0.13] animate-float-deco" aria-hidden="true" />
@@ -1570,7 +1576,92 @@ function ProcessSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+        {/* Mobile: circular progress layout */}
+        <div className="md:hidden flex flex-col items-center">
+          <div className="relative w-72 h-72 mx-auto">
+            {/* SVG circle track + progress arc */}
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 240 240" aria-hidden="true">
+              <circle cx="120" cy="120" r="90" fill="none" stroke="rgba(129,216,208,0.15)" strokeWidth="3" />
+              <circle
+                cx="120" cy="120" r="90"
+                fill="none"
+                stroke="rgba(129,216,208,0.75)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={`${activeStep * circumference / 4} ${circumference}`}
+                transform="rotate(-90 120 120)"
+                style={{ transition: "stroke-dasharray 0.7s ease-in-out" }}
+              />
+            </svg>
+
+            {/* Step nodes at 12 / 3 / 6 / 9 o'clock */}
+            {steps.map((step, i) => {
+              const nodeStyle = [
+                { left: "calc(50% - 22px)", top: "0px" },
+                { left: "calc(100% - 44px)", top: "calc(50% - 22px)" },
+                { left: "calc(50% - 22px)", top: "calc(100% - 44px)" },
+                { left: "0px", top: "calc(50% - 22px)" },
+              ][i];
+              const isActive = i === activeStep;
+              const isPast = i < activeStep;
+              return (
+                <button
+                  key={step.title}
+                  className="absolute z-10 flex items-center justify-center"
+                  style={nodeStyle}
+                  onClick={() => setActiveStep(i)}
+                  data-testid={`btn-process-step-${i}`}
+                  aria-label={step.title}
+                >
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-500 ${
+                    isActive
+                      ? "bg-tiffany/30 ring-2 ring-tiffany/70 shadow-md scale-110"
+                      : isPast
+                      ? "bg-tiffany/20"
+                      : "bg-gray-50 border border-gray-200"
+                  }`}>
+                    <step.icon className={`w-5 h-5 transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/40"}`} />
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Center: active step info */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-16">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeStep}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.85 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-center"
+                >
+                  <span className="block text-[10px] font-bold text-tiffany/60 tracking-widest mb-1">{steps[activeStep].number}</span>
+                  <p className="text-sm font-semibold text-foreground mb-1.5">{steps[activeStep].title}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{steps[activeStep].description}</p>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Dots */}
+          <div className="flex items-center justify-center gap-2 mt-6">
+            {steps.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveStep(i)}
+                className={`rounded-full transition-all duration-500 ${
+                  i === activeStep ? "w-6 h-2 bg-tiffany" : "w-2 h-2 bg-tiffany/30"
+                }`}
+                aria-label={`步驟 ${i + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop: 4-column grid */}
+        <div className="hidden md:grid grid-cols-4 gap-8">
           {steps.map((step, i) => {
             const isActive = i === activeStep;
             const isPast = i < activeStep;
@@ -1584,7 +1675,7 @@ function ProcessSection() {
                 transition={{ duration: 0.6, delay: i * 0.15 }}
               >
                 {i < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-8 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
+                  <div className="absolute top-8 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
                     <div
                       className="h-full bg-tiffany/50 rounded-full transition-all duration-700 ease-in-out"
                       style={{ width: isPast ? "100%" : isActive ? "50%" : "0%" }}
@@ -1618,7 +1709,7 @@ function ProcessSection() {
           })}
         </div>
 
-        <div className="flex items-center justify-center gap-2 mt-10">
+        <div className="hidden md:flex items-center justify-center gap-2 mt-10">
           {steps.map((_, i) => (
             <button
               key={i}
@@ -1800,10 +1891,12 @@ function FAQSection() {
     <section id="faq" className="py-14 md:py-24 px-4 md:px-6 bg-white">
       <div className="max-w-3xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16 relative overflow-visible" {...fadeInUp}>
-          <img src={ip13Img} alt="" className="absolute -top-8 -left-2 md:-left-8 w-20 md:w-24 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
-          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
-            常見問題
-          </h2>
+          <div className="relative inline-block">
+            <img src={ip13Img} alt="" className="absolute -top-8 -left-10 md:-left-14 w-28 md:w-36 h-auto object-contain pointer-events-none select-none animate-float-ip-slow" aria-hidden="true" />
+            <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
+              常見問題
+            </h2>
+          </div>
           <p className="text-muted-foreground max-w-xl mx-auto">
             關於質數教室，您可能想知道的事
           </p>
@@ -2053,7 +2146,6 @@ export default function LandingPage() {
         <FAQSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
         <CTASection />
-        <WaveDivider from="#FAF9F6" to="hsl(var(--foreground))" />
         <FooterSection />
       </div>
     </SiteContentContext.Provider>
