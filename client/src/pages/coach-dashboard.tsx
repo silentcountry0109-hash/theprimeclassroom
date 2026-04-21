@@ -1108,9 +1108,11 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     }
   };
 
+  const presentStudents = students.filter((s: any) => s.status !== "absent");
+
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const entries = students.map((s: any) => {
+      const entries = presentStudents.map((s: any) => {
         const data = getStudentFormData(s.childId);
         return {
           bookingId: s.bookingId,
@@ -1166,14 +1168,21 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
                 <button
                   key={s.childId}
                   onClick={() => setActiveStudentIdx(idx)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1 ${
                     idx === activeStudentIdx
-                      ? "bg-tiffany text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      ? s.status === "absent"
+                        ? "bg-red-400 text-white"
+                        : "bg-tiffany text-white"
+                      : s.status === "absent"
+                        ? "bg-red-50 text-red-400 hover:bg-red-100"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                   data-testid={`student-tab-${s.childId}`}
                 >
                   {s.childName}
+                  {s.status === "absent" && (
+                    <span className="text-[10px] opacity-80">未到</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -1182,13 +1191,25 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
           {currentStudent && currentData && (
             <div className="space-y-3 border rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-full bg-tiffany/10 flex items-center justify-center">
-                  <span className="text-xs text-tiffany font-bold">{currentStudent.childName[0]}</span>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${currentStudent.status === "absent" ? "bg-red-50" : "bg-tiffany/10"}`}>
+                  <span className={`text-xs font-bold ${currentStudent.status === "absent" ? "text-red-400" : "text-tiffany"}`}>{currentStudent.childName[0]}</span>
                 </div>
                 <span className="font-semibold text-sm">{currentStudent.childName}</span>
                 <span className="text-xs text-muted-foreground">{currentStudent.childGrade}年級</span>
+                {currentStudent.status === "absent" && (
+                  <span className="inline-flex items-center gap-1 text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full ml-auto">
+                    <UserX className="w-3 h-3" />
+                    未到
+                  </span>
+                )}
               </div>
 
+              {currentStudent.status === "absent" ? (
+                <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-3 text-sm text-red-600" data-testid={`absent-notice-${currentStudent.childId}`}>
+                  <UserX className="w-4 h-4 flex-shrink-0" />
+                  已標記為未到，無需填寫聯絡簿
+                </div>
+              ) : (<>
               <TextbookUnitSelector
                 childGrade={currentStudent.childGrade}
                 value={currentData.lessonUnit}
@@ -1301,12 +1322,13 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
                   data-testid="textarea-internal-notes"
                 />
               </div>
+              </>)}
             </div>
           )}
 
           <Button
             className="w-full bg-tiffany hover:bg-tiffany/90 text-white"
-            disabled={students.some((s: any) => !getStudentFormData(s.childId).lessonUnit) || saveMutation.isPending}
+            disabled={presentStudents.some((s: any) => !getStudentFormData(s.childId).lessonUnit) || saveMutation.isPending}
             onClick={() => saveMutation.mutate()}
             data-testid="button-save-contact-book"
           >
