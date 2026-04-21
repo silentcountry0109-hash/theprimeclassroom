@@ -1033,7 +1033,7 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     queryKey: ["/api/coach/contact-books/slot", slot.id],
   });
 
-  const [activeStudentIdx, setActiveStudentIdx] = useState(0);
+  const [activeStudentId, setActiveStudentId] = useState<number | null>(null);
   const [studentData, setStudentData] = useState<Record<number, {
     lessonUnit: string;
     lessonProgress: string;
@@ -1110,6 +1110,13 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
 
   const presentStudents = students.filter((s: any) => s.status !== "absent");
 
+  const sortedStudents = [
+    ...students.filter((s: any) => s.status !== "absent"),
+    ...students.filter((s: any) => s.status === "absent"),
+  ];
+
+  const effectiveActiveId = activeStudentId ?? sortedStudents[0]?.childId ?? null;
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const entries = presentStudents.map((s: any) => {
@@ -1140,7 +1147,7 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     },
   });
 
-  const currentStudent = students[activeStudentIdx];
+  const currentStudent = sortedStudents.find((s: any) => s.childId === effectiveActiveId) ?? null;
   const currentData = currentStudent ? getStudentFormData(currentStudent.childId) : null;
   const hasExisting = existingBooks.length > 0;
 
@@ -1162,29 +1169,48 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
         </div>
 
         <div className="space-y-4">
-          {students.length > 1 && (
-            <div className="flex gap-1 overflow-x-auto pb-1">
-              {students.map((s: any, idx: number) => (
-                <button
-                  key={s.childId}
-                  onClick={() => setActiveStudentIdx(idx)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1 ${
-                    idx === activeStudentIdx
-                      ? s.status === "absent"
-                        ? "bg-red-400 text-white"
-                        : "bg-tiffany text-white"
-                      : s.status === "absent"
-                        ? "bg-red-50 text-red-400 hover:bg-red-100"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                  data-testid={`student-tab-${s.childId}`}
-                >
-                  {s.childName}
-                  {s.status === "absent" && (
-                    <span className="text-[10px] opacity-80">未到</span>
-                  )}
-                </button>
-              ))}
+          {sortedStudents.length > 1 && (
+            <div className="space-y-1">
+              <div className="flex gap-1.5 text-[10px] text-muted-foreground px-0.5">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" />已填</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full border border-gray-300 inline-block" />未填</span>
+                <span className="flex items-center gap-1 ml-2 text-red-400"><span className="w-2 h-2 rounded-full bg-red-200 inline-block" />未到</span>
+              </div>
+              <div className="flex gap-1 overflow-x-auto pb-1">
+                {sortedStudents.map((s: any) => {
+                  const isActive = s.childId === effectiveActiveId;
+                  const isAbsent = s.status === "absent";
+                  const isFilled = existingBooks.some((b: any) => b.childId === s.childId);
+                  return (
+                    <button
+                      key={s.childId}
+                      onClick={() => setActiveStudentId(s.childId)}
+                      className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                        isActive
+                          ? isAbsent
+                            ? "bg-red-400 text-white"
+                            : "bg-tiffany text-white"
+                          : isAbsent
+                            ? "bg-red-50 text-red-400 hover:bg-red-100"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                      data-testid={`student-tab-${s.childId}`}
+                    >
+                      {!isAbsent && (
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          isFilled
+                            ? isActive ? "bg-white" : "bg-green-400"
+                            : isActive ? "border border-white/70 bg-transparent" : "border border-gray-400 bg-transparent"
+                        }`} data-testid={`dot-filled-${s.childId}`} />
+                      )}
+                      {s.childName}
+                      {isAbsent && (
+                        <span className="text-[10px] opacity-80">未到</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
