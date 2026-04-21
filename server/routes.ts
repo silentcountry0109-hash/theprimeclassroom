@@ -888,20 +888,38 @@ export async function registerRoutes(
           await sendLineReply(replyToken, `${name ? name + " 您好！" : ""}您已完成 LINE 綁定，無需重複操作 ✅`);
           continue;
         }
-        const [matchUser] = await db.select().from(users).where(
-          and(eq(users.phone, normalized), or(eq(users.role, "coach"), eq(users.role, "franchise_admin")))
-        ).limit(1);
-        if (!matchUser) {
+        // 先從 coaches 表格比對手機號碼（老師手機存在 coaches，不在 users）
+        const [matchCoach] = await db.select().from(coaches).where(eq(coaches.phone, normalized)).limit(1);
+        let targetUserId: string | null = null;
+        let displayName = "老師";
+        if (matchCoach) {
+          if (!matchCoach.userId) {
+            await sendLineReply(replyToken, `找到老師「${matchCoach.name}」，但尚未建立系統帳號，請聯絡分校主任協助建立帳號後再綁定。`);
+            continue;
+          }
+          targetUserId = matchCoach.userId;
+          displayName = matchCoach.name || "老師";
+        } else {
+          // 再從 users 表格比對（分校主任可能有手機號碼）
+          const [matchUser] = await db.select().from(users).where(
+            and(eq(users.phone, normalized), eq(users.role, "franchise_admin"))
+          ).limit(1);
+          if (matchUser) {
+            targetUserId = matchUser.id;
+            displayName = matchUser.firstName || matchUser.username || "主任";
+          }
+        }
+        if (!targetUserId) {
           await sendLineReply(replyToken, `查無手機號碼「${normalized}」對應的老師或分校主任帳號，請確認號碼是否正確，或聯絡分校主任協助。`);
           continue;
         }
-        if (matchUser.lineUserId) {
+        const [targetUser] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+        if (targetUser?.lineUserId) {
           await sendLineReply(replyToken, `此手機號碼已完成 LINE 綁定。若需重新綁定，請聯絡分校主任協助解除後再操作。`);
           continue;
         }
-        await storage.updateUserLineUserId(matchUser.id, lineUserId);
-        const name = matchUser.firstName || matchUser.username || "老師";
-        await sendLineReply(replyToken, `✅ 綁定成功！${name} 您好，往後課程排班通知、新生預約等重要訊息將直接傳送到這裡。`);
+        await storage.updateUserLineUserId(targetUserId, lineUserId);
+        await sendLineReply(replyToken, `✅ 綁定成功！${displayName} 您好，往後課程排班通知、新生預約等重要訊息將直接傳送到這裡。`);
       }
       res.status(200).json({ success: true });
     } catch (error) {
