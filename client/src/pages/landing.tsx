@@ -1576,10 +1576,8 @@ function ProcessSection() {
           </p>
         </motion.div>
 
-        {/* Mobile: circular progress layout */}
         <div className="md:hidden flex flex-col items-center">
           <div className="relative w-72 h-72 mx-auto">
-            {/* SVG circle track + progress arc */}
             <svg className="absolute inset-0 w-full h-full" viewBox="0 0 240 240" aria-hidden="true">
               <circle cx="120" cy="120" r="90" fill="none" stroke="rgba(129,216,208,0.15)" strokeWidth="3" />
               <circle
@@ -1594,24 +1592,19 @@ function ProcessSection() {
               />
             </svg>
 
-            {/* Step nodes at 12 / 3 / 6 / 9 o'clock — icon + title label */}
             {steps.map((step, i) => {
-              // Pixel positions: r=90 in viewBox 0 0 240 240, rendered at w-72=288px
-              // Scale=1.2; node centers at (144,36),(252,144),(144,252),(36,144)
               const nodeStyle = [
-                { left: "122px", top: "14px" },   // 12 o'clock
-                { left: "230px", top: "122px" },   // 3 o'clock
-                { left: "122px", top: "218px" },   // 6 o'clock (shifted up so label fits)
-                { left: "14px", top: "122px" },    // 9 o'clock
+                { left: "122px", top: "14px" },
+                { left: "230px", top: "122px" },
+                { left: "122px", top: "218px" },
+                { left: "14px", top: "122px" },
               ][i];
               const isActive = i === activeStep;
               const isPast = i < activeStep;
-              // bottom node: label renders above icon via flex-col-reverse
-              const isBottom = i === 2;
               return (
                 <button
                   key={step.title}
-                  className={`absolute z-10 flex items-center gap-0.5 ${isBottom ? "flex-col-reverse" : "flex-col"}`}
+                  className={`absolute z-10 flex items-center gap-0.5 ${i === 2 ? "flex-col-reverse" : "flex-col"}`}
                   style={nodeStyle}
                   onClick={() => setActiveStep(i)}
                   data-testid={`btn-process-step-${i}`}
@@ -1636,7 +1629,6 @@ function ProcessSection() {
               );
             })}
 
-            {/* Center: active step info */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-16">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -1655,7 +1647,6 @@ function ProcessSection() {
             </div>
           </div>
 
-          {/* Dots */}
           <div className="flex items-center justify-center gap-2 mt-6">
             {steps.map((_, i) => (
               <button
@@ -1670,7 +1661,6 @@ function ProcessSection() {
           </div>
         </div>
 
-        {/* Desktop: 4-column grid */}
         <div className="hidden md:grid grid-cols-4 gap-8">
           {steps.map((step, i) => {
             const isActive = i === activeStep;
