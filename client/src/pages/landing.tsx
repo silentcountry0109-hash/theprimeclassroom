@@ -1594,26 +1594,30 @@ function ProcessSection() {
               />
             </svg>
 
-            {/* Step nodes at 12 / 3 / 6 / 9 o'clock */}
+            {/* Step nodes at 12 / 3 / 6 / 9 o'clock — icon + title label */}
             {steps.map((step, i) => {
+              // Pixel positions: r=90 in viewBox 0 0 240 240, rendered at w-72=288px
+              // Scale=1.2; node centers at (144,36),(252,144),(144,252),(36,144)
               const nodeStyle = [
-                { left: "calc(50% - 22px)", top: "0px" },
-                { left: "calc(100% - 44px)", top: "calc(50% - 22px)" },
-                { left: "calc(50% - 22px)", top: "calc(100% - 44px)" },
-                { left: "0px", top: "calc(50% - 22px)" },
+                { left: "122px", top: "14px" },   // 12 o'clock
+                { left: "230px", top: "122px" },   // 3 o'clock
+                { left: "122px", top: "218px" },   // 6 o'clock (shifted up so label fits)
+                { left: "14px", top: "122px" },    // 9 o'clock
               ][i];
               const isActive = i === activeStep;
               const isPast = i < activeStep;
+              // bottom node: label renders above icon via flex-col-reverse
+              const isBottom = i === 2;
               return (
                 <button
                   key={step.title}
-                  className="absolute z-10 flex items-center justify-center"
+                  className={`absolute z-10 flex items-center gap-0.5 ${isBottom ? "flex-col-reverse" : "flex-col"}`}
                   style={nodeStyle}
                   onClick={() => setActiveStep(i)}
                   data-testid={`btn-process-step-${i}`}
                   aria-label={step.title}
                 >
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-500 ${
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-500 shrink-0 ${
                     isActive
                       ? "bg-tiffany/30 ring-2 ring-tiffany/70 shadow-md scale-110"
                       : isPast
@@ -1622,6 +1626,12 @@ function ProcessSection() {
                   }`}>
                     <step.icon className={`w-5 h-5 transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/40"}`} />
                   </div>
+                  <span
+                    className={`text-[10px] font-semibold text-center leading-tight transition-colors duration-300 ${isActive ? "text-tiffany" : "text-foreground/45"}`}
+                    style={{ maxWidth: 48 }}
+                  >
+                    {step.title}
+                  </span>
                 </button>
               );
             })}
