@@ -244,6 +244,7 @@ export interface IStorage {
   updatePurchaseStatusAndTradeNo(id: number, status: string, ecpayTradeNo: string): Promise<CreditPurchase>;
   getPurchasesByParent(parentId: string): Promise<CreditPurchase[]>;
   getCreditPurchaseByTradeNo(ecpayTradeNo: string): Promise<CreditPurchase | undefined>;
+  atomicMarkPurchasePaid(ecpayTradeNo: string): Promise<CreditPurchase | null>;
 
   getParentBalance(parentId: string): Promise<number>;
   getCreditBalances(parentId: string): Promise<CreditBalance[]>;
@@ -2401,6 +2402,14 @@ export class DatabaseStorage implements IStorage {
   async getCreditPurchaseByTradeNo(ecpayTradeNo: string): Promise<CreditPurchase | undefined> {
     const [purchase] = await db.select().from(creditPurchases).where(eq(creditPurchases.ecpayTradeNo, ecpayTradeNo));
     return purchase;
+  }
+
+  async atomicMarkPurchasePaid(ecpayTradeNo: string): Promise<CreditPurchase | null> {
+    const result = await db.update(creditPurchases)
+      .set({ paymentStatus: "paid" })
+      .where(and(eq(creditPurchases.ecpayTradeNo, ecpayTradeNo), eq(creditPurchases.paymentStatus, "pending")))
+      .returning();
+    return result[0] ?? null;
   }
 
   async getPurchasesByParent(parentId: string): Promise<CreditPurchase[]> {

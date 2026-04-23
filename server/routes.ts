@@ -3445,6 +3445,7 @@ export async function registerRoutes(
     const raw = `HashKey=${ECPAY_HASH_KEY}&${queryStr}&HashIV=${ECPAY_HASH_IV}`;
     const encoded = encodeURIComponent(raw)
       .toLowerCase()
+      .replace(/%20/g, "+")
       .replace(/%21/g, "!")
       .replace(/%28/g, "(")
       .replace(/%29/g, ")")
@@ -3489,13 +3490,19 @@ export async function registerRoutes(
       let couponDiscount = 0;
       if (couponId) {
         const coupon = await storage.getCouponByCode(String(couponId));
-        if (coupon && coupon.isActive) {
-          couponDbId = coupon.id;
-          if (coupon.discountType === "fixed") {
-            couponDiscount = coupon.discountValue;
-          } else if (coupon.discountType === "percentage") {
-            couponDiscount = Math.round((originalAmount - discountAmount) * coupon.discountValue / 100);
-          }
+        if (!coupon) return res.status(400).json({ message: "優惠碼不存在" });
+        if (!coupon.isActive) return res.status(400).json({ message: "此優惠碼已停用" });
+        if (coupon.maxUses != null && coupon.currentUses >= coupon.maxUses) return res.status(400).json({ message: "此優惠碼已達使用上限" });
+        const today = new Date().toISOString().split("T")[0];
+        if (coupon.validFrom && today < coupon.validFrom) return res.status(400).json({ message: "此優惠碼尚未開始" });
+        if (coupon.validUntil && today > coupon.validUntil) return res.status(400).json({ message: "此優惠碼已過期" });
+        const discountedSoFar = originalAmount - discountAmount;
+        if (coupon.minPurchaseAmount != null && discountedSoFar < coupon.minPurchaseAmount) return res.status(400).json({ message: `最低消費金額為 $${coupon.minPurchaseAmount}` });
+        couponDbId = coupon.id;
+        if (coupon.discountType === "fixed") {
+          couponDiscount = coupon.discountValue;
+        } else if (coupon.discountType === "percentage") {
+          couponDiscount = Math.round(discountedSoFar * coupon.discountValue / 100);
         }
       }
       discountAmount += couponDiscount;
@@ -3557,20 +3564,17 @@ export async function registerRoutes(
       }
 
       if (RtnCode !== "1") {
-        const purchase = await storage.getCreditPurchaseByTradeNo(MerchantTradeNo);
-        if (purchase) await storage.updatePurchaseStatus(purchase.id, "failed");
+        const failedPurchase = await storage.getCreditPurchaseByTradeNo(MerchantTradeNo);
+        if (failedPurchase && failedPurchase.paymentStatus === "pending") {
+          await storage.updatePurchaseStatus(failedPurchase.id, "failed");
+        }
         return res.status(200).send("1|OK");
       }
 
-      const purchase = await storage.getCreditPurchaseByTradeNo(MerchantTradeNo);
+      const purchase = await storage.atomicMarkPurchasePaid(MerchantTradeNo);
       if (!purchase) {
-        console.error("ECPay notify: purchase not found for", MerchantTradeNo);
         return res.status(200).send("1|OK");
       }
-
-      if (purchase.paymentStatus === "paid") return res.status(200).send("1|OK");
-
-      await storage.updatePurchaseStatus(purchase.id, "paid");
 
       const pkg = purchase.packageId
         ? await storage.getActiveCreditPackages().then(pkgs => pkgs.find(p => p.id === purchase.packageId))
