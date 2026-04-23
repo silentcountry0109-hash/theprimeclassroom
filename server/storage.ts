@@ -2420,12 +2420,20 @@ export class DatabaseStorage implements IStorage {
         .where(and(eq(creditPurchases.ecpayTradeNo, ecpayTradeNo), eq(creditPurchases.paymentStatus, "pending")))
         .returning();
       if (!purchase) return null;
-      await tx.insert(creditBalances).values({
+      const [balance] = await tx.insert(creditBalances).values({
         parentId: purchase.parentId,
         purchaseId: purchase.id,
         originalCredits: purchase.credits,
         remainingCredits: purchase.credits,
         expiresAt,
+      }).returning();
+      await tx.insert(creditTransactions).values({
+        parentId: purchase.parentId,
+        type: "purchase",
+        credits: purchase.credits,
+        balanceId: balance.id,
+        purchaseId: purchase.id,
+        description: "線上付款購買堂數",
       });
       return purchase;
     });
