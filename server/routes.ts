@@ -3571,20 +3571,24 @@ export async function registerRoutes(
         return res.status(200).send("1|OK");
       }
 
-      const purchase = await storage.atomicMarkPurchasePaid(MerchantTradeNo);
-      if (!purchase) {
+      const existingPurchase = await storage.getCreditPurchaseByTradeNo(MerchantTradeNo);
+      if (!existingPurchase) {
+        console.error("ECPay notify: purchase not found for", MerchantTradeNo);
         return res.status(200).send("1|OK");
       }
 
-      const pkg = purchase.packageId
-        ? await storage.getActiveCreditPackages().then(pkgs => pkgs.find(p => p.id === purchase.packageId))
+      const pkg = existingPurchase.packageId
+        ? await storage.getActiveCreditPackages().then(pkgs => pkgs.find(p => p.id === existingPurchase.packageId))
         : null;
 
       const expiresAt = pkg?.expiryDays
         ? new Date(Date.now() + pkg.expiryDays * 86400 * 1000)
         : null;
 
-      await storage.addCredits(purchase.parentId, purchase.id, purchase.credits, expiresAt);
+      const purchase = await storage.atomicMarkPaidAndAddCredits(MerchantTradeNo, expiresAt);
+      if (!purchase) {
+        return res.status(200).send("1|OK");
+      }
 
       if (purchase.couponId) {
         await storage.incrementCouponUsage(purchase.couponId);
@@ -3597,11 +3601,14 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/payment/ecpay/return", (req, res) => {
-    const { RtnCode } = req.query as Record<string, string>;
+  const handleEcpayReturn = (req: any, res: any) => {
+    const data = req.method === "POST" ? req.body : req.query;
+    const { RtnCode } = data as Record<string, string>;
     const status = RtnCode === "1" ? "success" : "fail";
     res.redirect(`/parent?tab=credits&payment=${status}`);
-  });
+  };
+  app.get("/api/payment/ecpay/return", handleEcpayReturn);
+  app.post("/api/payment/ecpay/return", handleEcpayReturn);
 
   return httpServer;
 }
