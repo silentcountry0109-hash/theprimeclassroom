@@ -3424,5 +3424,180 @@ export async function registerRoutes(
     }
   });
 
+  // ─── ECPay Payment Integration ──────────────────────────────────
+  const ECPAY_MERCHANT_ID = process.env.ECPAY_MERCHANT_ID || "2000132";
+  const ECPAY_HASH_KEY = process.env.ECPAY_HASH_KEY || "5294y06JbISpM5x9";
+  const ECPAY_HASH_IV = process.env.ECPAY_HASH_IV || "v77hoKGq4kWxNNIS";
+  const ECPAY_IS_SANDBOX = process.env.ECPAY_IS_SANDBOX !== "false";
+  const ECPAY_AIO_URL = ECPAY_IS_SANDBOX
+    ? "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5"
+    : "https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5";
+
+  const domain = process.env.REPLIT_DOMAINS
+    ? process.env.REPLIT_DOMAINS.split(",")[0]
+    : "localhost:5000";
+
+  function computeCheckMacValue(params: Record<string, string>): string {
+    const p = { ...params };
+    delete p.CheckMacValue;
+    const sorted = Object.keys(p).sort();
+    const queryStr = sorted.map(k => `${k}=${p[k]}`).join("&");
+    const raw = `HashKey=${ECPAY_HASH_KEY}&${queryStr}&HashIV=${ECPAY_HASH_IV}`;
+    const encoded = encodeURIComponent(raw)
+      .toLowerCase()
+      .replace(/%21/g, "!")
+      .replace(/%28/g, "(")
+      .replace(/%29/g, ")")
+      .replace(/%2a/g, "*");
+    return crypto.createHash("sha256").update(encoded).digest("hex").toUpperCase();
+  }
+
+  app.post("/api/payment/ecpay/create", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      if (req.currentUser.role !== "parent") return res.status(403).json({ message: "僅限家長使用" });
+      const parentId = req.currentUser.id;
+      const { packageId, couponId } = req.body;
+      if (!packageId) return res.status(400).json({ message: "請選擇堂數方案" });
+
+      const pkg = await storage.getActiveCreditPackages().then(pkgs => pkgs.find(p => p.id === Number(packageId)));
+      if (!pkg) return res.status(404).json({ message: "找不到此方案" });
+
+      let originalAmount = pkg.price;
+      let discountAmount = 0;
+      let couponDbId: number | null = null;
+      let promotionId: number | null = null;
+
+      const activePromotions = await storage.getActivePromotions();
+      const now = new Date().toISOString().split("T")[0];
+      const promo = activePromotions.find(p => {
+        if (!p.isActive || p.startDate > now || p.endDate < now) return false;
+        if (p.applicablePackageIds && p.applicablePackageIds.length > 0) {
+          return p.applicablePackageIds.includes(Number(packageId));
+        }
+        return true;
+      });
+
+      if (promo) {
+        promotionId = promo.id;
+        if (promo.discountType === "percentage") {
+          discountAmount = Math.round(originalAmount * promo.discountValue / 100);
+        } else {
+          discountAmount = Math.min(promo.discountValue, originalAmount);
+        }
+      }
+
+      let couponDiscount = 0;
+      if (couponId) {
+        const coupon = await storage.getCouponByCode(String(couponId));
+        if (coupon && coupon.isActive) {
+          couponDbId = coupon.id;
+          if (coupon.discountType === "fixed") {
+            couponDiscount = coupon.discountValue;
+          } else if (coupon.discountType === "percentage") {
+            couponDiscount = Math.round((originalAmount - discountAmount) * coupon.discountValue / 100);
+          }
+        }
+      }
+      discountAmount += couponDiscount;
+      const finalAmount = Math.max(1, originalAmount - discountAmount);
+
+      const now2 = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const tradeDate = `${now2.getFullYear()}/${pad(now2.getMonth() + 1)}/${pad(now2.getDate())} ${pad(now2.getHours())}:${pad(now2.getMinutes())}:${pad(now2.getSeconds())}`;
+
+      const purchase = await storage.createCreditPurchase({
+        parentId,
+        packageId: pkg.id,
+        credits: pkg.credits,
+        originalAmount,
+        discountAmount,
+        finalAmount,
+        promotionId,
+        couponId: couponDbId,
+        paymentMethod: "ecpay",
+        paymentStatus: "pending",
+        ecpayTradeNo: null,
+        expiresAt: pkg.expiryDays ? new Date(Date.now() + pkg.expiryDays * 86400 * 1000) : null,
+      });
+
+      const merchantTradeNo = `P${purchase.id}T${Date.now().toString().slice(-8)}`.slice(0, 20);
+      await storage.updatePurchaseStatusAndTradeNo(purchase.id, "pending", merchantTradeNo);
+
+      const params: Record<string, string> = {
+        MerchantID: ECPAY_MERCHANT_ID,
+        MerchantTradeNo: merchantTradeNo,
+        MerchantTradeDate: tradeDate,
+        PaymentType: "aio",
+        TotalAmount: String(finalAmount),
+        TradeDesc: "質數教室堂數購買",
+        ItemName: `${pkg.name} ${pkg.credits}堂`,
+        ReturnURL: `https://${domain}/api/payment/ecpay/notify`,
+        OrderResultURL: `https://${domain}/api/payment/ecpay/return`,
+        ChoosePayment: "Credit",
+        EncryptType: "1",
+      };
+      params.CheckMacValue = computeCheckMacValue(params);
+
+      res.json({ actionUrl: ECPAY_AIO_URL, params });
+    } catch (error) {
+      console.error("ECPay create error:", error);
+      res.status(500).json({ message: "建立付款失敗" });
+    }
+  });
+
+  app.post("/api/payment/ecpay/notify", async (req, res) => {
+    try {
+      const body = req.body as Record<string, string>;
+      const { CheckMacValue, RtnCode, MerchantTradeNo } = body;
+
+      const computedMac = computeCheckMacValue(body);
+      if (computedMac !== CheckMacValue) {
+        console.error("ECPay notify: CheckMacValue mismatch", { computedMac, received: CheckMacValue });
+        return res.status(200).send("0|CheckMacValue Error");
+      }
+
+      if (RtnCode !== "1") {
+        const purchase = await storage.getCreditPurchaseByTradeNo(MerchantTradeNo);
+        if (purchase) await storage.updatePurchaseStatus(purchase.id, "failed");
+        return res.status(200).send("1|OK");
+      }
+
+      const purchase = await storage.getCreditPurchaseByTradeNo(MerchantTradeNo);
+      if (!purchase) {
+        console.error("ECPay notify: purchase not found for", MerchantTradeNo);
+        return res.status(200).send("1|OK");
+      }
+
+      if (purchase.paymentStatus === "paid") return res.status(200).send("1|OK");
+
+      await storage.updatePurchaseStatus(purchase.id, "paid");
+
+      const pkg = purchase.packageId
+        ? await storage.getActiveCreditPackages().then(pkgs => pkgs.find(p => p.id === purchase.packageId))
+        : null;
+
+      const expiresAt = pkg?.expiryDays
+        ? new Date(Date.now() + pkg.expiryDays * 86400 * 1000)
+        : null;
+
+      await storage.addCredits(purchase.parentId, purchase.id, purchase.credits, expiresAt);
+
+      if (purchase.couponId) {
+        await storage.incrementCouponUsage(purchase.couponId);
+      }
+
+      return res.status(200).send("1|OK");
+    } catch (error) {
+      console.error("ECPay notify error:", error);
+      return res.status(200).send("1|OK");
+    }
+  });
+
+  app.get("/api/payment/ecpay/return", (req, res) => {
+    const { RtnCode } = req.query as Record<string, string>;
+    const status = RtnCode === "1" ? "success" : "fail";
+    res.redirect(`/parent?tab=credits&payment=${status}`);
+  });
+
   return httpServer;
 }

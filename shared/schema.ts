@@ -352,6 +352,7 @@ export const creditPurchases = pgTable("credit_purchases", {
   couponId: integer("coupon_id").references(() => couponCodes.id),
   paymentMethod: text("payment_method").default("manual").notNull(),
   paymentStatus: text("payment_status").default("pending").notNull(),
+  ecpayTradeNo: text("ecpay_trade_no"),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

@@ -234,6 +234,28 @@ export default function ParentDashboard() {
     }
   }, [isLoading, user]);
 
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    const payment = params.get("payment");
+    if (tab) setActiveTab(tab);
+    if (payment === "success") {
+      toast({ title: "付款成功！", description: "堂數已加值至您的帳戶，感謝您的購買。" });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/transactions"] });
+    } else if (payment === "fail") {
+      toast({ title: "付款失敗", description: "付款未完成，請重試或聯繫總部。", variant: "destructive" });
+    }
+    if (tab || payment) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("tab");
+      url.searchParams.delete("payment");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
   const { data: welcomeChildren = [] } = useQuery<any[]>({
     queryKey: ["/api/children"],
     enabled: showWelcomeModal,
@@ -867,6 +889,34 @@ function CreditsTab() {
     discount: number;
   } | null>(null);
 
+  const purchaseMutation = useMutation({
+    mutationFn: async ({ packageId, couponCode: code }: { packageId: number; couponCode?: string }) => {
+      const res = await apiRequest("POST", "/api/payment/ecpay/create", { packageId, couponId: code || undefined });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "建立付款失敗");
+      }
+      return res.json() as Promise<{ actionUrl: string; params: Record<string, string> }>;
+    },
+    onSuccess: ({ actionUrl, params }) => {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = actionUrl;
+      Object.entries(params).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+    },
+    onError: (error: Error) => {
+      toast({ title: "建立付款失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletData>({
     queryKey: ["/api/parent/wallet"],
   });
@@ -1202,20 +1252,27 @@ function CreditsTab() {
                 </div>
               </div>
 
-              <div className="bg-amber-50/60 rounded-lg border border-amber-200/50 px-3 py-2">
-                <p className="text-[11px] text-amber-700 leading-relaxed flex items-start gap-1.5">
+              <div className="bg-blue-50/60 rounded-lg border border-blue-200/50 px-3 py-2">
+                <p className="text-[11px] text-blue-700 leading-relaxed flex items-start gap-1.5">
                   <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                  <span>線上金流功能開發中，目前請聯繫總部購買堂數。完成付款後，總部將為您手動加值堂數。</span>
+                  <span>您即將前往綠界安全付款頁面完成信用卡付款，付款成功後堂數將自動加值。</span>
                 </p>
               </div>
 
               <Button
                 className="w-full rounded-full"
-                disabled
-                style={{ backgroundColor: "#81D8D0", color: "white", opacity: 0.6 }}
+                disabled={purchaseMutation.isPending}
+                onClick={() => {
+                  if (!selectedPackageId) return;
+                  purchaseMutation.mutate({
+                    packageId: selectedPackageId,
+                    couponCode: couponResult?.coupon?.code,
+                  });
+                }}
+                style={{ backgroundColor: "#81D8D0", color: "white" }}
                 data-testid="button-purchase-credits"
               >
-                請聯繫總部購買
+                {purchaseMutation.isPending ? "處理中..." : "立即購買"}
               </Button>
             </div>
           )}

@@ -62,6 +62,10 @@ integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.
 
 [userenv.shared]
 TZ = "Asia/Taipei"
+ECPAY_MERCHANT_ID = "2000132"
+ECPAY_HASH_KEY = "5294y06JbISpM5x9"
+ECPAY_HASH_IV = "v77hoKGq4kWxNNIS"
+ECPAY_IS_SANDBOX = "true"
 
 [postMerge]
 path = "scripts/post-merge.sh"
