@@ -120,6 +120,22 @@ async function deletePrivatePdf(storedPath: string): Promise<void> {
   }
 }
 
+async function deletePublicFile(photoUrl: string): Promise<void> {
+  if (photoUrl.startsWith("https://storage.googleapis.com/")) {
+    try {
+      const url = new URL(photoUrl);
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+      await objectStorageClient.bucket(bucketName).file(objectName).delete();
+    } catch { /* ignore if already deleted */ }
+  } else if (photoUrl.startsWith("/uploads/")) {
+    const filename = photoUrl.replace("/uploads/", "");
+    const filePath = path.join(uploadsDir, filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface OtpRecord {
@@ -294,6 +310,8 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  // Legacy: serve files uploaded before the App Storage migration (e.g. coach photoUrl = "/uploads/xxx.jpg").
+  // New uploads go to GCS; this route remains only for backward compatibility with existing DB records.
   app.use("/uploads", express.static(uploadsDir));
 
   await seedDatabase();
@@ -1550,6 +1568,7 @@ export async function registerRoutes(
         updateData.coverPhoto = null;
       }
       await storage.updateFranchise(req.franchiseId, updateData);
+      await deletePublicFile(photoUrl);
       res.json({ photos: updatedPhotos });
     } catch (error) {
       res.status(500).json({ message: "刪除失敗" });
