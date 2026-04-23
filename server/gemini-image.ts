@@ -1,6 +1,4 @@
 import { GoogleGenAI } from "@google/genai";
-import fs from "fs";
-import path from "path";
 import sharp from "sharp";
 
 const HEADSHOT_PROMPT = `Transform this photo into a professional teacher portrait for a children's math tutoring center:
@@ -11,8 +9,6 @@ const HEADSHOT_PROMPT = `Transform this photo into a professional teacher portra
 - Soft natural lighting with slight warm tone, no harsh shadows.
 - Portrait aspect ratio 3:4, centered composition, upper body visible (head to just below the waist).
 - Ultra-realistic, high quality. No text overlays on the person.`;
-
-const uploadsDir = path.join(process.cwd(), "uploads");
 
 async function cropTo3x4(inputBuffer: Buffer): Promise<Buffer> {
   const metadata = await sharp(inputBuffer).metadata();
@@ -45,10 +41,10 @@ async function cropTo3x4(inputBuffer: Buffer): Promise<Buffer> {
     .toBuffer();
 }
 
-export async function generateCoachHeadshot(
-  originalFilePath: string,
+export async function generateCoachHeadshotFromBuffer(
+  imageBuffer: Buffer,
   mimeType: string = "image/jpeg"
-): Promise<string | null> {
+): Promise<Buffer | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("[gemini-image] GEMINI_API_KEY not set — skipping AI generation");
@@ -58,8 +54,7 @@ export async function generateCoachHeadshot(
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    const imageData = fs.readFileSync(originalFilePath);
-    const base64Data = imageData.toString("base64");
+    const base64Data = imageBuffer.toString("base64");
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
@@ -86,13 +81,8 @@ export async function generateCoachHeadshot(
     for (const part of parts) {
       if (part.inlineData?.data) {
         const rawBuffer = Buffer.from(part.inlineData.data, "base64");
-
         const croppedBuffer = await cropTo3x4(rawBuffer);
-
-        const filename = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-        const outPath = path.join(uploadsDir, filename);
-        fs.writeFileSync(outPath, croppedBuffer);
-        return `/uploads/${filename}`;
+        return croppedBuffer;
       }
     }
 

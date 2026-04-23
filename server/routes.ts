@@ -14,8 +14,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
-import { generateCoachHeadshot } from "./gemini-image";
+import { generateCoachHeadshotFromBuffer } from "./gemini-image";
 import { generateFranchiseDescription } from "./gemini-text";
+import { objectStorageClient } from "./replit_integrations/object_storage";
 
 interface PgUniqueViolation {
   code: "23505";
@@ -31,6 +32,95 @@ function isPgUniqueViolation(err: unknown): err is PgUniqueViolation {
 }
 
 const uploadsDir = path.join(process.cwd(), "uploads");
+
+// ─── App Storage helpers ────────────────────────────────────────────────────
+
+function parseStoragePath(fullPath: string): { bucketName: string; objectName: string } {
+  const p = fullPath.startsWith("/") ? fullPath : `/${fullPath}`;
+  const parts = p.split("/").filter(Boolean);
+  return { bucketName: parts[0], objectName: parts.slice(1).join("/") };
+}
+
+async function uploadPublicFile(
+  buffer: Buffer,
+  originalname: string,
+  contentType: string,
+  folder: string = "uploads"
+): Promise<string> {
+  const pathsStr = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
+  const firstPath = pathsStr.split(",")[0].trim();
+  if (!firstPath) throw new Error("PUBLIC_OBJECT_SEARCH_PATHS not configured");
+  const { bucketName, objectName: basePath } = parseStoragePath(firstPath);
+  const ext = path.extname(originalname);
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+  const objectName = `${basePath}/${folder}/${filename}`;
+  const bucket = objectStorageClient.bucket(bucketName);
+  const file = bucket.file(objectName);
+  await file.save(buffer, { contentType, resumable: false });
+  await file.makePublic();
+  return `https://storage.googleapis.com/${bucketName}/${objectName}`;
+}
+
+async function uploadPrivatePdf(
+  buffer: Buffer,
+  originalname: string
+): Promise<string> {
+  const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+  if (!privateDir) throw new Error("PRIVATE_OBJECT_DIR not configured");
+  const { bucketName, objectName: basePath } = parseStoragePath(privateDir);
+  const ext = path.extname(originalname) || ".pdf";
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+  const objectName = `${basePath}/curriculum/${filename}`;
+  const bucket = objectStorageClient.bucket(bucketName);
+  const file = bucket.file(objectName);
+  await file.save(buffer, { contentType: "application/pdf", resumable: false });
+  return `gcs:/${bucketName}/${objectName}`;
+}
+
+async function streamPrivatePdf(
+  storedPath: string,
+  originalName: string,
+  res: any
+): Promise<void> {
+  let bucketName: string;
+  let objectName: string;
+  if (storedPath.startsWith("gcs:/")) {
+    const { bucketName: b, objectName: o } = parseStoragePath(storedPath.slice(4));
+    bucketName = b;
+    objectName = o;
+  } else {
+    const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(storedPath));
+    if (!fs.existsSync(fullPath)) {
+      res.status(404).json({ message: "檔案已遺失" });
+      return;
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(originalName)}"`);
+    fs.createReadStream(fullPath).pipe(res);
+    return;
+  }
+  const bucket = objectStorageClient.bucket(bucketName);
+  const file = bucket.file(objectName);
+  const [exists] = await file.exists();
+  if (!exists) { res.status(404).json({ message: "檔案已遺失" }); return; }
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(originalName)}"`);
+  file.createReadStream().pipe(res);
+}
+
+async function deletePrivatePdf(storedPath: string): Promise<void> {
+  if (storedPath.startsWith("gcs:/")) {
+    const { bucketName, objectName } = parseStoragePath(storedPath.slice(4));
+    try {
+      await objectStorageClient.bucket(bucketName).file(objectName).delete();
+    } catch { /* ignore */ }
+  } else {
+    const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(storedPath));
+    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface OtpRecord {
   otp: string;
@@ -111,13 +201,7 @@ const siteContentDir = path.join(uploadsDir, "site-content");
 if (!fs.existsSync(siteContentDir)) fs.mkdirSync(siteContentDir, { recursive: true });
 
 const uploadSiteContent = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, siteContentDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = /\.(jpg|jpeg|png|webp)$/i;
@@ -127,13 +211,7 @@ const uploadSiteContent = multer({
 });
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadsDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
@@ -143,13 +221,7 @@ const upload = multer({
 });
 
 const pdfUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, curriculumDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (path.extname(file.originalname).toLowerCase() === ".pdf") cb(null, true);
@@ -1115,14 +1187,15 @@ export async function registerRoutes(
     try {
       if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
       const franchiseId = parseInt(req.params.id);
-      const photoUrl = `/uploads/${req.file.filename}`;
       const franchise = await storage.getFranchise(franchiseId);
       if (!franchise) return res.status(404).json({ message: "Franchise not found" });
+      const photoUrl = await uploadPublicFile(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
       const currentPhotos = franchise.photos || [];
       const updatedPhotos = [...currentPhotos, photoUrl];
       await storage.updateFranchise(franchiseId, { photos: updatedPhotos });
       res.json({ url: photoUrl, photos: updatedPhotos });
     } catch (error) {
+      console.error("[upload-photo]", error);
       res.status(500).json({ message: "上傳失敗" });
     }
   });
@@ -1426,14 +1499,15 @@ export async function registerRoutes(
   app.post("/api/franchise-admin/upload-photo", isFranchiseAdmin, upload.single("photo"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
-      const photoUrl = `/uploads/${req.file.filename}`;
       const franchise = await storage.getFranchise(req.franchiseId);
       if (!franchise) return res.status(404).json({ message: "Franchise not found" });
+      const photoUrl = await uploadPublicFile(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
       const currentPhotos = franchise.photos || [];
       const updatedPhotos = [...currentPhotos, photoUrl];
       await storage.updateFranchise(req.franchiseId, { photos: updatedPhotos });
       res.json({ url: photoUrl, photos: updatedPhotos });
     } catch (error) {
+      console.error("[upload-photo]", error);
       res.status(500).json({ message: "上傳失敗" });
     }
   });
@@ -1445,20 +1519,20 @@ export async function registerRoutes(
       const coach = await storage.getCoach(coachId);
       if (!coach) return res.status(404).json({ message: "Coach not found" });
       if (coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "無權限" });
-      const originalPhotoUrl = `/uploads/${req.file.filename}`;
+      const mimeType = req.file.mimetype || "image/jpeg";
+      const originalPhotoUrl = await uploadPublicFile(req.file.buffer, req.file.originalname, mimeType, "uploads");
       await storage.updateCoach(coachId, { photoUrl: originalPhotoUrl });
 
-      const originalFilePath = path.join(uploadsDir, req.file.filename);
-      const mimeType = req.file.mimetype || "image/jpeg";
-      const aiPhotoUrl = await generateCoachHeadshot(originalFilePath, mimeType);
-
-      if (aiPhotoUrl) {
+      const aiBuffer = await generateCoachHeadshotFromBuffer(req.file.buffer, mimeType);
+      if (aiBuffer) {
+        const aiPhotoUrl = await uploadPublicFile(aiBuffer, `ai-${Date.now()}.jpg`, "image/jpeg", "uploads");
         await storage.updateCoach(coachId, { photoUrl: aiPhotoUrl });
         res.json({ url: aiPhotoUrl, aiGenerated: true });
       } else {
         res.json({ url: originalPhotoUrl, aiGenerated: false });
       }
     } catch (error) {
+      console.error("[upload-coach-photo]", error);
       res.status(500).json({ message: "上傳失敗" });
     }
   });
@@ -1476,9 +1550,6 @@ export async function registerRoutes(
         updateData.coverPhoto = null;
       }
       await storage.updateFranchise(req.franchiseId, updateData);
-      const filename = photoUrl.replace("/uploads/", "");
-      const filePath = path.join(uploadsDir, filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       res.json({ photos: updatedPhotos });
     } catch (error) {
       res.status(500).json({ message: "刪除失敗" });
@@ -2515,7 +2586,7 @@ export async function registerRoutes(
       if (!name || !price || !category) {
         return res.status(400).json({ message: "請填寫商品名稱、價格和分類" });
       }
-      const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+      const imageUrl = req.file ? await uploadPublicFile(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads") : null;
       const product = await storage.createProduct({
         name,
         description: description || null,
@@ -2545,7 +2616,7 @@ export async function registerRoutes(
       if (stock !== undefined) data.stock = parseInt(stock);
       if (isActive !== undefined) data.isActive = isActive === "true" || isActive === true;
       if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
-      if (req.file) data.imageUrl = `/uploads/${req.file.filename}`;
+      if (req.file) data.imageUrl = await uploadPublicFile(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
       const product = await storage.updateProduct(parseInt(req.params.id), data);
       res.json(product);
     } catch (error) {
@@ -2651,9 +2722,10 @@ export async function registerRoutes(
   app.post("/api/admin/site-content/upload-image", isAdmin, uploadSiteContent.single("image"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
-      const url = `/uploads/site-content/${req.file.filename}`;
+      const url = await uploadPublicFile(req.file.buffer, req.file.originalname, req.file.mimetype, "site-content");
       res.json({ url });
     } catch (error) {
+      console.error("[site-content-upload]", error);
       res.status(500).json({ message: "圖片上傳失敗" });
     }
   });
@@ -2963,11 +3035,10 @@ export async function registerRoutes(
 
       const existing = await storage.getTextbookFile(textbookId, fileType);
       if (existing) {
-        const oldPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await deletePrivatePdf(existing.storedPath);
       }
 
-      const storedPath = `/uploads/curriculum/${req.file.filename}`;
+      const storedPath = await uploadPrivatePdf(req.file.buffer, req.file.originalname);
       const file = await storage.upsertTextbookFile({
         textbookId,
         fileType,
@@ -2993,8 +3064,7 @@ export async function registerRoutes(
       if (!validTypes.includes(fileType)) return res.status(400).json({ message: "無效的檔案類型" });
       const existing = await storage.getTextbookFile(textbookId, fileType);
       if (existing) {
-        const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
-        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        await deletePrivatePdf(existing.storedPath);
         await storage.deleteTextbookFile(textbookId, fileType);
       }
       res.json({ success: true });
@@ -3013,11 +3083,7 @@ export async function registerRoutes(
       if (!validTypes.includes(fileType)) return res.status(400).json({ message: "無效的檔案類型" });
       const file = await storage.getTextbookFile(textbookId, fileType);
       if (!file) return res.status(404).json({ message: "檔案不存在" });
-      const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(file.storedPath));
-      if (!fs.existsSync(fullPath)) return res.status(404).json({ message: "檔案已遺失" });
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file.originalName)}"`);
-      fs.createReadStream(fullPath).pipe(res);
+      await streamPrivatePdf(file.storedPath, file.originalName, res);
     } catch {
       res.status(500).json({ message: "無法開啟檔案" });
     }
@@ -3233,11 +3299,10 @@ export async function registerRoutes(
 
       const existing = await storage.getCurriculumFile(unitId, fileType);
       if (existing) {
-        const oldPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await deletePrivatePdf(existing.storedPath);
       }
 
-      const storedPath = `/uploads/curriculum/${req.file.filename}`;
+      const storedPath = await uploadPrivatePdf(req.file.buffer, req.file.originalname);
       const file = await storage.upsertCurriculumFile({
         unitId,
         fileType,
@@ -3258,8 +3323,7 @@ export async function registerRoutes(
       const fileType = req.params.fileType;
       const existing = await storage.getCurriculumFile(unitId, fileType);
       if (existing) {
-        const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(existing.storedPath));
-        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        await deletePrivatePdf(existing.storedPath);
         await storage.deleteCurriculumFile(unitId, fileType);
       }
       res.json({ success: true });
@@ -3275,11 +3339,7 @@ export async function registerRoutes(
       const fileType = req.params.fileType;
       const file = await storage.getCurriculumFile(unitId, fileType);
       if (!file) return res.status(404).json({ message: "檔案不存在" });
-      const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(file.storedPath));
-      if (!fs.existsSync(fullPath)) return res.status(404).json({ message: "檔案已遺失" });
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file.originalName)}"`);
-      fs.createReadStream(fullPath).pipe(res);
+      await streamPrivatePdf(file.storedPath, file.originalName, res);
     } catch {
       res.status(500).json({ message: "無法開啟檔案" });
     }
@@ -3305,7 +3365,7 @@ export async function registerRoutes(
       if (!req.file) return res.status(400).json({ message: "請選擇 PDF 檔案" });
       const { title, semester, grade } = req.body;
       if (!title) return res.status(400).json({ message: "請輸入標題" });
-      const storedPath = `/uploads/curriculum/${req.file.filename}`;
+      const storedPath = await uploadPrivatePdf(req.file.buffer, req.file.originalname);
       const exam = await storage.createCurriculumMidtermExam({
         title,
         semester: semester || null,
@@ -3325,8 +3385,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const exam = await storage.getCurriculumMidtermExam(id);
       if (exam) {
-        const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(exam.storedPath));
-        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        await deletePrivatePdf(exam.storedPath);
         await storage.deleteCurriculumMidtermExam(id);
       }
       res.json({ success: true });
@@ -3340,11 +3399,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const exam = await storage.getCurriculumMidtermExam(id);
       if (!exam) return res.status(404).json({ message: "找不到此考卷" });
-      const fullPath = path.join(process.cwd(), "uploads", "curriculum", path.basename(exam.storedPath));
-      if (!fs.existsSync(fullPath)) return res.status(404).json({ message: "檔案已遺失" });
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(exam.originalName)}"`);
-      fs.createReadStream(fullPath).pipe(res);
+      await streamPrivatePdf(exam.storedPath, exam.originalName, res);
     } catch {
       res.status(500).json({ message: "無法開啟檔案" });
     }
