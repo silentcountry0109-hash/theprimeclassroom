@@ -489,9 +489,20 @@ function OverviewTab() {
   const [preset, setPreset] = useState("week");
 
   const applyPreset = (key: string) => {
-    setPreset(key);
     const now = new Date();
     let s = new Date(now);
+    if (key === "this_week") {
+      const day = now.getDay();
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+      const friday = new Date(monday);
+      friday.setDate(monday.getDate() + 4);
+      setStartDate(formatDate(monday));
+      setEndDate(formatDate(friday));
+      setPreset(key);
+      return;
+    }
+    setPreset(key);
     if (key === "week") { s.setDate(now.getDate() - 6); }
     else if (key === "2weeks") { s.setDate(now.getDate() - 13); }
     else if (key === "month") { s.setMonth(now.getMonth() - 1); }
@@ -523,6 +534,7 @@ function OverviewTab() {
   ];
 
   const presets = [
+    { key: "this_week", label: "本週一到五" },
     { key: "week", label: "近 7 天" },
     { key: "2weeks", label: "近 14 天" },
     { key: "month", label: "近 1 個月" },
