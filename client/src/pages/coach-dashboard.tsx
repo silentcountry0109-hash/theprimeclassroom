@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -1047,25 +1047,27 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     selectedQuizId: number | null;
   }>>({});
 
+  const hydrated = useRef(false);
+
   useEffect(() => {
     if (!existingBooks || existingBooks.length === 0) return;
+    if (hydrated.current) return;
+    hydrated.current = true;
     setStudentData(prev => {
       const next = { ...prev };
       for (const existing of existingBooks) {
-        if (!next[existing.childId]) {
-          next[existing.childId] = {
-            lessonUnit: existing.lessonUnit || "",
-            lessonProgress: existing.lessonProgress || "",
-            homework: existing.homework || "",
-            nextExam: existing.nextExam || "",
-            quizScore: existing.quizScore?.toString() || "",
-            quizTotal: existing.quizTotal?.toString() || "100",
-            teacherRemarks: existing.teacherRemarks || "",
-            internalNotes: existing.internalNotes || "",
-            selectedTextbook: null,
-            selectedQuizId: null,
-          };
-        }
+        next[existing.childId] = {
+          lessonUnit: existing.lessonUnit || "",
+          lessonProgress: existing.lessonProgress || "",
+          homework: existing.homework || "",
+          nextExam: existing.nextExam || "",
+          quizScore: existing.quizScore?.toString() || "",
+          quizTotal: existing.quizTotal?.toString() || "100",
+          teacherRemarks: existing.teacherRemarks || "",
+          internalNotes: existing.internalNotes || "",
+          selectedTextbook: prev[existing.childId]?.selectedTextbook ?? null,
+          selectedQuizId: prev[existing.childId]?.selectedQuizId ?? null,
+        };
       }
       return next;
     });
@@ -1159,9 +1161,11 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
           teacherRemarks: data.teacherRemarks || null,
           internalNotes: data.internalNotes || null,
         };
-        const existing = existingBooks.find((b: any) => b.childId === s.childId);
-        if (existing) {
-          await apiRequest("PATCH", `/api/coach/contact-books/${existing.id}`, payload);
+        const existingForChild = existingBooks.filter((b: any) => b.childId === s.childId);
+        if (existingForChild.length > 0) {
+          for (const existing of existingForChild) {
+            await apiRequest("PATCH", `/api/coach/contact-books/${existing.id}`, payload);
+          }
         } else {
           newEntries.push(payload);
         }
