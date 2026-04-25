@@ -2419,6 +2419,7 @@ export async function registerRoutes(
       }
       res.json(results);
     } catch (error) {
+      console.error("[contact-books POST]", error);
       res.status(500).json({ message: "儲存聯絡簿失敗" });
     }
   });
@@ -2433,6 +2434,7 @@ export async function registerRoutes(
       const updated = await storage.updateContactBook(id, req.body);
       res.json(updated);
     } catch (error) {
+      console.error("[contact-books PATCH]", error);
       res.status(500).json({ message: "更新聯絡簿失敗" });
     }
   });

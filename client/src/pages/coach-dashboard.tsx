@@ -1047,6 +1047,30 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     selectedQuizId: number | null;
   }>>({});
 
+  useEffect(() => {
+    if (!existingBooks || existingBooks.length === 0) return;
+    setStudentData(prev => {
+      const next = { ...prev };
+      for (const existing of existingBooks) {
+        if (!next[existing.childId]) {
+          next[existing.childId] = {
+            lessonUnit: existing.lessonUnit || "",
+            lessonProgress: existing.lessonProgress || "",
+            homework: existing.homework || "",
+            nextExam: existing.nextExam || "",
+            quizScore: existing.quizScore?.toString() || "",
+            quizTotal: existing.quizTotal?.toString() || "100",
+            teacherRemarks: existing.teacherRemarks || "",
+            internalNotes: existing.internalNotes || "",
+            selectedTextbook: null,
+            selectedQuizId: null,
+          };
+        }
+      }
+      return next;
+    });
+  }, [existingBooks]);
+
   const initStudentData = (childId: number) => {
     if (studentData[childId]) return studentData[childId];
     const existing = existingBooks.find((b: any) => b.childId === childId);
@@ -1119,9 +1143,10 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const entries = presentStudents.map((s: any) => {
+      const newEntries: any[] = [];
+      for (const s of presentStudents) {
         const data = getStudentFormData(s.childId);
-        return {
+        const payload = {
           bookingId: s.bookingId,
           childId: s.childId,
           lessonDate: slot.date,
@@ -1134,8 +1159,16 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
           teacherRemarks: data.teacherRemarks || null,
           internalNotes: data.internalNotes || null,
         };
-      });
-      await apiRequest("POST", "/api/coach/contact-books", { entries });
+        const existing = existingBooks.find((b: any) => b.childId === s.childId);
+        if (existing) {
+          await apiRequest("PATCH", `/api/coach/contact-books/${existing.id}`, payload);
+        } else {
+          newEntries.push(payload);
+        }
+      }
+      if (newEntries.length > 0) {
+        await apiRequest("POST", "/api/coach/contact-books", { entries: newEntries });
+      }
     },
     onSuccess: () => {
       toast({ title: "聯絡簿已儲存", description: "家長現在可以看到上課紀錄了" });
