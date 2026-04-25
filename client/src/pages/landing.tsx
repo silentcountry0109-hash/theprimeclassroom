@@ -631,6 +631,23 @@ function HeroSection() {
       <HeroTestimonialCarousel socialProofText={heroSocialProof} />
 
       <motion.div
+        className="flex items-center justify-center gap-3 mt-4 z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.8, duration: 0.6 }}
+      >
+        <span className="text-xs text-muted-foreground/60">不想搜尋？</span>
+        <a
+          href="/api/login"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-tiffany hover:underline underline-offset-2"
+          data-testid="link-hero-direct-cta"
+        >
+          直接預約免費診斷
+          <ArrowRight className="w-3.5 h-3.5" />
+        </a>
+      </motion.div>
+
+      <motion.div
         className="absolute bottom-10 left-1/2 -translate-x-1/2"
         animate={{ y: [0, 8, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
@@ -2065,6 +2082,11 @@ function FooterSection() {
                 </a>
               </li>
               <li>
+                <a href="#branches" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-branches">
+                  全台分校
+                </a>
+              </li>
+              <li>
                 <a href="#testimonials" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-testimonials">
                   成功案例
                 </a>
@@ -2122,6 +2144,166 @@ function FooterSection() {
   );
 }
 
+const BRANCH_LOCATIONS = [
+  { city: "台北市", districts: "大安區、信義區、中山區", count: 3 },
+  { city: "新北市", districts: "板橋區、中和區、新莊區", count: 3 },
+  { city: "桃園市", districts: "桃園區、中壢區", count: 2 },
+  { city: "台中市", districts: "西屯區、北屯區", count: 2 },
+  { city: "台南市", districts: "東區、永康區", count: 2 },
+  { city: "高雄市", districts: "苓雅區、三民區", count: 2 },
+];
+
+function StatsSection() {
+  const stats = [
+    { value: "500+", label: "累計服務學生", icon: GraduationCap },
+    { value: "50+", label: "認證師資", icon: Users },
+    { value: "10+", label: "服務城市", icon: MapPin },
+    { value: "4.8", label: "家長平均評分", icon: Star },
+  ];
+
+  return (
+    <section className="py-10 md:py-14 px-4 md:px-6 bg-white" aria-label="數字說話">
+      <div className="max-w-5xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          {stats.map((stat, i) => (
+            <motion.div
+              key={stat.label}
+              className="text-center p-5 md:p-6 rounded-2xl bg-washi border border-transparent hover:border-tiffany/20 transition-all duration-300"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              data-testid={`stat-card-${i}`}
+            >
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-tiffany/10 mb-3">
+                <stat.icon className="w-5 h-5 text-tiffany" />
+              </div>
+              <p className="text-2xl md:text-3xl font-bold text-foreground font-serif mb-1" data-testid={`stat-value-${i}`}>
+                {stat.value}
+              </p>
+              <p className="text-xs text-muted-foreground">{stat.label}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BranchLocationsSection() {
+  return (
+    <section id="branches" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
+      <div className="max-w-6xl mx-auto">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <div className="inline-flex items-center gap-2 bg-tiffany/10 text-tiffany text-sm font-medium px-3 py-1.5 rounded-full mb-4">
+            <MapPin className="w-4 h-4" />
+            全台服務據點
+          </div>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-branches-title">
+            全台分校地圖
+          </h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">
+            精選展示 6 大核心城市，全台 10+ 縣市均有服務據點，讓每個孩子都能就近找到優質師資
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-14">
+          {BRANCH_LOCATIONS.map((branch, i) => (
+            <motion.a
+              key={branch.city}
+              href={`/search?city=${branch.city}`}
+              className="group bg-white rounded-2xl p-5 md:p-6 border border-gray-100 hover:border-tiffany/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300 block no-underline"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.08 }}
+              data-testid={`card-branch-${i}`}
+              aria-label={`搜尋 ${branch.city} 的教室`}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-4 h-4 text-tiffany" />
+                </div>
+                <h3 className="font-semibold text-foreground">{branch.city}</h3>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-3">{branch.districts}</p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-tiffany/60" />
+                  <span className="text-xs text-tiffany font-medium">{branch.count} 個分校</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-tiffany/40 group-hover:text-tiffany transition-colors duration-200" />
+              </div>
+            </motion.a>
+          ))}
+        </div>
+
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+        >
+          <Button
+            size="lg"
+            className="rounded-full px-8"
+            style={{ backgroundColor: "#81D8D0", color: "white" }}
+            onClick={() => {
+              const el = document.querySelector("#hero-search");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
+            data-testid="button-find-branch"
+          >
+            <Search className="w-4 h-4 mr-2" />
+            搜尋附近教室
+          </Button>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function FloatingCTA() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setVisible(window.scrollY > window.innerHeight * 0.7);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:hidden"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 40 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <Button
+            size="lg"
+            className="rounded-full px-7 shadow-xl text-sm font-medium"
+            style={{ backgroundColor: "#81D8D0", color: "white", boxShadow: "0 8px 30px rgba(129,216,208,0.45)" }}
+            onClick={() => {
+              const el = document.querySelector("#hero-search");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
+            data-testid="button-floating-cta"
+          >
+            <Search className="w-4 h-4 mr-2" />
+            預約免費診斷
+          </Button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export default function LandingPage() {
   const { data: siteContentData = {} } = useQuery<Record<string, string>>({
     queryKey: ["/api/site-content"],
@@ -2130,11 +2312,13 @@ export default function LandingPage() {
   return (
     <SiteContentContext.Provider value={siteContentData}>
       <SplashScreen />
+      <FloatingCTA />
       <div className="min-h-screen">
         <Navbar />
         <HeroSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <BrandPhilosophySection />
+        <StatsSection />
         <WaveDivider from="#F0FBFA" to="#ffffff" />
         <TeachingMethodSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
@@ -2143,6 +2327,7 @@ export default function LandingPage() {
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <FeaturesSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
+        <BranchLocationsSection />
         <CoachesSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <ProcessSection />
