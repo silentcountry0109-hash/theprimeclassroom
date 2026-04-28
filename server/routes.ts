@@ -2251,13 +2251,18 @@ export async function registerRoutes(
     try {
       const slotId = parseInt(req.params.slotId);
       const slot = await storage.getTimeSlot(slotId);
-      if (!slot || !req.coachIds.includes(slot.coachId)) {
+      if (!slot) {
+        return res.status(404).json({ message: "時段不存在" });
+      }
+      if (slot.coachId && !req.coachIds.includes(slot.coachId)) {
+        console.error(`[slots/students] 403: coach coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slotId=${slotId}`);
         return res.status(403).json({ message: "此時段不屬於您" });
       }
       const students = await storage.getSlotStudents(slotId);
       res.json(students);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch students" });
+      console.error("[slots/students]", error);
+      res.status(500).json({ message: "讀取學生名單失敗" });
     }
   });
 
@@ -2395,14 +2400,15 @@ export async function registerRoutes(
           const booking = await storage.getBooking(entry.bookingId);
           if (booking) {
             const slot = await storage.getTimeSlot(booking.slotId);
-            if (!slot || !req.coachIds.includes(slot.coachId)) {
-              return res.status(403).json({ message: "此預約不屬於您的時段" });
-            }
-            if (slot.coachId && req.coachIds.includes(slot.coachId)) {
-              effectiveCoachId = slot.coachId;
-            }
-            if (slot.date) {
-              slotsToUpdate.add(`${slot.date}:${effectiveCoachId}`);
+            if (slot) {
+              if (slot.coachId && req.coachIds.includes(slot.coachId)) {
+                effectiveCoachId = slot.coachId;
+              } else if (slot.coachId) {
+                console.error(`[contact-books POST] coachId mismatch: req.coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId}`);
+              }
+              if (slot.date) {
+                slotsToUpdate.add(`${slot.date}:${effectiveCoachId}`);
+              }
             }
           }
         }

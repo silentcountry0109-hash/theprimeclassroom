@@ -53,6 +53,7 @@ import {
   HelpCircle,
   Settings,
   Library,
+  AlertCircle,
 } from "lucide-react";
 import type { Notification } from "@shared/schema";
 
@@ -539,12 +540,13 @@ function useCheckInAvailability(slotDate: string, slotStartTime: string, slotEnd
 function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; selectedDate: string; onOpenContactBook: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data: students = [], isLoading } = useQuery<any[]>({
+  const { data: students = [], isLoading, isError: studentsError } = useQuery<any[]>({
     queryKey: ["/api/coach/slots", slot.id, "students"],
     staleTime: 0,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+    retry: 1,
   });
 
   const { canCheckIn, isSlotEnded, minutesUntilCheckIn } = useCheckInAvailability(
@@ -623,6 +625,11 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
 
       {isLoading ? (
         <Skeleton className="h-8 w-full" />
+      ) : studentsError ? (
+        <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-2" data-testid={`error-students-${slot.id}`}>
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>無法載入學生名單，請重新整理後再試</span>
+        </div>
       ) : students.length === 0 ? (
         <p className="text-xs text-muted-foreground">沒有學生預約</p>
       ) : (
@@ -746,7 +753,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
         size="sm"
         className="w-full border-tiffany/30 text-tiffany hover:bg-tiffany/5"
         onClick={onOpenContactBook}
-        disabled={isLoading || students.length === 0}
+        disabled={isLoading || (!studentsError && students.length === 0)}
         data-testid={`button-contact-book-${slot.id}`}
       >
         <FileText className="w-4 h-4 mr-1.5" />
@@ -1389,15 +1396,28 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
             </div>
           )}
 
-          <Button
-            className="w-full bg-tiffany hover:bg-tiffany/90 text-white"
-            disabled={presentStudents.some((s: any) => !getStudentFormData(s.childId).lessonUnit) || saveMutation.isPending}
-            onClick={() => saveMutation.mutate()}
-            data-testid="button-save-contact-book"
-          >
-            <Save className="w-4 h-4 mr-1.5" />
-            {saveMutation.isPending ? "儲存中..." : hasExisting ? "更新聯絡簿" : "儲存聯絡簿"}
-          </Button>
+          {(() => {
+            const missingStudents = presentStudents.filter((s: any) => !getStudentFormData(s.childId).lessonUnit);
+            const isDisabled = missingStudents.length > 0 || saveMutation.isPending;
+            return (
+              <>
+                {missingStudents.length > 0 && (
+                  <p className="text-xs text-amber-600 text-center -mb-1" data-testid="text-missing-lesson-unit">
+                    請先填寫上課單元：{missingStudents.map((s: any) => s.childName).join("、")}
+                  </p>
+                )}
+                <Button
+                  className="w-full bg-tiffany hover:bg-tiffany/90 text-white disabled:opacity-60"
+                  disabled={isDisabled}
+                  onClick={() => saveMutation.mutate()}
+                  data-testid="button-save-contact-book"
+                >
+                  <Save className="w-4 h-4 mr-1.5" />
+                  {saveMutation.isPending ? "儲存中..." : hasExisting ? "更新聯絡簿" : "儲存聯絡簿"}
+                </Button>
+              </>
+            );
+          })()}
         </div>
       </DialogContent>
     </Dialog>
