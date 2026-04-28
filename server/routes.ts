@@ -2400,15 +2400,18 @@ export async function registerRoutes(
           const booking = await storage.getBooking(entry.bookingId);
           if (booking) {
             const slot = await storage.getTimeSlot(booking.slotId);
-            if (slot) {
-              if (slot.coachId && req.coachIds.includes(slot.coachId)) {
-                effectiveCoachId = slot.coachId;
-              } else if (slot.coachId) {
-                console.error(`[contact-books POST] coachId mismatch: req.coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId}`);
-              }
-              if (slot.date) {
-                slotsToUpdate.add(`${slot.date}:${effectiveCoachId}`);
-              }
+            if (!slot) {
+              continue;
+            }
+            if (slot.coachId && !req.coachIds.includes(slot.coachId)) {
+              console.error(`[contact-books POST] 403: coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slotId=${slot.id}`);
+              return res.status(403).json({ message: "此預約不屬於您的時段" });
+            }
+            if (slot.coachId && req.coachIds.includes(slot.coachId)) {
+              effectiveCoachId = slot.coachId;
+            }
+            if (slot.date) {
+              slotsToUpdate.add(`${slot.date}:${effectiveCoachId}`);
             }
           }
         }
