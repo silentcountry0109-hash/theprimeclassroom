@@ -1028,12 +1028,13 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: students = [] } = useQuery<any[]>({
+  const { data: students = [], isError: studentsError } = useQuery<any[]>({
     queryKey: ["/api/coach/slots", slot.id, "students"],
     staleTime: 0,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+    retry: 1,
   });
 
   const { data: existingBooks = [] } = useQuery<any[]>({
@@ -1213,6 +1214,12 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
         </div>
 
         <div className="space-y-4">
+          {studentsError && (
+            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-3 rounded-lg" data-testid="error-students-dialog">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>無法載入學生名單，請關閉後重新整理再試</span>
+            </div>
+          )}
           {sortedStudents.length > 1 && (
             <div className="space-y-1">
               <div className="flex gap-1.5 text-[10px] text-muted-foreground px-0.5">
@@ -1398,7 +1405,7 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
 
           {(() => {
             const missingStudents = presentStudents.filter((s: any) => !getStudentFormData(s.childId).lessonUnit);
-            const isDisabled = missingStudents.length > 0 || saveMutation.isPending;
+            const isDisabled = studentsError || missingStudents.length > 0 || saveMutation.isPending;
             return (
               <>
                 {missingStudents.length > 0 && (
