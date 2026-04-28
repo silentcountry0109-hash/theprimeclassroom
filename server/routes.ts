@@ -300,6 +300,7 @@ const isCoach: RequestHandler = async (req: any, res, next) => {
   req.currentUser = user;
   req.coach = coach;
   req.coachIds = allCoaches.map((c: any) => c.id);
+  req.coachFranchiseIds = [...new Set(allCoaches.map((c: any) => c.franchiseId).filter(Boolean))];
   next();
 };
 
@@ -2254,8 +2255,14 @@ export async function registerRoutes(
       if (!slot) {
         return res.status(404).json({ message: "時段不存在" });
       }
-      if (slot.coachId && !req.coachIds.includes(slot.coachId)) {
-        console.warn(`[slots/students] coachId mismatch (allow): coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slotId=${slotId}`);
+      const coachOwnsSlot = req.coachIds.includes(slot.coachId);
+      const franchiseMatch = slot.franchiseId && req.coachFranchiseIds.includes(slot.franchiseId);
+      if (!coachOwnsSlot && !franchiseMatch) {
+        console.error(`[slots/students] 403: coachIds=${JSON.stringify(req.coachIds)} franchiseIds=${JSON.stringify(req.coachFranchiseIds)} slot.coachId=${slot.coachId} slot.franchiseId=${slot.franchiseId} slotId=${slotId}`);
+        return res.status(403).json({ message: "此時段不屬於您" });
+      }
+      if (!coachOwnsSlot && franchiseMatch) {
+        console.warn(`[slots/students] franchise fallback: coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slot.franchiseId=${slot.franchiseId} slotId=${slotId}`);
       }
       const students = await storage.getSlotStudents(slotId);
       res.json(students);
@@ -2399,11 +2406,18 @@ export async function registerRoutes(
           const booking = await storage.getBooking(entry.bookingId);
           if (booking) {
             const slot = await storage.getTimeSlot(booking.slotId);
-            effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
-            if (slot?.coachId && !req.coachIds.includes(slot.coachId)) {
-              console.warn(`[contact-books POST] coachId mismatch (allow): coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slotId=${slot.id}`);
+            if (!slot) continue;
+            const coachOwnsSlot = req.coachIds.includes(slot.coachId);
+            const franchiseMatch = slot.franchiseId && req.coachFranchiseIds.includes(slot.franchiseId);
+            if (!coachOwnsSlot && !franchiseMatch) {
+              console.error(`[contact-books POST] 403: coachIds=${JSON.stringify(req.coachIds)} franchiseIds=${JSON.stringify(req.coachFranchiseIds)} slot.coachId=${slot.coachId} slot.franchiseId=${slot.franchiseId} slotId=${slot.id}`);
+              return res.status(403).json({ message: "此預約不屬於您的時段" });
             }
-            if (slot?.date) {
+            effectiveCoachId = coachOwnsSlot ? slot.coachId! : req.coach.id;
+            if (!coachOwnsSlot && franchiseMatch) {
+              console.warn(`[contact-books POST] franchise fallback: coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slot.franchiseId=${slot.franchiseId} slotId=${slot.id}`);
+            }
+            if (slot.date) {
               slotsToUpdate.add(`${slot.date}:${effectiveCoachId}`);
             }
           }
