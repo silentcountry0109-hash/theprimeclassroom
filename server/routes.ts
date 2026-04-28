@@ -2251,9 +2251,11 @@ export async function registerRoutes(
     try {
       const slotId = parseInt(req.params.slotId);
       const slot = await storage.getTimeSlot(slotId);
-      if (!slot || !req.coachIds.includes(slot.coachId)) {
-        console.error(`[slots/students] 403: coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot?.coachId} slotId=${slotId}`);
-        return res.status(403).json({ message: "此時段不屬於您" });
+      if (!slot) {
+        return res.status(404).json({ message: "時段不存在" });
+      }
+      if (slot.coachId && !req.coachIds.includes(slot.coachId)) {
+        console.warn(`[slots/students] coachId mismatch (allow): coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slotId=${slotId}`);
       }
       const students = await storage.getSlotStudents(slotId);
       res.json(students);
@@ -2397,14 +2399,11 @@ export async function registerRoutes(
           const booking = await storage.getBooking(entry.bookingId);
           if (booking) {
             const slot = await storage.getTimeSlot(booking.slotId);
-            if (!slot || !req.coachIds.includes(slot.coachId)) {
-              console.error(`[contact-books POST] 403: coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot?.coachId} slotId=${slot?.id}`);
-              return res.status(403).json({ message: "此預約不屬於您的時段" });
+            effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
+            if (slot?.coachId && !req.coachIds.includes(slot.coachId)) {
+              console.warn(`[contact-books POST] coachId mismatch (allow): coachIds=${JSON.stringify(req.coachIds)} slot.coachId=${slot.coachId} slotId=${slot.id}`);
             }
-            if (slot.coachId && req.coachIds.includes(slot.coachId)) {
-              effectiveCoachId = slot.coachId;
-            }
-            if (slot.date) {
+            if (slot?.date) {
               slotsToUpdate.add(`${slot.date}:${effectiveCoachId}`);
             }
           }
