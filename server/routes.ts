@@ -3025,6 +3025,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/ecpay-purchases", isAdmin, async (req: any, res) => {
+    try {
+      const status = typeof req.query.status === "string" && req.query.status ? req.query.status : undefined;
+      const purchases = await storage.getEcpayPurchases(status);
+      res.json(purchases);
+    } catch (error) {
+      res.status(500).json({ message: "取得線上付款紀錄失敗" });
+    }
+  });
+
   // ========== Textbook / Curriculum Management ==========
   app.get("/api/textbooks", isCredentialOrAuth, async (req: any, res) => {
     try {

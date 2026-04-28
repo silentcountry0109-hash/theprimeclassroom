@@ -244,6 +244,7 @@ export interface IStorage {
   updatePurchaseStatusAndTradeNo(id: number, status: string, ecpayTradeNo: string): Promise<CreditPurchase>;
   getPurchasesByParent(parentId: string): Promise<CreditPurchase[]>;
   getCreditPurchaseByTradeNo(ecpayTradeNo: string): Promise<CreditPurchase | undefined>;
+  getEcpayPurchases(status?: string): Promise<Array<CreditPurchase & { parentName: string | null; parentUsername: string | null; packageName: string | null }>>;
   atomicMarkPurchasePaid(ecpayTradeNo: string): Promise<CreditPurchase | null>;
   atomicMarkPaidAndAddCredits(ecpayTradeNo: string, expiresAt: Date | null): Promise<CreditPurchase | null>;
 
@@ -2403,6 +2404,62 @@ export class DatabaseStorage implements IStorage {
   async getCreditPurchaseByTradeNo(ecpayTradeNo: string): Promise<CreditPurchase | undefined> {
     const [purchase] = await db.select().from(creditPurchases).where(eq(creditPurchases.ecpayTradeNo, ecpayTradeNo));
     return purchase;
+  }
+
+  async getEcpayPurchases(status?: string): Promise<Array<CreditPurchase & { parentName: string | null; parentUsername: string | null; packageName: string | null }>> {
+    const rows = await db
+      .select({
+        id: creditPurchases.id,
+        parentId: creditPurchases.parentId,
+        packageId: creditPurchases.packageId,
+        credits: creditPurchases.credits,
+        originalAmount: creditPurchases.originalAmount,
+        discountAmount: creditPurchases.discountAmount,
+        finalAmount: creditPurchases.finalAmount,
+        promotionId: creditPurchases.promotionId,
+        couponId: creditPurchases.couponId,
+        paymentMethod: creditPurchases.paymentMethod,
+        paymentStatus: creditPurchases.paymentStatus,
+        ecpayTradeNo: creditPurchases.ecpayTradeNo,
+        expiresAt: creditPurchases.expiresAt,
+        createdAt: creditPurchases.createdAt,
+        parentFirstName: users.firstName,
+        parentLastName: users.lastName,
+        parentUsername: users.username,
+        packageName: creditPackages.name,
+      })
+      .from(creditPurchases)
+      .leftJoin(users, eq(creditPurchases.parentId, users.id))
+      .leftJoin(creditPackages, eq(creditPurchases.packageId, creditPackages.id))
+      .where(
+        and(
+          eq(creditPurchases.paymentMethod, "ecpay"),
+          status ? eq(creditPurchases.paymentStatus, status) : undefined
+        )
+      )
+      .orderBy(desc(creditPurchases.createdAt));
+
+    return rows.map(row => ({
+      id: row.id,
+      parentId: row.parentId,
+      packageId: row.packageId,
+      credits: row.credits,
+      originalAmount: row.originalAmount,
+      discountAmount: row.discountAmount,
+      finalAmount: row.finalAmount,
+      promotionId: row.promotionId,
+      couponId: row.couponId,
+      paymentMethod: row.paymentMethod,
+      paymentStatus: row.paymentStatus,
+      ecpayTradeNo: row.ecpayTradeNo,
+      expiresAt: row.expiresAt,
+      createdAt: row.createdAt,
+      parentName: row.parentFirstName || row.parentLastName
+        ? `${row.parentFirstName ?? ""} ${row.parentLastName ?? ""}`.trim()
+        : null,
+      parentUsername: row.parentUsername ?? null,
+      packageName: row.packageName ?? null,
+    }));
   }
 
   async atomicMarkPurchasePaid(ecpayTradeNo: string): Promise<CreditPurchase | null> {

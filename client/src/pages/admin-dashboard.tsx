@@ -77,6 +77,10 @@ import {
   Upload,
   X,
   ImageIcon,
+  CreditCard,
+  CheckCircle,
+  AlertCircle,
+  Clock as ClockIcon,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
@@ -2496,13 +2500,14 @@ interface CreditSalesStats {
 }
 
 function CreditsManagementTab() {
-  const [subTab, setSubTab] = useState<"packages" | "promotions" | "coupons" | "wallets">("packages");
+  const [subTab, setSubTab] = useState<"packages" | "promotions" | "coupons" | "wallets" | "ecpay">("packages");
 
   const subTabs = [
     { id: "packages" as const, label: "堂數方案", icon: Package },
     { id: "promotions" as const, label: "優惠活動", icon: Gift },
     { id: "coupons" as const, label: "優惠碼", icon: Ticket },
     { id: "wallets" as const, label: "家長點數", icon: Wallet },
+    { id: "ecpay" as const, label: "線上付款", icon: CreditCard },
   ];
 
   const { data: salesStats, isLoading: statsLoading } = useQuery<CreditSalesStats>({
@@ -2563,6 +2568,163 @@ function CreditsManagementTab() {
       {subTab === "promotions" && <PromotionsSection />}
       {subTab === "coupons" && <CouponsSection />}
       {subTab === "wallets" && <ParentWalletsSection />}
+      {subTab === "ecpay" && <EcpayPurchasesSection />}
+    </div>
+  );
+}
+
+type EcpayPurchase = {
+  id: number;
+  parentId: string;
+  packageId: number | null;
+  credits: number;
+  originalAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+  promotionId: number | null;
+  couponId: number | null;
+  paymentMethod: string;
+  paymentStatus: string;
+  ecpayTradeNo: string | null;
+  expiresAt: string | null;
+  createdAt: string | null;
+  parentName: string | null;
+  parentUsername: string | null;
+  packageName: string | null;
+};
+
+function EcpayPurchasesSection() {
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const { data: allPurchases = [], isLoading } = useQuery<EcpayPurchase[]>({
+    queryKey: ["/api/admin/ecpay-purchases"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/ecpay-purchases", { credentials: "include" });
+      if (!res.ok) throw new Error("取得失敗");
+      return res.json();
+    },
+  });
+
+  const purchases = statusFilter === "all"
+    ? allPurchases
+    : allPurchases.filter(p => p.paymentStatus === statusFilter);
+
+  const statusBadge = (status: string) => {
+    if (status === "paid") return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-status-paid`}>
+        <CheckCircle className="w-3 h-3" />已付款
+      </span>
+    );
+    if (status === "failed") return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full" data-testid={`badge-status-failed`}>
+        <AlertCircle className="w-3 h-3" />付款失敗
+      </span>
+    );
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full" data-testid={`badge-status-pending`}>
+        <ClockIcon className="w-3 h-3" />待付款
+      </span>
+    );
+  };
+
+  const totalAmount = allPurchases.filter(p => p.paymentStatus === "paid").reduce((s, p) => s + p.finalAmount, 0);
+  const paidCount = allPurchases.filter(p => p.paymentStatus === "paid").length;
+  const pendingCount = allPurchases.filter(p => p.paymentStatus === "pending").length;
+  const failedCount = allPurchases.filter(p => p.paymentStatus === "failed").length;
+
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ecpay-total">
+          <p className="text-xs text-muted-foreground mb-1">總收款金額</p>
+          <p className="text-lg font-bold text-foreground">NT$ {totalAmount.toLocaleString()}</p>
+        </div>
+        <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ecpay-paid">
+          <p className="text-xs text-muted-foreground mb-1">已付款筆數</p>
+          <p className="text-lg font-bold text-green-600">{paidCount} 筆</p>
+        </div>
+        <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ecpay-pending">
+          <p className="text-xs text-muted-foreground mb-1">待付款筆數</p>
+          <p className="text-lg font-bold text-yellow-600">{pendingCount} 筆</p>
+        </div>
+        <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ecpay-failed">
+          <p className="text-xs text-muted-foreground mb-1">付款失敗筆數</p>
+          <p className="text-lg font-bold text-red-600">{failedCount} 筆</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        {[
+          { value: "all", label: "全部" },
+          { value: "paid", label: "已付款" },
+          { value: "pending", label: "待付款" },
+          { value: "failed", label: "付款失敗" },
+        ].map(opt => (
+          <Button
+            key={opt.value}
+            variant={statusFilter === opt.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter(opt.value)}
+            data-testid={`button-ecpay-filter-${opt.value}`}
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+        </div>
+      ) : purchases.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm" data-testid="text-ecpay-empty">
+          目前沒有線上付款紀錄
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse" data-testid="table-ecpay-purchases">
+            <thead>
+              <tr className="border-b border-gray-100 text-muted-foreground text-xs">
+                <th className="text-left py-2 px-3 font-medium">建立時間</th>
+                <th className="text-left py-2 px-3 font-medium">家長</th>
+                <th className="text-left py-2 px-3 font-medium">方案</th>
+                <th className="text-right py-2 px-3 font-medium">金額</th>
+                <th className="text-center py-2 px-3 font-medium">狀態</th>
+                <th className="text-left py-2 px-3 font-medium">綠界訂單號</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.map(p => (
+                <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50/50" data-testid={`row-ecpay-${p.id}`}>
+                  <td className="py-2.5 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                    {p.createdAt ? new Date(p.createdAt).toLocaleString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-"}
+                  </td>
+                  <td className="py-2.5 px-3">
+                    <div className="font-medium text-foreground" data-testid={`text-ecpay-parent-${p.id}`}>
+                      {p.parentName || p.parentUsername || p.parentId}
+                    </div>
+                    {p.parentUsername && p.parentName && (
+                      <div className="text-xs text-muted-foreground">{p.parentUsername}</div>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-foreground" data-testid={`text-ecpay-package-${p.id}`}>
+                    {p.packageName ?? `${p.credits} 堂`}
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-medium" data-testid={`text-ecpay-amount-${p.id}`}>
+                    NT$ {p.finalAmount.toLocaleString()}
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    {statusBadge(p.paymentStatus)}
+                  </td>
+                  <td className="py-2.5 px-3 font-mono text-xs text-muted-foreground" data-testid={`text-ecpay-tradeno-${p.id}`}>
+                    {p.ecpayTradeNo ?? "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
