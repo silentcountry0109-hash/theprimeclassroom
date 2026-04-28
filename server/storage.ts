@@ -244,9 +244,11 @@ export interface IStorage {
   updatePurchaseStatusAndTradeNo(id: number, status: string, ecpayTradeNo: string): Promise<CreditPurchase>;
   getPurchasesByParent(parentId: string): Promise<CreditPurchase[]>;
   getCreditPurchaseByTradeNo(ecpayTradeNo: string): Promise<CreditPurchase | undefined>;
-  getEcpayPurchases(status?: string): Promise<Array<CreditPurchase & { parentName: string | null; parentUsername: string | null; packageName: string | null }>>;
+  getEcpayPurchases(status?: string): Promise<Array<CreditPurchase & { parentName: string | null; parentUsername: string | null; packageName: string | null; ecpayInternalTradeNo: string | null }>>;
   atomicMarkPurchasePaid(ecpayTradeNo: string): Promise<CreditPurchase | null>;
-  atomicMarkPaidAndAddCredits(ecpayTradeNo: string, expiresAt: Date | null): Promise<CreditPurchase | null>;
+  atomicMarkPaidAndAddCredits(ecpayTradeNo: string, expiresAt: Date | null, ecpayInternalTradeNo?: string): Promise<CreditPurchase | null>;
+  refundEcpayPurchase(purchaseId: number): Promise<{ purchase: CreditPurchase; creditsDeducted: number }>;
+
 
   getParentBalance(parentId: string): Promise<number>;
   getCreditBalances(parentId: string): Promise<CreditBalance[]>;
@@ -2421,6 +2423,7 @@ export class DatabaseStorage implements IStorage {
         paymentMethod: creditPurchases.paymentMethod,
         paymentStatus: creditPurchases.paymentStatus,
         ecpayTradeNo: creditPurchases.ecpayTradeNo,
+        ecpayInternalTradeNo: creditPurchases.ecpayInternalTradeNo,
         expiresAt: creditPurchases.expiresAt,
         createdAt: creditPurchases.createdAt,
         parentFirstName: users.firstName,
@@ -2452,6 +2455,7 @@ export class DatabaseStorage implements IStorage {
       paymentMethod: row.paymentMethod,
       paymentStatus: row.paymentStatus,
       ecpayTradeNo: row.ecpayTradeNo,
+      ecpayInternalTradeNo: row.ecpayInternalTradeNo,
       expiresAt: row.expiresAt,
       createdAt: row.createdAt,
       parentName: row.parentFirstName || row.parentLastName
@@ -2470,10 +2474,10 @@ export class DatabaseStorage implements IStorage {
     return result[0] ?? null;
   }
 
-  async atomicMarkPaidAndAddCredits(ecpayTradeNo: string, expiresAt: Date | null): Promise<CreditPurchase | null> {
+  async atomicMarkPaidAndAddCredits(ecpayTradeNo: string, expiresAt: Date | null, ecpayInternalTradeNo?: string): Promise<CreditPurchase | null> {
     return db.transaction(async (tx) => {
       const [purchase] = await tx.update(creditPurchases)
-        .set({ paymentStatus: "paid" })
+        .set(ecpayInternalTradeNo ? { paymentStatus: "paid", ecpayInternalTradeNo } : { paymentStatus: "paid" })
         .where(and(eq(creditPurchases.ecpayTradeNo, ecpayTradeNo), eq(creditPurchases.paymentStatus, "pending")))
         .returning();
       if (!purchase) return null;
@@ -2493,6 +2497,43 @@ export class DatabaseStorage implements IStorage {
         description: "線上付款購買堂數",
       });
       return purchase;
+    });
+  }
+
+  async refundEcpayPurchase(purchaseId: number): Promise<{ purchase: CreditPurchase; creditsDeducted: number }> {
+    return db.transaction(async (tx) => {
+      const [purchase] = await tx.select().from(creditPurchases).where(eq(creditPurchases.id, purchaseId));
+      if (!purchase) throw new Error("找不到該付款紀錄");
+      if (purchase.paymentStatus !== "paid") throw new Error("只有已付款的訂單可以退款");
+
+      const [updated] = await tx.update(creditPurchases)
+        .set({ paymentStatus: "refunded" })
+        .where(and(eq(creditPurchases.id, purchaseId), eq(creditPurchases.paymentStatus, "paid")))
+        .returning();
+      if (!updated) throw new Error("退款狀態更新失敗（可能已退款）");
+
+      const balanceRows = await tx.select().from(creditBalances)
+        .where(eq(creditBalances.purchaseId, purchaseId));
+
+      let creditsDeducted = 0;
+      for (const bal of balanceRows) {
+        if (bal.remainingCredits > 0) {
+          creditsDeducted += bal.remainingCredits;
+          await tx.update(creditBalances)
+            .set({ remainingCredits: 0 })
+            .where(eq(creditBalances.id, bal.id));
+        }
+      }
+
+      await tx.insert(creditTransactions).values({
+        parentId: purchase.parentId,
+        type: "payment_refund",
+        credits: -creditsDeducted,
+        purchaseId: purchase.id,
+        description: `線上付款退款（退還 NT$${purchase.finalAmount}，扣除 ${creditsDeducted} 堂）`,
+      });
+
+      return { purchase: updated, creditsDeducted };
     });
   }
 

@@ -3035,6 +3035,55 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/ecpay-refund/:purchaseId", isAdmin, async (req: any, res) => {
+    try {
+      const purchaseId = parseInt(req.params.purchaseId);
+      if (isNaN(purchaseId)) return res.status(400).json({ message: "無效的付款 ID" });
+
+      const purchases = await storage.getEcpayPurchases();
+      const purchase = purchases.find(p => p.id === purchaseId);
+      if (!purchase) return res.status(404).json({ message: "找不到該付款紀錄" });
+      if (purchase.paymentStatus !== "paid") return res.status(400).json({ message: "只有已付款的訂單可以退款" });
+      if (!purchase.ecpayTradeNo) return res.status(400).json({ message: "缺少綠界訂單號，無法退款" });
+
+      if (!purchase.ecpayInternalTradeNo) {
+        return res.status(400).json({ message: "此訂單缺少綠界內部訂單號（可能為舊訂單或未完成收款），無法發起綠界退款。請聯絡技術人員處理。" });
+      }
+
+      const doActionParams: Record<string, string> = {
+        MerchantID: ECPAY_MERCHANT_ID,
+        MerchantTradeNo: purchase.ecpayTradeNo,
+        TradeNo: purchase.ecpayInternalTradeNo,
+        Action: "R",
+        TotalAmount: String(purchase.finalAmount),
+      };
+      doActionParams.CheckMacValue = computeCheckMacValue(doActionParams);
+
+      const ecpayDoActionUrl = ECPAY_IS_SANDBOX
+        ? "https://payment-stage.ecpay.com.tw/CreditDetail/DoAction"
+        : "https://payment.ecpay.com.tw/CreditDetail/DoAction";
+      const formBody = new URLSearchParams(doActionParams).toString();
+      const ecpayRes = await fetch(ecpayDoActionUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formBody,
+      });
+      const ecpayText = await ecpayRes.text();
+      console.log("[ecpay-refund] DoAction response:", ecpayText);
+
+      const [rtnCode, rtnMsg] = ecpayText.split("|");
+      if (rtnCode !== "1") {
+        return res.status(502).json({ message: `綠界退款失敗：${rtnMsg || ecpayText}` });
+      }
+
+      const result = await storage.refundEcpayPurchase(purchaseId);
+      res.json({ message: "退款成功", creditsDeducted: result.creditsDeducted, purchase: result.purchase });
+    } catch (error: any) {
+      console.error("[ecpay-refund] error:", error);
+      res.status(500).json({ message: error.message || "退款失敗" });
+    }
+  });
+
   // ========== Textbook / Curriculum Management ==========
   app.get("/api/textbooks", isCredentialOrAuth, async (req: any, res) => {
     try {
@@ -3597,7 +3646,8 @@ export async function registerRoutes(
         ? new Date(Date.now() + pkg.expiryDays * 86400 * 1000)
         : null;
 
-      const purchase = await storage.atomicMarkPaidAndAddCredits(MerchantTradeNo, expiresAt);
+      const ecpayInternalTradeNo = typeof body.TradeNo === "string" ? body.TradeNo : undefined;
+      const purchase = await storage.atomicMarkPaidAndAddCredits(MerchantTradeNo, expiresAt, ecpayInternalTradeNo);
       if (!purchase) {
         return res.status(200).send("1|OK");
       }

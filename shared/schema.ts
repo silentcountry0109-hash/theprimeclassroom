@@ -353,6 +353,7 @@ export const creditPurchases = pgTable("credit_purchases", {
   paymentMethod: text("payment_method").default("manual").notNull(),
   paymentStatus: text("payment_status").default("pending").notNull(),
   ecpayTradeNo: text("ecpay_trade_no"),
+  ecpayInternalTradeNo: text("ecpay_internal_trade_no"),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

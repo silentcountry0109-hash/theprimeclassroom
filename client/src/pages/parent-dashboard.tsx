@@ -990,6 +990,7 @@ function CreditsTab() {
     purchase: { label: "購買堂數", icon: ArrowUpRight, colorClass: "text-green-600", sign: "+" },
     deduct: { label: "預約扣除", icon: ArrowDownRight, colorClass: "text-red-500", sign: "-" },
     refund: { label: "取消退回", icon: RefreshCw, colorClass: "text-blue-500", sign: "+" },
+    payment_refund: { label: "付款退款", icon: RefreshCw, colorClass: "text-orange-500", sign: "-" },
     expire: { label: "到期失效", icon: Timer, colorClass: "text-gray-500", sign: "-" },
     admin_adjust: { label: "手動調整", icon: Gift, colorClass: "text-purple-600", sign: "" },
   };

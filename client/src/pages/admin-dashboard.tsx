@@ -23,6 +23,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -81,6 +91,7 @@ import {
   CheckCircle,
   AlertCircle,
   Clock as ClockIcon,
+  RotateCcw,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
@@ -2586,6 +2597,7 @@ type EcpayPurchase = {
   paymentMethod: string;
   paymentStatus: string;
   ecpayTradeNo: string | null;
+  ecpayInternalTradeNo: string | null;
   expiresAt: string | null;
   createdAt: string | null;
   parentName: string | null;
@@ -2594,7 +2606,9 @@ type EcpayPurchase = {
 };
 
 function EcpayPurchasesSection() {
+  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [confirmRefundId, setConfirmRefundId] = useState<number | null>(null);
 
   const { data: allPurchases = [], isLoading } = useQuery<EcpayPurchase[]>({
     queryKey: ["/api/admin/ecpay-purchases"],
@@ -2602,6 +2616,26 @@ function EcpayPurchasesSection() {
       const res = await fetch("/api/admin/ecpay-purchases", { credentials: "include" });
       if (!res.ok) throw new Error("取得失敗");
       return res.json();
+    },
+  });
+
+  const refundMutation = useMutation({
+    mutationFn: async (purchaseId: number) => {
+      const res = await apiRequest("POST", `/api/admin/ecpay-refund/${purchaseId}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || "退款失敗");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "退款成功", description: `已退款，扣除 ${data.creditsDeducted} 堂` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ecpay-purchases"] });
+      setConfirmRefundId(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "退款失敗", description: err.message, variant: "destructive" });
+      setConfirmRefundId(null);
     },
   });
 
@@ -2613,6 +2647,11 @@ function EcpayPurchasesSection() {
     if (status === "paid") return (
       <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-status-paid`}>
         <CheckCircle className="w-3 h-3" />已付款
+      </span>
+    );
+    if (status === "refunded") return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full" data-testid={`badge-status-refunded`}>
+        <RotateCcw className="w-3 h-3" />已退款
       </span>
     );
     if (status === "failed") return (
@@ -2631,10 +2670,13 @@ function EcpayPurchasesSection() {
   const paidCount = allPurchases.filter(p => p.paymentStatus === "paid").length;
   const pendingCount = allPurchases.filter(p => p.paymentStatus === "pending").length;
   const failedCount = allPurchases.filter(p => p.paymentStatus === "failed").length;
+  const refundedCount = allPurchases.filter(p => p.paymentStatus === "refunded").length;
+
+  const confirmPurchase = confirmRefundId != null ? allPurchases.find(p => p.id === confirmRefundId) : null;
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-5 gap-3 mb-5">
         <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ecpay-total">
           <p className="text-xs text-muted-foreground mb-1">總收款金額</p>
           <p className="text-lg font-bold text-foreground">NT$ {totalAmount.toLocaleString()}</p>
@@ -2651,6 +2693,10 @@ function EcpayPurchasesSection() {
           <p className="text-xs text-muted-foreground mb-1">付款失敗筆數</p>
           <p className="text-lg font-bold text-red-600">{failedCount} 筆</p>
         </div>
+        <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ecpay-refunded">
+          <p className="text-xs text-muted-foreground mb-1">已退款筆數</p>
+          <p className="text-lg font-bold text-blue-600">{refundedCount} 筆</p>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -2659,6 +2705,7 @@ function EcpayPurchasesSection() {
           { value: "paid", label: "已付款" },
           { value: "pending", label: "待付款" },
           { value: "failed", label: "付款失敗" },
+          { value: "refunded", label: "已退款" },
         ].map(opt => (
           <Button
             key={opt.value}
@@ -2691,6 +2738,7 @@ function EcpayPurchasesSection() {
                 <th className="text-right py-2 px-3 font-medium">金額</th>
                 <th className="text-center py-2 px-3 font-medium">狀態</th>
                 <th className="text-left py-2 px-3 font-medium">綠界訂單號</th>
+                <th className="text-center py-2 px-3 font-medium">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -2719,12 +2767,53 @@ function EcpayPurchasesSection() {
                   <td className="py-2.5 px-3 font-mono text-xs text-muted-foreground" data-testid={`text-ecpay-tradeno-${p.id}`}>
                     {p.ecpayTradeNo ?? "-"}
                   </td>
+                  <td className="py-2.5 px-3 text-center">
+                    {p.paymentStatus === "paid" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => setConfirmRefundId(p.id)}
+                        data-testid={`button-refund-${p.id}`}
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />退款
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <AlertDialog open={confirmRefundId != null} onOpenChange={(open) => { if (!open) setConfirmRefundId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認退款</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmPurchase && (
+                <span>
+                  確定要對 <strong>{confirmPurchase.parentName || confirmPurchase.parentUsername}</strong> 的訂單退款
+                  <strong> NT$ {confirmPurchase.finalAmount.toLocaleString()}</strong> 嗎？<br />
+                  退款後將自動扣除對應的剩餘堂數，此操作無法還原。
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-refund-cancel">取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRefundId != null && refundMutation.mutate(confirmRefundId)}
+              disabled={refundMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-refund-confirm"
+            >
+              {refundMutation.isPending ? "退款中..." : "確認退款"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
