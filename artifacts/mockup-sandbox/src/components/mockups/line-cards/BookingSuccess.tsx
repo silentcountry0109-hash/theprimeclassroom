@@ -1,7 +1,7 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
+const ipChar = `${import.meta.env.BASE_URL}ip-character.png`; // 機器人❤️眼
 
 export function BookingSuccess() {
   return (

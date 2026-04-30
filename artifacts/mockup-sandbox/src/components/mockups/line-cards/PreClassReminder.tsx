@@ -1,7 +1,7 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
+const ipChar = `${import.meta.env.BASE_URL}ip-reminder.png`; // 機器人笑臉
 
 export function PreClassReminder() {
   return (

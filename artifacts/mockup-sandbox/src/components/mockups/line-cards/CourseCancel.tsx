@@ -1,7 +1,7 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
+const ipChar = `${import.meta.env.BASE_URL}ip-cancel.png`; // 綠髮小朋友
 
 export function CourseCancel() {
   return (
