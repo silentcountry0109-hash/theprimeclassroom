@@ -67,6 +67,7 @@ ECPAY_HASH_KEY = "5294y06JbISpM5x9"
 ECPAY_HASH_IV = "v77hoKGq4kWxNNIS"
 ECPAY_IS_SANDBOX = "true"
 VITE_LINE_OA_URL = "https://line.me/R/ti/p/@643apwlp"
+LINE_MESSAGING_CHANNEL_ID = "2009852161"
 
 [postMerge]
 path = "scripts/post-merge.sh"

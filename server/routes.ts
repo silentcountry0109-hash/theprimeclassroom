@@ -4029,26 +4029,32 @@ export async function registerRoutes(
     const body = JSON.stringify({ messages: flexMessages });
     console.log(`[TEST] body len=${body.length}`);
 
-    // 用 curl 子行程發送（確認 curl 能成功）
+    // 用 curl 子行程發送；token 和 body 都寫入暫存檔避免 shell 跳脫問題
     const { execSync } = await import("child_process");
     const fs = await import("fs");
-    const tmpFile = `/tmp/line-flex-${Date.now()}.json`;
-    fs.writeFileSync(tmpFile, body, "utf-8");
+    const ts = Date.now();
+    const tmpBody = `/tmp/line-body-${ts}.json`;
+    const tmpToken = `/tmp/line-token-${ts}.txt`;
+    fs.writeFileSync(tmpBody, body, "utf-8");
+    fs.writeFileSync(tmpToken, token, "utf-8");
+    fs.writeFileSync("/tmp/server-token.txt", token, "utf-8"); // 測試用：保留完整 token
     try {
+      console.log(`[TEST] running curl subprocess with token len=${token.length}`);
       const curlOut = execSync(
-        `curl -s -w "\\n%{http_code}" -X POST "https://api.line.me/v2/bot/message/broadcast" ` +
-        `-H "Content-Type: application/json" ` +
-        `-H "Authorization: Bearer ${token}" ` +
-        `-d @${tmpFile}`,
-        { timeout: 10000 }
+        `curl -s -w "\\n%{http_code}" -X POST "https://api.line.me/v2/bot/message/broadcast"` +
+        ` -H "Content-Type: application/json"` +
+        ` -H "Authorization: Bearer $LINE_TOKEN"` +
+        ` -d @${tmpBody}`,
+        { timeout: 15000, env: { ...process.env, LINE_TOKEN: token } }
       ).toString();
       const lines = curlOut.trim().split("\n");
       const statusCode = parseInt(lines[lines.length - 1]);
       const responseBody = lines.slice(0, -1).join("\n");
       console.log(`[TEST] curl result: ${statusCode} ${responseBody}`);
-      res.json({ ok: statusCode === 200, status: statusCode, body: responseBody });
+      res.json({ ok: statusCode === 200, status: statusCode, body: responseBody, token: token.slice(0,20) + "..." });
     } finally {
-      fs.unlinkSync(tmpFile);
+      try { fs.unlinkSync(tmpBody); } catch {}
+      try { fs.unlinkSync(tmpToken); } catch {}
     }
   });
   // === END 暫時測試路由 ===
