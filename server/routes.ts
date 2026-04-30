@@ -223,6 +223,12 @@ async function sendTwilioOtp(phone: string): Promise<void> {
     if (code === 20003 || msg.includes("authenticate")) {
       throw new Error("簡訊服務認證失敗，請聯絡系統管理員。");
     }
+    if (code === 60223 || msg.includes("Geo permission")) {
+      throw new Error("台灣地區尚未啟用。請至 Twilio Console → Verify → Services → Geo Permissions 開啟 Taiwan (TW)。");
+    }
+    if (code === 60202) {
+      throw new Error("發送次數過多，請稍後再試。");
+    }
     throw new Error(`簡訊發送失敗（錯誤碼 ${code ?? status ?? "unknown"}），請稍後再試。`);
   }
 }
