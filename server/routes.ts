@@ -204,10 +204,22 @@ async function sendTwilioOtp(phone: string): Promise<void> {
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID!;
   const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
   const e164 = toE164Taiwan(phone);
-  await client.verify.v2.services(serviceSid).verifications.create({
-    to: e164,
-    channel: "sms",
-  });
+  try {
+    await client.verify.v2.services(serviceSid).verifications.create({
+      to: e164,
+      channel: "sms",
+    });
+  } catch (err: any) {
+    const code = err?.code;
+    const msg: string = err?.message ?? "";
+    if (code === 21608 || msg.includes("unverified")) {
+      throw new Error("此號碼尚未通過驗證（Twilio 試用帳號限制）。請至 Twilio Console → Phone Numbers → Verified Caller IDs 新增此號碼後再試。");
+    }
+    if (code === 60200 || msg.includes("Invalid parameter")) {
+      throw new Error("手機號碼格式不正確，請確認後重試。");
+    }
+    throw new Error("簡訊發送失敗，請稍後再試。");
+  }
 }
 
 async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
