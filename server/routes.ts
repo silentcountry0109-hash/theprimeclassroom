@@ -212,13 +212,18 @@ async function sendTwilioOtp(phone: string): Promise<void> {
   } catch (err: any) {
     const code = err?.code;
     const msg: string = err?.message ?? "";
+    const status = err?.status;
+    console.error(`[Twilio] send-otp error — code=${code} status=${status} msg=${msg}`);
     if (code === 21608 || msg.includes("unverified")) {
       throw new Error("此號碼尚未通過驗證（Twilio 試用帳號限制）。請至 Twilio Console → Phone Numbers → Verified Caller IDs 新增此號碼後再試。");
     }
     if (code === 60200 || msg.includes("Invalid parameter")) {
       throw new Error("手機號碼格式不正確，請確認後重試。");
     }
-    throw new Error("簡訊發送失敗，請稍後再試。");
+    if (code === 20003 || msg.includes("authenticate")) {
+      throw new Error("簡訊服務認證失敗，請聯絡系統管理員。");
+    }
+    throw new Error(`簡訊發送失敗（錯誤碼 ${code ?? status ?? "unknown"}），請稍後再試。`);
   }
 }
 
