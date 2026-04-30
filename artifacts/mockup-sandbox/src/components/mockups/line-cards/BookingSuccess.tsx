@@ -1,7 +1,7 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const mascot = `${import.meta.env.BASE_URL}mascot.gif`;
+const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
 
 export function BookingSuccess() {
   return (
@@ -26,13 +26,18 @@ export function BookingSuccess() {
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-hero" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)', minHeight: 68 }}>
+              {/* Hero 色條 */}
+              <div className="card-hero" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)' }}>
                 <div className="card-hero-icon">✅</div>
                 <div className="card-hero-text">
                   <div className="card-hero-title">課程預約成功！</div>
                   <div className="card-hero-sub">The Prime 質數教室</div>
                 </div>
-                <img className="card-hero-mascot" src={mascot} alt="" />
+              </div>
+
+              {/* IP 角色 */}
+              <div className="card-ip-banner" style={{ background: 'linear-gradient(180deg, #e8faf9 0%, #f5fffe 100%)' }}>
+                <img src={ipChar} alt="質數先生" />
               </div>
 
               <div className="card-body">

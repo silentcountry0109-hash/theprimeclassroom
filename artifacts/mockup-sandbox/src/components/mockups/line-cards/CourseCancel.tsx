@@ -1,7 +1,7 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const mascot = `${import.meta.env.BASE_URL}mascot.gif`;
+const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
 
 export function CourseCancel() {
   return (
@@ -26,14 +26,18 @@ export function CourseCancel() {
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-hero" style={{ background: 'linear-gradient(135deg, #78909C 0%, #546E7A 100%)', minHeight: 68 }}>
+              {/* Hero 色條 */}
+              <div className="card-hero" style={{ background: 'linear-gradient(135deg, #78909C 0%, #546E7A 100%)' }}>
                 <div className="card-hero-icon">😢</div>
                 <div className="card-hero-text">
                   <div className="card-hero-title">課程已取消</div>
                   <div className="card-hero-sub">點數已退回，期待下次見！</div>
                 </div>
-                <img className="card-hero-mascot" src={mascot} alt=""
-                  style={{ animationDelay: '0.6s', filter: 'grayscale(40%) drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
+              </div>
+
+              {/* IP 角色 — 灰階版傳達遺憾感 */}
+              <div className="card-ip-banner" style={{ background: 'linear-gradient(180deg, #f4f5f6 0%, #f9f9fa 100%)' }}>
+                <img src={ipChar} alt="質數先生" style={{ filter: 'grayscale(60%) opacity(0.8)' }} />
               </div>
 
               <div className="card-body">
