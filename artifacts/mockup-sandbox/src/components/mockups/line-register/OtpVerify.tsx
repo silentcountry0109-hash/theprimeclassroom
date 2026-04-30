@@ -3,7 +3,7 @@ import { useState } from "react";
 
 export function OtpVerify() {
   const [otpValues] = useState(["", "", "", "", "", ""]);
-  const [countdown] = useState(42);
+  const [countdown] = useState(60);
   const phone = "0912***678";
 
   return (
