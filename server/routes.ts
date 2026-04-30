@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { sendLineFlexMessages, buildBookingSuccessFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -4002,6 +4003,17 @@ export async function registerRoutes(
   };
   app.get("/api/payment/ecpay/return", handleEcpayReturn);
   app.post("/api/payment/ecpay/return", handleEcpayReturn);
+
+  // === 暫時測試路由：發送 LINE Flex Message 三張範例 ===
+  app.post("/api/dev/send-flex-test", async (req, res) => {
+    const lineUserId = "Uecb97d0ef5b5bfa232d24893c35bfa42";
+    const booking = buildBookingSuccessFlex({ childName: "陳小明", date: "2026/05/03（日）", time: "10:00 – 11:00", teacher: "林老師", location: "台北信義分校", credits: 5 });
+    const reminder = buildPreClassReminderFlex({ childName: "陳小明", date: "2026/05/03（日）", time: "10:00 – 11:00", teacher: "林老師", location: "台北信義分校", hoursUntil: 2 });
+    const cancel = buildCourseCancelFlex({ childName: "陳小明", date: "2026/05/03（日）", time: "10:00 – 11:00", teacher: "林老師", credits: 6 });
+    await sendLineFlexMessages(lineUserId, [booking, reminder, cancel]);
+    res.json({ ok: true });
+  });
+  // === END 暫時測試路由 ===
 
   return httpServer;
 }
