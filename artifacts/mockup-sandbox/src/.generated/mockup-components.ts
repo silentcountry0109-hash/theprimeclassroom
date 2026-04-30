@@ -8,6 +8,7 @@ export const modules: ModuleMap = {
   "./components/mockups/curriculum/HQCurriculum.tsx": () => import("../components/mockups/curriculum/HQCurriculum.tsx"),
   "./components/mockups/learning-map/LearningMap.tsx": () => import("../components/mockups/learning-map/LearningMap.tsx"),
   "./components/mockups/line-register/FillProfile.tsx": () => import("../components/mockups/line-register/FillProfile.tsx"),
+  "./components/mockups/line-register/LineAuth.tsx": () => import("../components/mockups/line-register/LineAuth.tsx"),
   "./components/mockups/line-register/LoginPage.tsx": () => import("../components/mockups/line-register/LoginPage.tsx"),
   "./components/mockups/line-register/OtpVerify.tsx": () => import("../components/mockups/line-register/OtpVerify.tsx"),
   "./components/mockups/materials/CoachLibrary.tsx": () => import("../components/mockups/materials/CoachLibrary.tsx"),
