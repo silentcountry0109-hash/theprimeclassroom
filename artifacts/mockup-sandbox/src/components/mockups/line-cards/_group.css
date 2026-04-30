@@ -4,7 +4,7 @@
 
 .line-card-root {
   font-family: 'Noto Sans TC', sans-serif;
-  background: #e8e8e8;
+  background: #e5ddd5;
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -14,39 +14,50 @@
 
 .phone-shell {
   width: 360px;
-  background: #e8e8e8;
+  background: #e5ddd5;
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.22);
   display: flex;
   flex-direction: column;
 }
 
+/* ── LINE OA 聊天頂欄 ── */
 .chat-header {
   background: #06C755;
   color: white;
-  padding: 13px 16px;
-  font-size: 14px;
+  padding: 11px 14px;
+  font-size: 13px;
   font-weight: 700;
   display: flex;
   align-items: center;
   gap: 10px;
+  letter-spacing: 0.3px;
 }
 
 .chat-header-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  overflow: hidden;
   background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
 }
 
+.chat-header-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── 聊天區背景 ── */
 .chat-area {
-  background: #c7edcc;
-  padding: 16px 12px 20px;
+  background: #ddd0be;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+  padding: 14px 10px 18px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -58,53 +69,79 @@
   gap: 8px;
 }
 
+/* ── 發送者大頭貼 ── */
 .sender-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #81D8D0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: white;
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.18);
 }
 
+.sender-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Flex Message 卡片 ── */
 .flex-card {
   background: white;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-  width: 272px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.14);
+  width: 270px;
 }
 
+/* ── 卡片 Header ── */
 .card-hero {
-  padding: 13px 14px 11px;
+  padding: 12px 14px 10px;
   display: flex;
   align-items: center;
   gap: 10px;
+  position: relative;
+  overflow: hidden;
 }
 
-.card-hero-icon { font-size: 26px; line-height: 1; }
+.card-hero-mascot {
+  position: absolute;
+  right: -4px;
+  bottom: -10px;
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+  animation: mascot-bounce 2s ease-in-out infinite;
+}
 
-.card-hero-text { flex: 1; }
+@keyframes mascot-bounce {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%       { transform: translateY(-5px) rotate(2deg); }
+}
+
+.card-hero-icon { font-size: 26px; line-height: 1; z-index: 1; }
+
+.card-hero-text { flex: 1; z-index: 1; }
 
 .card-hero-title {
   font-size: 13px;
   font-weight: 700;
   color: white;
   line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.12);
 }
 
 .card-hero-sub {
   font-size: 10px;
-  color: rgba(255,255,255,0.82);
+  color: rgba(255,255,255,0.85);
   margin-top: 2px;
 }
 
+/* ── 卡片 Body ── */
 .card-body {
-  padding: 11px 14px 10px;
+  padding: 11px 14px 9px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -118,7 +155,7 @@
 
 .info-label {
   font-size: 10px;
-  color: #999;
+  color: #aaa;
   width: 40px;
   flex-shrink: 0;
 }
@@ -134,7 +171,7 @@
 .divider {
   height: 1px;
   background: #f2f2f2;
-  margin: 3px 0;
+  margin: 2px 0;
 }
 
 .credit-badge {
@@ -150,12 +187,13 @@
   color: #E65100;
 }
 
-.card-footer { padding: 8px 14px 14px; }
+/* ── 卡片 Footer ── */
+.card-footer { padding: 7px 14px 13px; }
 
 .cta-btn {
   display: block;
   width: 100%;
-  padding: 10px;
+  padding: 9px;
   border-radius: 8px;
   border: none;
   font-family: 'Noto Sans TC', sans-serif;
@@ -164,13 +202,40 @@
   cursor: pointer;
   text-align: center;
   letter-spacing: 0.3px;
-  transition: filter 0.15s;
+  transition: filter 0.15s, transform 0.1s;
 }
-.cta-btn:hover { filter: brightness(0.93); }
+.cta-btn:hover  { filter: brightness(0.93); transform: scale(0.99); }
+.cta-btn:active { transform: scale(0.97); }
 
+/* ── 時間戳 ── */
 .timestamp {
   font-size: 10px;
-  color: #9e9e9e;
-  margin-top: 5px;
-  padding-left: 44px;
+  color: #8a7d6e;
+  margin-top: 4px;
+  padding-left: 46px;
+}
+
+/* ── 讀取動畫（Typing indicator）── */
+.typing-bubble {
+  background: white;
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: fit-content;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2px;
+}
+.typing-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #ccc;
+  animation: typing 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+  0%,60%,100% { transform: translateY(0); background: #ccc; }
+  30%          { transform: translateY(-5px); background: #aaa; }
 }
