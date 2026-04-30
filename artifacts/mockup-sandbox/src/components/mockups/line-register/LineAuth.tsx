@@ -1,7 +1,7 @@
 import "./_group.css";
 import { useState } from "react";
 
-export function LineAuth() {
+export function LineAuth({ onNext }: { onNext?: () => void } = {}) {
   const [addFriend, setAddFriend] = useState(true);
 
   return (
@@ -124,6 +124,7 @@ export function LineAuth() {
 
       <div style={{ padding: "28px 24px 12px" }}>
         <button
+          onClick={onNext}
           style={{
             width: "100%", padding: "13px 0",
             borderRadius: 10, border: "none",

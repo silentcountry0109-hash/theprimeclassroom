@@ -29,7 +29,7 @@ function QRCodeIcon() {
   );
 }
 
-export function BindLineOfficial() {
+export function BindLineOfficial({ onNext }: { onNext?: () => void } = {}) {
   const [joined, setJoined] = useState(false);
 
   return (
@@ -168,6 +168,7 @@ export function BindLineOfficial() {
 
           <button
             disabled={!joined}
+            onClick={joined ? onNext : undefined}
             style={{
               width: "100%", padding: "13px 0",
               borderRadius: 10, border: "none",
