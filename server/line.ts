@@ -58,6 +58,7 @@ export async function sendLineFlexMessages(
 ): Promise<void> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token || !lineUserId) return;
+  console.log(`[LINE Flex] token length=${token.length} starts=${token.slice(0,6)} ends=${token.slice(-6)}`);
   try {
     const res = await fetch("https://api.line.me/v2/bot/message/push", {
       method: "POST",
