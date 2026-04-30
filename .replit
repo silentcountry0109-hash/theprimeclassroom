@@ -66,6 +66,7 @@ ECPAY_MERCHANT_ID = "2000132"
 ECPAY_HASH_KEY = "5294y06JbISpM5x9"
 ECPAY_HASH_IV = "v77hoKGq4kWxNNIS"
 ECPAY_IS_SANDBOX = "true"
+LINE_CHANNEL_ID = "2009943763"
 
 [postMerge]
 path = "scripts/post-merge.sh"
