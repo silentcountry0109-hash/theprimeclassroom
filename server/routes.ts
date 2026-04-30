@@ -160,6 +160,8 @@ setInterval(() => {
   }
 }, 10 * 60_000);
 
+const isDev = process.env.NODE_ENV === "development";
+
 function hasTwilioCredentials(): boolean {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&
@@ -169,12 +171,15 @@ function hasTwilioCredentials(): boolean {
 }
 
 async function sendTwilioOtp(phone: string): Promise<void> {
-  if (!hasTwilioCredentials()) {
+  if (isDev && !hasTwilioCredentials()) {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const now = Date.now();
     devOtpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
     console.log(`[DEV FALLBACK] OTP for ${phone}: ${otp}`);
     return;
+  }
+  if (!hasTwilioCredentials()) {
+    throw new Error("簡訊服務未設定，請聯絡系統管理員");
   }
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID!;
   const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
@@ -186,7 +191,7 @@ async function sendTwilioOtp(phone: string): Promise<void> {
 }
 
 async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
-  if (!hasTwilioCredentials()) {
+  if (isDev && !hasTwilioCredentials()) {
     const now = Date.now();
     const record = devOtpStore.get(phone);
     if (!record) return false;
@@ -198,6 +203,9 @@ async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
     }
     devOtpStore.delete(phone);
     return true;
+  }
+  if (!hasTwilioCredentials()) {
+    throw new Error("簡訊服務未設定，請聯絡系統管理員");
   }
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID!;
   const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
@@ -436,6 +444,13 @@ export async function registerRoutes(
       if (!phone || !/^09\d{8}$/.test(phone)) {
         return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
       }
+      if (isDev && !hasTwilioCredentials()) {
+        const existing = devOtpStore.get(phone);
+        if (existing && Date.now() - existing.sentAt < 60_000) {
+          const remaining = Math.ceil((60_000 - (Date.now() - existing.sentAt)) / 1000);
+          return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
+        }
+      }
       await sendTwilioOtp(phone);
       return res.json({ message: "驗證碼已發送" });
     } catch (error: unknown) {
@@ -620,6 +635,13 @@ export async function registerRoutes(
       const { phone } = req.body;
       if (!phone || !/^09\d{8}$/.test(phone)) {
         return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
+      }
+      if (isDev && !hasTwilioCredentials()) {
+        const existing = devOtpStore.get(phone);
+        if (existing && Date.now() - existing.sentAt < 60_000) {
+          const remaining = Math.ceil((60_000 - (Date.now() - existing.sentAt)) / 1000);
+          return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
+        }
       }
       await sendTwilioOtp(phone);
       res.json({ message: "驗證碼已發送" });
