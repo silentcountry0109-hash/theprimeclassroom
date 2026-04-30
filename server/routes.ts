@@ -370,6 +370,37 @@ export async function registerRoutes(
 
   await seedDatabase();
 
+  // ── 臨時測試路由：模擬各種 LINE 通知（僅開發用） ──
+  app.get("/api/dev/ping", (_req, res) => { res.json({ ok: true }); });
+  app.post("/api/dev/line-test", async (req, res) => {
+    const LINE_USER_ID = "Uecb97d0ef5b5bfa232d24893c35bfa42";
+    const scenarios = [
+      `【質數教室】✅ 課程預約成功\n孩子：陳小明\n日期：2026/05/03（日）\n時間：10:00–11:00\n老師：林老師\n地點：台北信義分校\n剩餘點數：5 堂`,
+      `【質數教室】✅ 連排預約成功（3 堂）\n孩子：陳小明\n📅 2026/05/03 10:00–11:00\n📅 2026/05/10 10:00–11:00\n📅 2026/05/17 10:00–11:00\n老師：林老師｜地點：信義分校\n剩餘點數：3 堂`,
+      `【質數教室】❌ 課程已取消\n孩子：陳小明\n日期：2026/05/03（日）\n時間：10:00–11:00\n點數已退回，剩餘 6 堂`,
+      `【質數教室】⏰ 上課提醒\n陳小明 今天 10:00–11:00 有數學課\n老師：林老師\n地點：台北信義分校\n請準時出席！`,
+      `【質數教室】📒 聯絡簿通知\n陳小明 今日課後紀錄已填寫\n老師 林老師 已完成記錄\n請至 App 查看詳情`,
+      `【質數教室】⚠️ 點數提醒\n陳小明 的點數僅剩 1 堂，請盡快購買以免影響課程。`,
+      `【質數教室】🔴 點數已用完\n陳小明 的點數已歸零，請盡快購買點數以繼續預約課程。`,
+    ];
+
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token) return res.status(500).json({ message: "LINE_CHANNEL_ACCESS_TOKEN 未設定" });
+
+    const results: { scenario: number; status: number; body: string }[] = [];
+    for (let i = 0; i < scenarios.length; i++) {
+      await new Promise((r) => setTimeout(r, 500)); // 避免 rate limit
+      const apiRes = await fetch("https://api.line.me/v2/bot/message/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ to: LINE_USER_ID, messages: [{ type: "text", text: scenarios[i] }] }),
+      });
+      const body = await apiRes.text();
+      results.push({ scenario: i + 1, status: apiRes.status, body });
+    }
+    res.json({ results });
+  });
+
   app.post("/api/credential-login", async (req: any, res) => {
     try {
       const { username, password } = req.body;
