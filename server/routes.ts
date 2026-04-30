@@ -6,6 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import twilio from "twilio";
 import { users } from "@shared/models/auth";
 import { coaches, franchises, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
 import { eq, and, or } from "drizzle-orm";
@@ -145,20 +146,38 @@ function toE164Taiwan(phone: string): string {
   return "+" + cleaned;
 }
 
-function getTwilioClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!accountSid || !authToken) return null;
-  const twilio = require("twilio");
-  return twilio(accountSid, authToken);
+interface DevOtpRecord {
+  otp: string;
+  expiresAt: number;
+  sentAt: number;
+  attempts: number;
+}
+const devOtpStore = new Map<string, DevOtpRecord>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [phone, record] of devOtpStore.entries()) {
+    if (now > record.expiresAt) devOtpStore.delete(phone);
+  }
+}, 10 * 60_000);
+
+function hasTwilioCredentials(): boolean {
+  return !!(
+    process.env.TWILIO_ACCOUNT_SID &&
+    process.env.TWILIO_AUTH_TOKEN &&
+    process.env.TWILIO_VERIFY_SERVICE_SID
+  );
 }
 
 async function sendTwilioOtp(phone: string): Promise<void> {
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-  const client = getTwilioClient();
-  if (!client || !serviceSid) {
-    throw new Error("簡訊服務未設定，請聯絡系統管理員");
+  if (!hasTwilioCredentials()) {
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const now = Date.now();
+    devOtpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
+    console.log(`[DEV FALLBACK] OTP for ${phone}: ${otp}`);
+    return;
   }
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID!;
+  const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
   const e164 = toE164Taiwan(phone);
   await client.verify.v2.services(serviceSid).verifications.create({
     to: e164,
@@ -167,11 +186,21 @@ async function sendTwilioOtp(phone: string): Promise<void> {
 }
 
 async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-  const client = getTwilioClient();
-  if (!client || !serviceSid) {
-    throw new Error("簡訊服務未設定，請聯絡系統管理員");
+  if (!hasTwilioCredentials()) {
+    const now = Date.now();
+    const record = devOtpStore.get(phone);
+    if (!record) return false;
+    if (now > record.expiresAt) { devOtpStore.delete(phone); return false; }
+    if (record.attempts >= 3) { devOtpStore.delete(phone); return false; }
+    if (record.otp !== String(code)) {
+      devOtpStore.set(phone, { ...record, attempts: record.attempts + 1 });
+      return false;
+    }
+    devOtpStore.delete(phone);
+    return true;
   }
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID!;
+  const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
   const e164 = toE164Taiwan(phone);
   const check = await client.verify.v2.services(serviceSid).verificationChecks.create({
     to: e164,
