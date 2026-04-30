@@ -26,18 +26,13 @@ export function PreClassReminder() {
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              {/* Hero 色條 */}
-              <div className="card-hero" style={{ background: 'linear-gradient(135deg, #FFB7B2 0%, #f0847c 100%)' }}>
-                <div className="card-hero-icon">⏰</div>
-                <div className="card-hero-text">
-                  <div className="card-hero-title">上課提醒</div>
-                  <div className="card-hero-sub">距離開課還有 2 小時</div>
+              {/* IP 角色 + 說話泡泡 */}
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #FFB7B2 0%, #f0847c 100%)' }}>
+                <img className="card-ip-img" src={ipChar} alt="質數先生" />
+                <div className="ip-speech-bubble">
+                  <div className="ip-speech-title" style={{ color: '#e06860' }}>上課提醒</div>
+                  <div className="ip-speech-sub" style={{ color: '#f0847c' }}>距離開課還有 2 小時</div>
                 </div>
-              </div>
-
-              {/* IP 角色 */}
-              <div className="card-ip-banner" style={{ background: 'linear-gradient(180deg, #fff4f3 0%, #fff9f9 100%)' }}>
-                <img src={ipChar} alt="質數先生" />
               </div>
 
               <div className="card-body">

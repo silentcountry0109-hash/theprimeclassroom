@@ -26,18 +26,18 @@ export function CourseCancel() {
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              {/* Hero 色條 */}
-              <div className="card-hero" style={{ background: 'linear-gradient(135deg, #78909C 0%, #546E7A 100%)' }}>
-                <div className="card-hero-icon">😢</div>
-                <div className="card-hero-text">
-                  <div className="card-hero-title">課程已取消</div>
-                  <div className="card-hero-sub">點數已退回，期待下次見！</div>
+              {/* IP 角色 + 說話泡泡 */}
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #90A4AE 0%, #546E7A 100%)' }}>
+                <img
+                  className="card-ip-img"
+                  src={ipChar}
+                  alt="質數先生"
+                  style={{ filter: 'grayscale(50%) opacity(0.85) drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
+                />
+                <div className="ip-speech-bubble">
+                  <div className="ip-speech-title" style={{ color: '#546E7A' }}>課程取消通知</div>
+                  <div className="ip-speech-sub" style={{ color: '#78909C' }}>點數已退回，期待下次見！</div>
                 </div>
-              </div>
-
-              {/* IP 角色 — 灰階版傳達遺憾感 */}
-              <div className="card-ip-banner" style={{ background: 'linear-gradient(180deg, #f4f5f6 0%, #f9f9fa 100%)' }}>
-                <img src={ipChar} alt="質數先生" style={{ filter: 'grayscale(60%) opacity(0.8)' }} />
               </div>
 
               <div className="card-body">
