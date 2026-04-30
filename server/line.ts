@@ -1,15 +1,56 @@
+// ─── Token 自動管理 ────────────────────────────────────────────────────────
+let _cachedToken: string | null = null;
+let _tokenExpiresAt = 0;
+
+async function getLineToken(): Promise<string | null> {
+  // 如果快取 token 還有 1 小時以上則直接使用
+  if (_cachedToken && Date.now() < _tokenExpiresAt - 3600_000) return _cachedToken;
+
+  // 優先用環境變數（若正確設定且不是 32 字元的 secret）
+  const envToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (envToken && envToken.length > 50) {
+    _cachedToken = envToken;
+    _tokenExpiresAt = Date.now() + 30 * 24 * 3600_000; // 假設 30 天
+    return _cachedToken;
+  }
+
+  // 自動用 Channel ID + Secret 取 short-lived token
+  const channelId = process.env.LINE_CHANNEL_ID || "2009852161";
+  const channelSecret = process.env.LINE_CHANNEL_SECRET;
+  if (!channelSecret) { console.error("[LINE] 缺少 LINE_CHANNEL_SECRET"); return null; }
+
+  try {
+    const res = await fetch("https://api.line.me/v2/oauth/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=client_credentials&client_id=${channelId}&client_secret=${channelSecret}`,
+    });
+    if (!res.ok) { console.error("[LINE] Token 取得失敗:", await res.text()); return null; }
+    const data = await res.json() as { access_token: string; expires_in: number };
+    _cachedToken = data.access_token;
+    _tokenExpiresAt = Date.now() + data.expires_in * 1000;
+    console.log(`[LINE] 已自動取得 Access Token (expires in ${Math.floor(data.expires_in / 86400)} 天)`);
+    return _cachedToken;
+  } catch (err) {
+    console.error("[LINE] Token 取得失敗:", err);
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export async function sendLineMessage(lineUserId: string, message: string): Promise<void> {
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const token = await getLineToken();
   if (!token || !lineUserId) return;
   try {
-    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+    const res = await fetch("https://api.line.me/v2/bot/message/multicast", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({
-        to: lineUserId,
+        to: [lineUserId],
         messages: [{ type: "text", text: message }],
       }),
     });
@@ -27,17 +68,17 @@ export async function sendLineFlexMessage(
   altText: string,
   contents: object
 ): Promise<void> {
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const token = await getLineToken();
   if (!token || !lineUserId) return;
   try {
-    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+    const res = await fetch("https://api.line.me/v2/bot/message/multicast", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({
-        to: lineUserId,
+        to: [lineUserId],
         messages: [{ type: "flex", altText, contents }],
       }),
     });
@@ -56,28 +97,49 @@ export async function sendLineFlexMessages(
   lineUserId: string,
   messages: Array<{ altText: string; contents: object }>
 ): Promise<void> {
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const token = await getLineToken();
   if (!token || !lineUserId) return;
-  console.log(`[LINE Flex] token length=${token.length} starts=${token.slice(0,6)} ends=${token.slice(-6)}`);
+  const MULTICAST_URL = "https://api.line.me/v2/bot/message/multicast";
+  const reqBody = JSON.stringify({
+    to: [lineUserId],
+    messages: messages.map(({ altText, contents }) => ({
+      type: "flex",
+      altText,
+      contents,
+    })),
+  });
+  console.log(`[LINE Flex Multi] calling ${MULTICAST_URL} with ${messages.length} msgs, token[0:10]=${token.slice(0,10)}, bodyLen=${reqBody.length}`);
   try {
-    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+    const res = await fetch(MULTICAST_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        to: lineUserId,
-        messages: messages.map(({ altText, contents }) => ({
-          type: "flex",
-          altText,
-          contents,
-        })),
-      }),
+      body: reqBody,
     });
     if (!res.ok) {
-      const body = await res.text();
-      console.error(`[LINE Flex Multi] API error ${res.status}:`, body);
+      const errBody = await res.text();
+      console.error(`[LINE Flex Multi] API error ${res.status}:`, errBody);
+      // 若 403，清除快取 token 並重試一次
+      if (res.status === 403) {
+        console.log("[LINE Flex Multi] 清除 token 快取並重試...");
+        _cachedToken = null;
+        _tokenExpiresAt = 0;
+        const freshToken = await getLineToken();
+        if (freshToken) {
+          const res2 = await fetch(MULTICAST_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${freshToken}` },
+            body: reqBody,
+          });
+          if (!res2.ok) {
+            console.error(`[LINE Flex Multi] 重試失敗 ${res2.status}:`, await res2.text());
+          } else {
+            console.log(`[LINE Flex Multi] 重試成功！Sent ${messages.length} messages`);
+          }
+        }
+      }
     } else {
       console.log(`[LINE Flex Multi] Sent ${messages.length} messages OK`);
     }
@@ -87,7 +149,7 @@ export async function sendLineFlexMessages(
 }
 
 export async function sendLineReply(replyToken: string, message: string): Promise<void> {
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const token = await getLineToken();
   if (!token) { console.error("[LINE Reply] No access token"); return; }
   try {
     const res = await fetch("https://api.line.me/v2/bot/message/reply", {

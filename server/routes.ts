@@ -4007,11 +4007,49 @@ export async function registerRoutes(
   // === 暫時測試路由：發送 LINE Flex Message 三張範例 ===
   app.post("/api/dev/send-flex-test", async (req, res) => {
     const lineUserId = "Uecb97d0ef5b5bfa232d24893c35bfa42";
+    const channelId = process.env.LINE_CHANNEL_ID || "2009852161";
+    const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
+
+    // 每次都取新 token（完全不 cache）
+    const tokenRes = await fetch("https://api.line.me/v2/oauth/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=client_credentials&client_id=${channelId}&client_secret=${channelSecret}`,
+    });
+    const tokenData = await tokenRes.json() as { access_token: string };
+    const token = tokenData.access_token;
+    console.log(`[TEST] fresh token[0:10]=${token.slice(0,10)}, len=${token.length}, last10=${token.slice(-10)}`);
+
     const booking = buildBookingSuccessFlex({ childName: "陳小明", date: "2026/05/03（日）", time: "10:00 – 11:00", teacher: "林老師", location: "台北信義分校", credits: 5 });
     const reminder = buildPreClassReminderFlex({ childName: "陳小明", date: "2026/05/03（日）", time: "10:00 – 11:00", teacher: "林老師", location: "台北信義分校", hoursUntil: 2 });
     const cancel = buildCourseCancelFlex({ childName: "陳小明", date: "2026/05/03（日）", time: "10:00 – 11:00", teacher: "林老師", credits: 6 });
-    await sendLineFlexMessages(lineUserId, [booking, reminder, cancel]);
-    res.json({ ok: true });
+
+    const flexMessages = [booking, reminder, cancel].map(({ altText, contents }) => ({ type: "flex", altText, contents }));
+    // broadcast 不需要 to 欄位
+    const body = JSON.stringify({ messages: flexMessages });
+    console.log(`[TEST] body len=${body.length}`);
+
+    // 用 curl 子行程發送（確認 curl 能成功）
+    const { execSync } = await import("child_process");
+    const fs = await import("fs");
+    const tmpFile = `/tmp/line-flex-${Date.now()}.json`;
+    fs.writeFileSync(tmpFile, body, "utf-8");
+    try {
+      const curlOut = execSync(
+        `curl -s -w "\\n%{http_code}" -X POST "https://api.line.me/v2/bot/message/broadcast" ` +
+        `-H "Content-Type: application/json" ` +
+        `-H "Authorization: Bearer ${token}" ` +
+        `-d @${tmpFile}`,
+        { timeout: 10000 }
+      ).toString();
+      const lines = curlOut.trim().split("\n");
+      const statusCode = parseInt(lines[lines.length - 1]);
+      const responseBody = lines.slice(0, -1).join("\n");
+      console.log(`[TEST] curl result: ${statusCode} ${responseBody}`);
+      res.json({ ok: statusCode === 200, status: statusCode, body: responseBody });
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
   });
   // === END 暫時測試路由 ===
 
