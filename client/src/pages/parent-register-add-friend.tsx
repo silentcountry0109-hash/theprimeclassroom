@@ -19,7 +19,14 @@ export default function ParentRegisterAddFriend() {
     }
   }, [user, isLoading, navigate]);
 
-  const lineOaUrl = import.meta.env.VITE_LINE_OA_URL || "https://line.me/R/ti/p/@643apwlp";
+  const lineOaUrlDesktop = import.meta.env.VITE_LINE_OA_URL || "https://line.me/R/ti/p/@643apwlp";
+  const lineOaUrlMobile = import.meta.env.VITE_LINE_OA_MOBILE_URL || "line://ti/p/@643apwlp";
+
+  const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    typeof navigator !== "undefined" ? navigator.userAgent : ""
+  );
+
+  const lineOaUrl = isMobile ? lineOaUrlMobile : lineOaUrlDesktop;
 
   return (
     <div className="min-h-screen bg-washi flex items-center justify-center px-4 py-8 relative overflow-hidden">
