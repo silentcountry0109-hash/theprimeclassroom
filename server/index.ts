@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { sendLineMessage } from "./line";
 
 const app = express();
 const httpServer = createServer(app);
@@ -77,6 +78,100 @@ app.use((req, res, next) => {
     } catch (e) {
     }
   }, 60 * 1000);
+
+  // ─── 上課前 2 小時提醒 cron job ───────────────────────────────────────────
+  const notifiedBookingIds = new Set<number>();
+
+  async function runPreClassReminder() {
+    try {
+      const { db } = await import("./db");
+      const { bookings, timeSlots, users: usersTable, children: childrenTable, coaches: coachesTable, franchises: franchisesTable } = await import("@shared/schema");
+      const { eq, and, inArray } = await import("drizzle-orm");
+
+      const nowTw = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+      const todayStr = `${nowTw.getFullYear()}-${String(nowTw.getMonth() + 1).padStart(2, "0")}-${String(nowTw.getDate()).padStart(2, "0")}`;
+
+      // 目標時間：現在 +2 小時（台灣時間），視窗 ±30 分鐘
+      const target = new Date(nowTw.getTime() + 2 * 60 * 60 * 1000);
+      const winStart = new Date(target.getTime() - 30 * 60 * 1000);
+      const winEnd = new Date(target.getTime() + 30 * 60 * 1000);
+      const pad2 = (n: number) => String(n).padStart(2, "0");
+      const winStartStr = `${pad2(winStart.getHours())}:${pad2(winStart.getMinutes())}`;
+      const winEndStr = `${pad2(winEnd.getHours())}:${pad2(winEnd.getMinutes())}`;
+
+      // 查詢今日 confirmed 的預約，只撈需要的欄位
+      const rows = await db
+        .select({
+          bookingId: bookings.id,
+          parentId: bookings.parentId,
+          childId: bookings.childId,
+          slotStart: timeSlots.startTime,
+          slotEnd: timeSlots.endTime,
+          franchiseId: timeSlots.franchiseId,
+          coachId: timeSlots.coachId,
+        })
+        .from(bookings)
+        .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+        .where(
+          and(
+            eq(timeSlots.date, todayStr),
+            inArray(bookings.status, ["confirmed"]),
+          )
+        );
+
+      // 篩選在提醒視窗內的預約
+      const inWindow = rows.filter((r) => {
+        const t = r.slotStart || "";
+        return t >= winStartStr && t <= winEndStr;
+      });
+
+      for (const row of inWindow) {
+        if (!row.parentId || notifiedBookingIds.has(row.bookingId)) continue;
+        notifiedBookingIds.add(row.bookingId);
+
+        try {
+          const [parentRow] = await db
+            .select({ lineUserId: usersTable.lineUserId })
+            .from(usersTable)
+            .where(eq(usersTable.id, row.parentId));
+          if (!parentRow?.lineUserId) continue;
+
+          // 取得孩子名字
+          let childName = "孩子";
+          if (row.childId) {
+            const [childRow] = await db.select({ name: childrenTable.name }).from(childrenTable).where(eq(childrenTable.id, row.childId));
+            childName = childRow?.name || "孩子";
+          }
+
+          // 取得老師名字
+          let coachName = "";
+          if (row.coachId) {
+            const [coachRow] = await db.select({ name: coachesTable.name }).from(coachesTable).where(eq(coachesTable.id, row.coachId));
+            coachName = coachRow?.name || "";
+          }
+
+          // 取得分校名字
+          let franchiseName = "教室";
+          if (row.franchiseId) {
+            const [frRow] = await db.select({ name: franchisesTable.name }).from(franchisesTable).where(eq(franchisesTable.id, row.franchiseId));
+            franchiseName = frRow?.name || "教室";
+          }
+
+          const msg = `【質數教室】⏰ 上課提醒\n${childName} 今天 ${row.slotStart}–${row.slotEnd} 有課${coachName ? `\n老師：${coachName}` : ""}\n地點：${franchiseName}\n請準時出席！`;
+          await sendLineMessage(parentRow.lineUserId, msg);
+          log(`[PreClassReminder] 已提醒 parentId=${row.parentId} bookingId=${row.bookingId}`);
+        } catch (e) {
+          log(`[PreClassReminder] 提醒失敗 bookingId=${row.bookingId}: ${e}`);
+        }
+      }
+    } catch (e) {
+      log(`[PreClassReminder] cron 執行失敗: ${e}`);
+    }
+  }
+
+  runPreClassReminder();
+  setInterval(runPreClassReminder, 60 * 60 * 1000);
+  // ─────────────────────────────────────────────────────────────────────────
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

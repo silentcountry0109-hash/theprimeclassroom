@@ -42,6 +42,7 @@ import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { sendLineMessage } from "./line";
 
 export interface IStorage {
   getCoaches(): Promise<Coach[]>;
@@ -2294,13 +2295,24 @@ export class DatabaseStorage implements IStorage {
           console.error("Refund failed for booking", b.id, refundErr);
         }
 
+        const notifMsg = `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂。`;
         await db.insert(notifications).values({
           userId: b.parentId,
           type: "slot_cancelled",
           title: "課程已取消",
-          message: `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂。`,
+          message: notifMsg,
           isRead: false,
         });
+
+        // LINE 推播給家長
+        try {
+          const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, b.parentId));
+          if (parentUser?.lineUserId) {
+            const newBalance = await this.getParentBalance(b.parentId);
+            const lineMsg = `【質數教室】❌ 課程已取消\n${b.childName} 在 ${slot.date} ${slot.startTime}–${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂，剩餘 ${newBalance} 堂。`;
+            await sendLineMessage(parentUser.lineUserId, lineMsg);
+          }
+        } catch (_) {}
       }
     }
   }

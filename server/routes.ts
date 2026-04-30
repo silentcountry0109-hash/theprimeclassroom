@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import twilio from "twilio";
 import { users } from "@shared/models/auth";
-import { coaches, franchises, creditPurchases, creditBalances, timeSlots, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
+import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
 import { eq, and, or } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -18,6 +18,7 @@ import express from "express";
 import { generateCoachHeadshotFromBuffer } from "./gemini-image";
 import { generateFranchiseDescription } from "./gemini-text";
 import { objectStorageClient } from "./replit_integrations/object_storage";
+import { sendLineMessage, sendLineReply } from "./line";
 
 interface PgUniqueViolation {
   code: "23505";
@@ -258,39 +259,6 @@ async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
     code: String(code),
   });
   return check.status === "approved";
-}
-async function sendLineMessage(lineUserId: string, message: string): Promise<void> {
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  if (!token || !lineUserId) return;
-  try {
-    await fetch("https://api.line.me/v2/bot/message/push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-      body: JSON.stringify({ to: lineUserId, messages: [{ type: "text", text: message }] }),
-    });
-  } catch (err) {
-    console.error("[LINE Push] Failed:", err);
-  }
-}
-
-async function sendLineReply(replyToken: string, message: string): Promise<void> {
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  if (!token) { console.error("[LINE Reply] No access token"); return; }
-  try {
-    const res = await fetch("https://api.line.me/v2/bot/message/reply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-      body: JSON.stringify({ replyToken, messages: [{ type: "text", text: message }] }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`[LINE Reply] API error ${res.status}:`, body);
-    } else {
-      console.log("[LINE Reply] Sent OK:", message.slice(0, 30));
-    }
-  } catch (err) {
-    console.error("[LINE Reply] Failed:", err);
-  }
 }
 
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -968,20 +936,47 @@ export async function registerRoutes(
       try {
         const child = kids.find((k: any) => k.id === req.body.childId);
         const childName = child?.name || "新學生";
-        const slotDate = slot.date;
+        const slotDateStr = slot.date;
         const slotTime = `${slot.startTime}–${slot.endTime}`;
+        const franchise = await storage.getFranchise(slot.franchiseId);
+        const franchiseName = franchise?.name || "教室";
+
+        // 通知：家長（預約成立）
+        const newBalance = await storage.getParentBalance(userId);
+        const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, userId));
+        if (parentUser?.lineUserId) {
+          let coachName = "";
+          if (slot.coachId) {
+            const [coachRec] = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, slot.coachId));
+            coachName = coachRec?.name || "";
+          }
+          const parentMsg = `【質數教室】✅ 預約成功！\n日期：${slotDateStr}\n時間：${slotTime}\n${coachName ? `老師：${coachName}\n` : ""}地點：${franchiseName}\n目前剩餘 ${newBalance} 堂`;
+          await sendLineMessage(parentUser.lineUserId, parentMsg);
+        }
+
+        // 點數不足提醒
+        if (parentUser?.lineUserId && newBalance <= 1) {
+          const warnMsg = newBalance === 0
+            ? `【質數教室】🔴 點數已用完\n請盡快至 App 購買點數，確保課程不中斷。`
+            : `【質數教室】⚠️ 點數提醒\n${childName} 的點數僅剩 1 堂，請盡快購買以免影響課程。`;
+          await sendLineMessage(parentUser.lineUserId, warnMsg);
+        }
+
+        // 通知：分校主任
         const [directorUser] = await db.select().from(users).where(and(eq(users.franchiseId, slot.franchiseId), eq(users.role, "franchise_admin")));
         if (directorUser) {
-          const msg = `【質數教室】新生預約通知\n${childName} 已預約 ${slotDate} ${slotTime} 的課程，請確認安排。`;
-          await storage.createNotification({ userId: directorUser.id, type: "new_booking", title: "新生預約通知", message: `${childName} 已預約 ${slotDate} ${slotTime} 的課程，請確認安排。` });
+          const msg = `【質數教室】新生預約通知\n${childName} 已預約 ${slotDateStr} ${slotTime} 的課程，請確認安排。`;
+          await storage.createNotification({ userId: directorUser.id, type: "new_booking", title: "新生預約通知", message: `${childName} 已預約 ${slotDateStr} ${slotTime} 的課程，請確認安排。` });
           if (directorUser.lineUserId) await sendLineMessage(directorUser.lineUserId, msg);
         }
+
+        // 通知：老師
         if (slot.coachId) {
           const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, slot.coachId));
           if (coachRec?.userId) {
             const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
-            const msg = `【質數教室】新課程預約\n新學生 ${childName} 將在 ${slotDate} ${slotTime} 出席您的課程。`;
-            await storage.createNotification({ userId: coachRec.userId, type: "new_booking", title: "新課程預約", message: `新學生 ${childName} 將在 ${slotDate} ${slotTime} 出席您的課程。` });
+            const msg = `【質數教室】新課程預約\n新學生 ${childName} 將在 ${slotDateStr} ${slotTime} 出席您的課程。`;
+            await storage.createNotification({ userId: coachRec.userId, type: "new_booking", title: "新課程預約", message: `新學生 ${childName} 將在 ${slotDateStr} ${slotTime} 出席您的課程。` });
             if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, msg);
           }
         }
@@ -1036,6 +1031,36 @@ export async function registerRoutes(
           results.push({ slotId, success: false, message: err.message });
         }
       }
+
+      // 通知：家長（連排預約確認）
+      try {
+        const successSlotIds = results.filter(r => r.success).map(r => r.slotId);
+        if (successSlotIds.length > 0) {
+          const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, userId));
+          if (parentUser?.lineUserId) {
+            const child = kids.find((k: any) => k.id === childId);
+            const childName = child?.name || "孩子";
+            const newBalance = await storage.getParentBalance(userId);
+            const slotSummary = await Promise.all(
+              successSlotIds.slice(0, 5).map(async (sid) => {
+                const s = await storage.getSlot(sid);
+                return s ? `${s.date} ${s.startTime}–${s.endTime}` : "";
+              })
+            );
+            const moreCount = successSlotIds.length > 5 ? `\n…等共 ${successSlotIds.length} 堂` : "";
+            const parentMsg = `【質數教室】✅ 連排預約成功！\n${childName} 已預約 ${successSlotIds.length} 堂課程：\n${slotSummary.filter(Boolean).join("\n")}${moreCount}\n目前剩餘 ${newBalance} 堂`;
+            await sendLineMessage(parentUser.lineUserId, parentMsg);
+
+            if (newBalance <= 1) {
+              const warnMsg = newBalance === 0
+                ? `【質數教室】🔴 點數已用完\n請盡快至 App 購買點數，確保課程不中斷。`
+                : `【質數教室】⚠️ 點數提醒\n${childName} 的點數僅剩 1 堂，請盡快購買以免影響課程。`;
+              await sendLineMessage(parentUser.lineUserId, warnMsg);
+            }
+          }
+        }
+      } catch (_) {}
+
       res.json({ results });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to create recurring bookings" });
@@ -1104,6 +1129,18 @@ export async function registerRoutes(
       } catch (refundErr) {
         console.error("Credit refund failed for booking", bookingId, refundErr);
       }
+
+      // 通知：家長（取消確認）
+      try {
+        const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, userId));
+        if (parentUser?.lineUserId) {
+          const newBalance = await storage.getParentBalance(userId);
+          const slotEndTime = target.slotEndTime || "";
+          const cancelMsg = `【質數教室】❌ 課程已取消\n日期：${slotDate}\n時間：${slotStartTime}–${slotEndTime}\n點數已退回，剩餘 ${newBalance} 堂`;
+          await sendLineMessage(parentUser.lineUserId, cancelMsg);
+        }
+      } catch (_) {}
+
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to cancel booking" });
@@ -2644,6 +2681,23 @@ export async function registerRoutes(
         const effectiveCoachId = parseInt(coachIdStr) || req.coach.id;
         await storage.updateCoachDailyRecord(effectiveCoachId, date);
       }
+
+      // 通知：家長（聯絡簿已填寫）
+      try {
+        const notifiedParents = new Set<string>();
+        for (const entry of entries) {
+          if (!entry.childId) continue;
+          const [childRow] = await db.select({ parentId: children.parentId, name: children.name }).from(children).where(eq(children.id, entry.childId));
+          if (!childRow?.parentId || notifiedParents.has(childRow.parentId)) continue;
+          notifiedParents.add(childRow.parentId);
+          const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, childRow.parentId));
+          if (parentUser?.lineUserId) {
+            const contactMsg = `【質數教室】📒 聯絡簿通知\n${childRow.name} 今日課後紀錄已填寫\n老師 ${req.coach.name} 已完成記錄\n請至 App 查看詳情`;
+            await sendLineMessage(parentUser.lineUserId, contactMsg);
+          }
+        }
+      } catch (_) {}
+
       res.json(results);
     } catch (error) {
       console.error("[contact-books POST]", error);
