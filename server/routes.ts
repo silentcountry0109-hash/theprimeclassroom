@@ -162,6 +162,26 @@ setInterval(() => {
 
 const isDev = process.env.NODE_ENV === "development";
 
+const otpRateLimitStore = new Map<string, number>();
+setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [key, ts] of otpRateLimitStore.entries()) {
+    if (ts < cutoff) otpRateLimitStore.delete(key);
+  }
+}, 5 * 60_000);
+
+function checkOtpRateLimit(phone: string): number {
+  const last = otpRateLimitStore.get(phone);
+  if (!last) return 0;
+  const elapsed = Date.now() - last;
+  if (elapsed < 60_000) return Math.ceil((60_000 - elapsed) / 1000);
+  return 0;
+}
+
+function recordOtpSend(phone: string): void {
+  otpRateLimitStore.set(phone, Date.now());
+}
+
 function hasTwilioCredentials(): boolean {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&
@@ -444,14 +464,12 @@ export async function registerRoutes(
       if (!phone || !/^09\d{8}$/.test(phone)) {
         return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
       }
-      if (isDev && !hasTwilioCredentials()) {
-        const existing = devOtpStore.get(phone);
-        if (existing && Date.now() - existing.sentAt < 60_000) {
-          const remaining = Math.ceil((60_000 - (Date.now() - existing.sentAt)) / 1000);
-          return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
-        }
+      const wait = checkOtpRateLimit(phone);
+      if (wait > 0) {
+        return res.status(429).json({ message: `請等待 ${wait} 秒後再重新發送` });
       }
       await sendTwilioOtp(phone);
+      recordOtpSend(phone);
       return res.json({ message: "驗證碼已發送" });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "發送失敗，請稍後再試";
@@ -464,6 +482,9 @@ export async function registerRoutes(
       const { username, password, firstName, email, phone, address, referralSource, otp } = req.body;
       if (!username || !password || !firstName || !phone || !email) {
         return res.status(400).json({ message: "請填寫所有必填欄位" });
+      }
+      if (!/^09\d{8}$/.test(phone)) {
+        return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
       }
       if (!otp) {
         return res.status(400).json({ message: "請先完成手機驗證" });
@@ -636,14 +657,12 @@ export async function registerRoutes(
       if (!phone || !/^09\d{8}$/.test(phone)) {
         return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
       }
-      if (isDev && !hasTwilioCredentials()) {
-        const existing = devOtpStore.get(phone);
-        if (existing && Date.now() - existing.sentAt < 60_000) {
-          const remaining = Math.ceil((60_000 - (Date.now() - existing.sentAt)) / 1000);
-          return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
-        }
+      const wait = checkOtpRateLimit(phone);
+      if (wait > 0) {
+        return res.status(429).json({ message: `請等待 ${wait} 秒後再重新發送` });
       }
       await sendTwilioOtp(phone);
+      recordOtpSend(phone);
       res.json({ message: "驗證碼已發送" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "發送失敗，請稍後再試";
@@ -656,7 +675,10 @@ export async function registerRoutes(
       const userId = getSessionUserId(req);
       if (!userId) return res.status(401).json({ message: "請先登入" });
       const { phone, otp } = req.body;
-      if (!phone || !otp) return res.status(400).json({ message: "缺少必要欄位" });
+      if (!phone || !/^09\d{8}$/.test(phone)) {
+        return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
+      }
+      if (!otp) return res.status(400).json({ message: "缺少必要欄位" });
       let approved = false;
       try {
         approved = await checkTwilioOtp(phone, otp);
