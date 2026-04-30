@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   managedFranchiseIds: integer("managed_franchise_ids").array(),
   mustChangePassword: boolean("must_change_password").default(false),
   lineUserId: varchar("line_user_id"),
+  lineRegistrationComplete: boolean("line_registration_complete").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

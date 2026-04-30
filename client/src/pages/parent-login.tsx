@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,8 @@ const REFERRAL_OPTIONS = [
 
 export default function ParentLogin() {
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const urlError = new URLSearchParams(search).get("error");
   const [mode, setMode] = useState<"login" | "register">("login");
   const savedUsername = localStorage.getItem("rememberedParentUsername") || "";
   const [username, setUsername] = useState(savedUsername);
@@ -310,7 +312,44 @@ export default function ParentLogin() {
                   {loading ? "登入中..." : "登入"}
                 </Button>
               </form>
-            ) : (
+            ) : null}
+
+            {urlError && (
+              <p className="mt-3 text-sm text-red-500 bg-red-50 rounded-md px-3 py-2 text-center" data-testid="text-line-error">
+                {urlError === "line_not_configured" && "LINE 登入尚未開放，請使用帳號密碼登入"}
+                {urlError === "line_denied" && "您取消了 LINE 授權"}
+                {urlError === "line_state" && "LINE 授權驗證失敗，請再試一次"}
+                {urlError === "line_token" && "LINE 登入失敗，請稍後再試"}
+                {urlError === "line_profile" && "無法取得 LINE 個人資料，請稍後再試"}
+                {urlError === "line_server" && "LINE 登入發生錯誤，請稍後再試"}
+                {!["line_not_configured","line_denied","line_state","line_token","line_profile","line_server"].includes(urlError || "") && "登入發生錯誤，請稍後再試"}
+              </p>
+            )}
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-muted-foreground">或</span>
+              </div>
+            </div>
+
+            <a
+              href="/api/auth/line"
+              data-testid="button-line-login"
+              className="flex items-center justify-center gap-2.5 w-full py-2.5 px-4 rounded-lg border text-sm font-medium transition-colors hover:bg-green-50 hover:border-[#06C755]"
+              style={{ borderColor: "#06C755", color: "#06C755" }}
+            >
+              <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
+                <rect width="40" height="40" rx="8" fill="#06C755" />
+                <path d="M20 8C13.373 8 8 12.722 8 18.5c0 4.697 3.119 8.76 7.637 10.433.334.121.79.372.907.854.103.44.067 1.125.033 1.566l-.147.882c-.044.268-.203 1.048.918.572C18.72 31.788 27.2 26.25 29.94 23.1 31.9 20.9 32 19.75 32 18.5 32 12.722 26.627 8 20 8z" fill="white" />
+                <path d="M17.333 21.333h-2.666a.667.667 0 0 1-.667-.666v-5.334c0-.368.299-.666.667-.666.368 0 .666.298.666.666v4.667h2c.368 0 .667.298.667.666a.667.667 0 0 1-.667.667zM22 20.667a.667.667 0 0 1-.667.666h-2.666a.667.667 0 0 1-.667-.666v-5.334c0-.368.299-.666.667-.666h2.666c.368 0 .667.298.667.666a.667.667 0 0 1-.667.667H19.333v1.333h1.333c.368 0 .667.299.667.667a.667.667 0 0 1-.667.667H19.333V20h1.333c.368.001.667.3.334.667zm7.333-4.667c0 .368-.298.667-.666.667h-2v1.333h2c.368 0 .666.299.666.667a.667.667 0 0 1-.666.666h-2V20h2c.368 0 .666.299.666.667a.667.667 0 0 1-.666.666H26a.667.667 0 0 1-.667-.666v-5.334c0-.368.299-.666.667-.666h2.667c.368 0 .666.298.666.666z" fill="#06C755" />
+              </svg>
+              使用 LINE 帳號登入 / 註冊
+            </a>
+
+            {mode === "login" ? null : (
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
                   <Label htmlFor="reg-name" className="text-sm">姓名 <span className="text-coral">*</span></Label>

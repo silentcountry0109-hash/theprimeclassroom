@@ -515,6 +515,165 @@ export async function registerRoutes(
     }
   });
 
+  // ── LINE Login OAuth ──────────────────────────────────────────────────────────
+
+  app.get("/api/auth/line", (req: any, res) => {
+    const channelId = process.env.LINE_CHANNEL_ID;
+    if (!channelId) {
+      return res.redirect("/parent-login?error=line_not_configured");
+    }
+    const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
+    const redirectUri = `${protocol}://${req.hostname}/api/auth/line/callback`;
+    const state = Math.random().toString(36).slice(2);
+    req.session.lineOAuthState = state;
+    req.session.save(() => {
+      const url = new URL("https://access.line.me/oauth2/v2.1/authorize");
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("client_id", channelId);
+      url.searchParams.set("redirect_uri", redirectUri);
+      url.searchParams.set("scope", "profile openid");
+      url.searchParams.set("state", state);
+      url.searchParams.set("bot_prompt", "normal");
+      res.redirect(url.toString());
+    });
+  });
+
+  app.get("/api/auth/line/callback", async (req: any, res) => {
+    try {
+      const { code, state, error } = req.query as Record<string, string>;
+      if (error) {
+        return res.redirect("/parent-login?error=line_denied");
+      }
+      if (!code || !state || state !== req.session.lineOAuthState) {
+        return res.redirect("/parent-login?error=line_state");
+      }
+      delete req.session.lineOAuthState;
+
+      const channelId = process.env.LINE_CHANNEL_ID!;
+      const channelSecret = process.env.LINE_CHANNEL_SECRET!;
+      const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
+      const redirectUri = `${protocol}://${req.hostname}/api/auth/line/callback`;
+
+      const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri,
+          client_id: channelId,
+          client_secret: channelSecret,
+        }),
+      });
+      if (!tokenRes.ok) {
+        console.error("[LINE OAuth] Token exchange failed:", await tokenRes.text());
+        return res.redirect("/parent-login?error=line_token");
+      }
+      const tokenData = await tokenRes.json() as { access_token: string };
+
+      const profileRes = await fetch("https://api.line.me/v2/profile", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      if (!profileRes.ok) {
+        return res.redirect("/parent-login?error=line_profile");
+      }
+      const profile = await profileRes.json() as { userId: string; displayName: string; pictureUrl?: string };
+
+      let user = await authStorage.getUserByLineUserId(profile.userId);
+
+      if (!user) {
+        user = await authStorage.upsertUser({
+          id: `line-${profile.userId}`,
+          lineUserId: profile.userId,
+          firstName: profile.displayName,
+          profileImageUrl: profile.pictureUrl ?? null,
+          role: "parent",
+          lineRegistrationComplete: false,
+        });
+      }
+
+      req.session.credentialUserId = user.id;
+      req.session.save(() => {
+        if (user!.lineRegistrationComplete) {
+          return res.redirect("/dashboard");
+        }
+        return res.redirect("/parent-register/add-friend");
+      });
+    } catch (err) {
+      console.error("[LINE OAuth] Callback error:", err);
+      res.redirect("/parent-login?error=line_server");
+    }
+  });
+
+  app.post("/api/auth/line/send-otp", async (req: any, res) => {
+    try {
+      const userId = getSessionUserId(req);
+      if (!userId) return res.status(401).json({ message: "請先登入" });
+      const { phone } = req.body;
+      if (!phone || !/^09\d{8}$/.test(phone)) {
+        return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
+      }
+      const now = Date.now();
+      const existing = otpStore.get(phone);
+      if (existing && now - existing.sentAt < 60_000) {
+        const remaining = Math.ceil((60_000 - (now - existing.sentAt)) / 1000);
+        return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
+      }
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      otpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
+      try {
+        await sendMitakeSms(phone, `【質數教室】您的驗證碼為 ${otp}，5 分鐘內有效，請勿告知他人。`);
+      } catch (smsError: unknown) {
+        otpStore.delete(phone);
+        const msg = smsError instanceof Error ? smsError.message : "簡訊發送失敗，請稍後再試";
+        return res.status(500).json({ message: msg });
+      }
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[DEV] LINE OTP for ${phone}: ${otp}`);
+      }
+      res.json({ message: "驗證碼已發送" });
+    } catch (err) {
+      res.status(500).json({ message: "發送失敗，請稍後再試" });
+    }
+  });
+
+  app.post("/api/auth/line/confirm-otp", async (req: any, res) => {
+    try {
+      const userId = getSessionUserId(req);
+      if (!userId) return res.status(401).json({ message: "請先登入" });
+      const { phone, otp } = req.body;
+      if (!phone || !otp) return res.status(400).json({ message: "缺少必要欄位" });
+      const now = Date.now();
+      const record = otpStore.get(phone);
+      if (!record) return res.status(400).json({ message: "請先發送驗證碼至手機" });
+      if (now > record.expiresAt) {
+        otpStore.delete(phone);
+        return res.status(400).json({ message: "驗證碼已過期，請重新發送" });
+      }
+      if (record.attempts >= 3) {
+        otpStore.delete(phone);
+        return res.status(400).json({ message: "驗證碼錯誤次數過多，請重新發送" });
+      }
+      if (record.otp !== String(otp)) {
+        otpStore.set(phone, { ...record, attempts: record.attempts + 1 });
+        const left = 3 - (record.attempts + 1);
+        return res.status(400).json({ message: `驗證碼不正確，還剩 ${left} 次機會` });
+      }
+      otpStore.delete(phone);
+      const [updated] = await db.update(users)
+        .set({ phone, lineRegistrationComplete: true, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "找不到使用者" });
+      const { passwordHash: _, ...safeUser } = updated;
+      req.session.save(() => res.json({ ...safeUser }));
+    } catch (err) {
+      res.status(500).json({ message: "驗證失敗，請稍後再試" });
+    }
+  });
+
+  // ── END LINE Login OAuth ───────────────────────────────────────────────────────
+
   app.post("/api/admin/create-credential-account", isAdmin, async (req: any, res) => {
     try {
       const { userId, username, password } = req.body;
