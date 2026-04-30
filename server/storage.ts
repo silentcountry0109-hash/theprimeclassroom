@@ -2312,7 +2312,7 @@ export class DatabaseStorage implements IStorage {
             const lineMsg = `【質數教室】❌ 課程已取消\n${b.childName} 在 ${slot.date} ${slot.startTime}–${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂，剩餘 ${newBalance} 堂。`;
             await sendLineMessage(parentUser.lineUserId, lineMsg);
           }
-        } catch (_) {}
+        } catch (e) { console.error("[LINE] cancelSlotBookingsAndNotify 通知失敗:", e); }
       }
     }
   }

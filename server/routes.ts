@@ -980,7 +980,7 @@ export async function registerRoutes(
             if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, msg);
           }
         }
-      } catch (_) {}
+      } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
       res.json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to create booking" });
@@ -1059,7 +1059,7 @@ export async function registerRoutes(
             }
           }
         }
-      } catch (_) {}
+      } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
 
       res.json({ results });
     } catch (error: any) {
@@ -1139,7 +1139,7 @@ export async function registerRoutes(
           const cancelMsg = `【質數教室】❌ 課程已取消\n日期：${slotDate}\n時間：${slotStartTime}–${slotEndTime}\n點數已退回，剩餘 ${newBalance} 堂`;
           await sendLineMessage(parentUser.lineUserId, cancelMsg);
         }
-      } catch (_) {}
+      } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -2365,6 +2365,25 @@ export async function registerRoutes(
         walkInSchool: walkInSchool || undefined,
         overrideCapacity: !!overrideCapacity,
       });
+
+      // 通知：若有家長 lineUserId，發送加排確認
+      if (result.parentId) {
+        const slot = await storage.getSlot(parseInt(slotId));
+        const franchise = slot ? await storage.getFranchise(slot.franchiseId) : null;
+        const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, result.parentId));
+        if (parentUser?.lineUserId && slot) {
+          let coachName = "";
+          if (slot.coachId) {
+            const [coachRec] = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, slot.coachId));
+            coachName = coachRec?.name || "";
+          }
+          const msg = `【質數教室】✅ 課程已加排\n日期：${slot.date}\n時間：${slot.startTime}–${slot.endTime}\n${coachName ? `老師：${coachName}\n` : ""}地點：${franchise?.name || "教室"}`;
+          await sendLineMessage(parentUser.lineUserId, msg).catch((e) =>
+            console.error("[LINE] manual-booking 家長通知失敗:", e)
+          );
+        }
+      }
+
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message || "加排失敗" });
@@ -2696,7 +2715,7 @@ export async function registerRoutes(
             await sendLineMessage(parentUser.lineUserId, contactMsg);
           }
         }
-      } catch (_) {}
+      } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
 
       res.json(results);
     } catch (error) {

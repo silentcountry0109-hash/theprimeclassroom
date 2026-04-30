@@ -89,17 +89,19 @@ app.use((req, res, next) => {
       const { eq, and, inArray } = await import("drizzle-orm");
 
       const nowTw = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
-      const todayStr = `${nowTw.getFullYear()}-${String(nowTw.getMonth() + 1).padStart(2, "0")}-${String(nowTw.getDate()).padStart(2, "0")}`;
 
-      // 目標時間：現在 +2 小時（台灣時間），視窗 ±30 分鐘
+      // 目標時間 = 台灣現在 + 2 小時；以目標時間的日期作為查詢基準，自然處理跨午夜情境
       const target = new Date(nowTw.getTime() + 2 * 60 * 60 * 1000);
+      const targetDateStr = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+
+      // 視窗 ±30 分鐘（以台灣時間的小時/分鐘計算）
       const winStart = new Date(target.getTime() - 30 * 60 * 1000);
       const winEnd = new Date(target.getTime() + 30 * 60 * 1000);
       const pad2 = (n: number) => String(n).padStart(2, "0");
       const winStartStr = `${pad2(winStart.getHours())}:${pad2(winStart.getMinutes())}`;
       const winEndStr = `${pad2(winEnd.getHours())}:${pad2(winEnd.getMinutes())}`;
 
-      // 查詢今日 confirmed 的預約，只撈需要的欄位
+      // 查詢目標日期的 confirmed 預約
       const rows = await db
         .select({
           bookingId: bookings.id,
@@ -114,12 +116,12 @@ app.use((req, res, next) => {
         .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
         .where(
           and(
-            eq(timeSlots.date, todayStr),
+            eq(timeSlots.date, targetDateStr),
             inArray(bookings.status, ["confirmed"]),
           )
         );
 
-      // 篩選在提醒視窗內的預約
+      // 篩選在提醒視窗內的預約（時間字串比較，課程時間通常在 08:00–22:00 不跨午夜）
       const inWindow = rows.filter((r) => {
         const t = r.slotStart || "";
         return t >= winStartStr && t <= winEndStr;
