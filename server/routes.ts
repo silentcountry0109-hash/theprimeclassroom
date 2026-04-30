@@ -138,41 +138,46 @@ async function deletePublicFile(photoUrl: string): Promise<void> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface OtpRecord {
-  otp: string;
-  expiresAt: number;
-  sentAt: number;
-  attempts: number;
+function toE164Taiwan(phone: string): string {
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.startsWith("09")) return "+886" + cleaned.slice(1);
+  if (cleaned.startsWith("886")) return "+" + cleaned;
+  return "+" + cleaned;
 }
-const otpStore = new Map<string, OtpRecord>();
-setInterval(() => {
-  const now = Date.now();
-  for (const [phone, record] of otpStore.entries()) {
-    if (now > record.expiresAt) otpStore.delete(phone);
-  }
-}, 10 * 60_000);
 
-async function sendMitakeSms(phone: string, body: string): Promise<void> {
-  const username = process.env.MITAKE_USERNAME;
-  const password = process.env.MITAKE_PASSWORD;
-  if (!username || !password) {
+function getTwilioClient() {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) return null;
+  const twilio = require("twilio");
+  return twilio(accountSid, authToken);
+}
+
+async function sendTwilioOtp(phone: string): Promise<void> {
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  const client = getTwilioClient();
+  if (!client || !serviceSid) {
     throw new Error("簡訊服務未設定，請聯絡系統管理員");
   }
-  const params = new URLSearchParams({
-    username,
-    password,
-    dstaddr: phone,
-    smbody: body,
+  const e164 = toE164Taiwan(phone);
+  await client.verify.v2.services(serviceSid).verifications.create({
+    to: e164,
+    channel: "sms",
   });
-  const res = await fetch(`https://smexpress.mitake.com.tw:9600/SmSendPost?${params.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  });
-  const text = await res.text();
-  if (!text.includes("statuscode=0") && !text.includes("StatusCode=0")) {
-    console.error("[Mitake SMS] Response:", text);
-    throw new Error("簡訊發送失敗，請稍後再試");
+}
+
+async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  const client = getTwilioClient();
+  if (!client || !serviceSid) {
+    throw new Error("簡訊服務未設定，請聯絡系統管理員");
   }
+  const e164 = toE164Taiwan(phone);
+  const check = await client.verify.v2.services(serviceSid).verificationChecks.create({
+    to: e164,
+    code: String(code),
+  });
+  return check.status === "approved";
 }
 async function sendLineMessage(lineUserId: string, message: string): Promise<void> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -402,24 +407,7 @@ export async function registerRoutes(
       if (!phone || !/^09\d{8}$/.test(phone)) {
         return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
       }
-      const now = Date.now();
-      const existing = otpStore.get(phone);
-      if (existing && now - existing.sentAt < 60_000) {
-        const remaining = Math.ceil((60_000 - (now - existing.sentAt)) / 1000);
-        return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
-      }
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
-      otpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
-      try {
-        await sendMitakeSms(phone, `【質數教室】您的驗證碼為 ${otp}，5 分鐘內有效，請勿告知他人。`);
-      } catch (smsError: unknown) {
-        otpStore.delete(phone);
-        const msg = smsError instanceof Error ? smsError.message : "簡訊發送失敗，請稍後再試";
-        return res.status(500).json({ message: msg });
-      }
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[DEV] OTP for ${phone}: ${otp}`);
-      }
+      await sendTwilioOtp(phone);
       return res.json({ message: "驗證碼已發送" });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "發送失敗，請稍後再試";
@@ -436,23 +424,15 @@ export async function registerRoutes(
       if (!otp) {
         return res.status(400).json({ message: "請先完成手機驗證" });
       }
-      const now = Date.now();
-      const record = otpStore.get(phone);
-      if (!record) {
-        return res.status(400).json({ message: "請先發送驗證碼至手機" });
+      let otpApproved = false;
+      try {
+        otpApproved = await checkTwilioOtp(phone, otp);
+      } catch (otpErr: unknown) {
+        const msg = otpErr instanceof Error ? otpErr.message : "驗證碼確認失敗，請稍後再試";
+        return res.status(500).json({ message: msg });
       }
-      if (now > record.expiresAt) {
-        otpStore.delete(phone);
-        return res.status(400).json({ message: "驗證碼已過期，請重新發送" });
-      }
-      if (record.attempts >= 3) {
-        otpStore.delete(phone);
-        return res.status(400).json({ message: "驗證碼錯誤次數過多，請重新發送" });
-      }
-      if (record.otp !== String(otp)) {
-        otpStore.set(phone, { ...record, attempts: record.attempts + 1 });
-        const left = 3 - (record.attempts + 1);
-        return res.status(400).json({ message: `驗證碼不正確，還剩 ${left} 次機會` });
+      if (!otpApproved) {
+        return res.status(400).json({ message: "驗證碼不正確或已過期，請重新發送" });
       }
       if (password.length < 6) {
         return res.status(400).json({ message: "密碼至少需要 6 個字元" });
@@ -480,7 +460,6 @@ export async function registerRoutes(
         referralSource: referralSource && referralSource.length > 0 ? referralSource : null,
         role: "parent",
       }).returning();
-      otpStore.delete(phone);
       const [freePurchase] = await db.insert(creditPurchases).values({
         parentId: newUser.id,
         credits: 2,
@@ -613,27 +592,11 @@ export async function registerRoutes(
       if (!phone || !/^09\d{8}$/.test(phone)) {
         return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
       }
-      const now = Date.now();
-      const existing = otpStore.get(phone);
-      if (existing && now - existing.sentAt < 60_000) {
-        const remaining = Math.ceil((60_000 - (now - existing.sentAt)) / 1000);
-        return res.status(429).json({ message: `請等待 ${remaining} 秒後再重新發送` });
-      }
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
-      otpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
-      try {
-        await sendMitakeSms(phone, `【質數教室】您的驗證碼為 ${otp}，5 分鐘內有效，請勿告知他人。`);
-      } catch (smsError: unknown) {
-        otpStore.delete(phone);
-        const msg = smsError instanceof Error ? smsError.message : "簡訊發送失敗，請稍後再試";
-        return res.status(500).json({ message: msg });
-      }
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[DEV] LINE OTP for ${phone}: ${otp}`);
-      }
+      await sendTwilioOtp(phone);
       res.json({ message: "驗證碼已發送" });
-    } catch (err) {
-      res.status(500).json({ message: "發送失敗，請稍後再試" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "發送失敗，請稍後再試";
+      res.status(500).json({ message: msg });
     }
   });
 
@@ -643,23 +606,16 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ message: "請先登入" });
       const { phone, otp } = req.body;
       if (!phone || !otp) return res.status(400).json({ message: "缺少必要欄位" });
-      const now = Date.now();
-      const record = otpStore.get(phone);
-      if (!record) return res.status(400).json({ message: "請先發送驗證碼至手機" });
-      if (now > record.expiresAt) {
-        otpStore.delete(phone);
-        return res.status(400).json({ message: "驗證碼已過期，請重新發送" });
+      let approved = false;
+      try {
+        approved = await checkTwilioOtp(phone, otp);
+      } catch (otpErr: unknown) {
+        const msg = otpErr instanceof Error ? otpErr.message : "驗證碼確認失敗，請稍後再試";
+        return res.status(500).json({ message: msg });
       }
-      if (record.attempts >= 3) {
-        otpStore.delete(phone);
-        return res.status(400).json({ message: "驗證碼錯誤次數過多，請重新發送" });
+      if (!approved) {
+        return res.status(400).json({ message: "驗證碼不正確或已過期，請重新發送" });
       }
-      if (record.otp !== String(otp)) {
-        otpStore.set(phone, { ...record, attempts: record.attempts + 1 });
-        const left = 3 - (record.attempts + 1);
-        return res.status(400).json({ message: `驗證碼不正確，還剩 ${left} 次機會` });
-      }
-      otpStore.delete(phone);
       const [updated] = await db.update(users)
         .set({ phone, lineRegistrationComplete: true, updatedAt: new Date() })
         .where(eq(users.id, userId))
