@@ -70,7 +70,7 @@ export function CourseCancel() {
               </div>
 
               <div className="card-footer">
-                <button className="cta-btn" style={{ background: '#81D8D0', color: 'white' }}>
+                <button className="cta-btn" style={{ background: '#78909C', color: 'white' }}>
                   重新預約課程 →
                 </button>
               </div>
