@@ -21,6 +21,7 @@ interface Conversation {
   time: string;
   status: Status;
   assignedTo: string | null;
+  unreadCount: number;
   messages: Message[];
 }
 
@@ -29,7 +30,7 @@ const ASSIGNEES = ['（未指派）', 'Admin 總部', '台北信義分校主任'
 const INIT_CONVOS: Conversation[] = [
   {
     id: 1, name: '王小明媽媽', avatar: '王', preview: '請問下週課程可以改時間嗎？', time: '09:41',
-    status: 'unread', assignedTo: null,
+    status: 'unread', assignedTo: null, unreadCount: 2,
     messages: [
       { id: 1, from: 'user', text: '你好，請問下週五的課程可以改到週六上午嗎？', time: '09:38' },
       { id: 2, from: 'user', text: '小明那天要去參加學校活動', time: '09:40' },
@@ -37,7 +38,7 @@ const INIT_CONVOS: Conversation[] = [
   },
   {
     id: 2, name: '陳大文爸爸', avatar: '陳', preview: '好的，謝謝老師！', time: '08:55',
-    status: 'processing', assignedTo: '台北信義分校主任',
+    status: 'processing', assignedTo: '台北信義分校主任', unreadCount: 0,
     messages: [
       { id: 1, from: 'user', text: '想詢問一下孩子的學習進度', time: '08:30' },
       { id: 2, from: 'admin', text: '您好！我們已將您的問題轉給台北信義分校主任，稍後會與您聯繫。', time: '08:45' },
@@ -46,7 +47,7 @@ const INIT_CONVOS: Conversation[] = [
   },
   {
     id: 3, name: '李小芸媽媽', avatar: '李', preview: '收到，我們等通知。', time: '昨天',
-    status: 'processing', assignedTo: '台北大安分校主任',
+    status: 'processing', assignedTo: '台北大安分校主任', unreadCount: 0,
     messages: [
       { id: 1, from: 'user', text: '請問下個月的課表什麼時候出來？', time: '昨天 14:20' },
       { id: 2, from: 'admin', text: '預計這週五公告，我們會提前通知您！', time: '昨天 15:00' },
@@ -55,7 +56,7 @@ const INIT_CONVOS: Conversation[] = [
   },
   {
     id: 4, name: '黃建豪爸爸', avatar: '黃', preview: '謝謝，問題解決了！', time: '週一',
-    status: 'done', assignedTo: '新竹分校主任',
+    status: 'done', assignedTo: '新竹分校主任', unreadCount: 0,
     messages: [
       { id: 1, from: 'user', text: '購買的堂數怎麼沒有顯示出來？', time: '週一 10:00' },
       { id: 2, from: 'admin', text: '您好！請問您是哪個時間點購買的？我們為您確認一下。', time: '週一 10:15' },
@@ -66,7 +67,7 @@ const INIT_CONVOS: Conversation[] = [
   },
   {
     id: 5, name: '張雅婷媽媽', avatar: '張', preview: '請問有沒有試聽課程？', time: '週日',
-    status: 'unread', assignedTo: null,
+    status: 'unread', assignedTo: null, unreadCount: 1,
     messages: [
       { id: 1, from: 'user', text: '你好！我在找尋國小數學補習，請問有沒有試聽課程？', time: '週日 16:30' },
     ],
@@ -93,6 +94,11 @@ export function AdminInbox() {
     const matchSearch = !search || c.name.includes(search) || c.preview.includes(search);
     return matchTab && matchSearch;
   });
+
+  function selectConvo(id: number) {
+    setSelected(id);
+    setConvos(prev => prev.map(c => c.id === id ? { ...c, unreadCount: 0 } : c));
+  }
 
   function send() {
     if (!input.trim()) return;
@@ -169,7 +175,7 @@ export function AdminInbox() {
           {filtered.map(c => {
             const sl = STATUS_LABEL[c.status];
             return (
-              <div key={c.id} onClick={() => setSelected(c.id)} style={{
+              <div key={c.id} onClick={() => selectConvo(c.id)} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px',
                 background: selected === c.id ? '#f0fdf4' : '#fff',
                 borderLeft: selected === c.id ? `3px solid ${LINE_GREEN}` : '3px solid transparent',
@@ -179,7 +185,12 @@ export function AdminInbox() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 600, fontSize: 14, color: '#111' }}>{c.name}</span>
-                    <span style={{ fontSize: 11, color: '#9ca3af' }}>{c.time}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {c.unreadCount > 0 && (
+                        <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{c.unreadCount}</span>
+                      )}
+                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{c.time}</span>
+                    </div>
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.preview}</div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
