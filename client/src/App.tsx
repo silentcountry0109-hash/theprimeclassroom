@@ -61,14 +61,6 @@ function HomePage() {
   return <LandingPage />;
 }
 
-function AdminLineInbox() {
-  return <AdminDashboard initialTab="line-inbox" />;
-}
-
-function FranchiseLineInbox() {
-  return <FranchiseAdminDashboard initialTab="line-inbox" />;
-}
-
 function Router() {
   return (
     <Switch>
@@ -79,9 +71,7 @@ function Router() {
       <Route path="/parent-login" component={ParentLogin} />
       <Route path="/franchise-login" component={FranchiseLogin} />
       <Route path="/hq-login" component={HqLogin} />
-      <Route path="/admin/line-inbox" component={AdminLineInbox} />
       <Route path="/admin" component={AdminDashboard} />
-      <Route path="/franchise/line-inbox" component={FranchiseLineInbox} />
       <Route path="/franchise-admin" component={FranchiseAdminDashboard} />
       <Route path="/coach-login" component={FranchiseLogin} />
       <Route path="/coach-dashboard" component={CoachDashboard} />

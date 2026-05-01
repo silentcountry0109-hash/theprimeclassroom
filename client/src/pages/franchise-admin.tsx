@@ -80,8 +80,7 @@ import {
   Pencil,
   MessageSquare,
 } from "lucide-react";
-import type { Franchise, Coach, TimeSlot, Classroom, LineConversation, LineMessage } from "@shared/schema";
-import { Send, RefreshCw } from "lucide-react";
+import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { setActiveFranchiseId, queryClient } from "@/lib/queryClient";
 import { DAY_LABELS } from "@shared/constants";
@@ -299,7 +298,6 @@ export default function FranchiseAdminDashboard({ initialTab }: { initialTab?: s
     { id: "timeslots", label: "時段管理", icon: Clock },
     { id: "bookings", label: "預約管理", icon: CalendarCheck },
     { id: "students", label: "學生管理", icon: Users },
-    { id: "line-inbox", label: "LINE 收件匣", icon: MessageSquare },
   ];
 
   return (
@@ -457,7 +455,6 @@ export default function FranchiseAdminDashboard({ initialTab }: { initialTab?: s
             {activeTab === "timeslots" && <TimeSlotsTab />}
             {activeTab === "bookings" && <BookingsTab />}
             {activeTab === "students" && <StudentsTab />}
-            {activeTab === "line-inbox" && <FranchiseLineInboxTab />}
           </main>
         </div>
       </div>
@@ -4458,215 +4455,6 @@ function StudentDetailPanel({ childId }: { childId: number }) {
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function FranchiseLineInboxTab() {
-  const { toast } = useToast();
-  const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
-  const [replyText, setReplyText] = useState("");
-  const [newMessageConvIds, setNewMessageConvIds] = useState<Set<number>>(new Set());
-  const prevConvsRef = useRef<LineConversation[] | null>(null);
-
-  const { data: conversations, isLoading, refetch } = useQuery<LineConversation[]>({
-    queryKey: ["/api/line-inbox/my-conversations"],
-    refetchInterval: 10000,
-  });
-
-  const { data: messages, isLoading: messagesLoading } = useQuery<LineMessage[]>({
-    queryKey: ["/api/line-inbox/conversations", selectedConvId, "messages"],
-    enabled: selectedConvId !== null,
-    refetchInterval: selectedConvId !== null ? 10000 : false,
-  });
-
-  useEffect(() => {
-    if (!conversations) return;
-    const prev = prevConvsRef.current;
-    if (prev) {
-      const updatedIds = new Set<number>();
-      conversations.forEach((conv) => {
-        if (conv.id === selectedConvId) return;
-        const prevConv = prev.find((p) => p.id === conv.id);
-        if (!prevConv) {
-          updatedIds.add(conv.id);
-        } else if (conv.lastMessageAt && prevConv.lastMessageAt !== conv.lastMessageAt) {
-          updatedIds.add(conv.id);
-        }
-      });
-      if (updatedIds.size > 0) {
-        setNewMessageConvIds((old) => new Set([...old, ...updatedIds]));
-        toast({ title: `有 ${updatedIds.size} 則新訊息`, description: "LINE 收件匣收到新訊息" });
-      }
-    }
-    prevConvsRef.current = conversations;
-  }, [conversations, selectedConvId, toast]);
-
-  const selectedConv = conversations?.find((c) => c.id === selectedConvId) ?? null;
-
-  const replyMutation = useMutation({
-    mutationFn: ({ convId, text }: { convId: number; text: string }) =>
-      apiRequest("POST", `/api/line-inbox/conversations/${convId}/reply`, { text }),
-    onSuccess: () => {
-      setReplyText("");
-      queryClient.invalidateQueries({ queryKey: ["/api/line-inbox/conversations", selectedConvId, "messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/line-inbox/my-conversations"] });
-      toast({ title: "訊息已傳送" });
-    },
-    onError: () => toast({ title: "傳送失敗", variant: "destructive" }),
-  });
-
-  const statusLabel = (s: string) => {
-    if (s === "open") return { label: "未指派", color: "bg-yellow-100 text-yellow-700" };
-    if (s === "assigned") return { label: "已指派", color: "bg-blue-100 text-blue-700" };
-    if (s === "closed") return { label: "已結案", color: "bg-gray-100 text-gray-500" };
-    return { label: s, color: "bg-gray-100 text-gray-500" };
-  };
-
-  const formatTime = (d: string | Date | null | undefined) => {
-    if (!d) return "";
-    return new Date(d).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  };
-
-  return (
-    <div className="flex gap-4 h-[calc(100vh-130px)]">
-      <div className="w-80 flex-shrink-0 border border-gray-200 rounded-xl bg-white flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <span className="text-sm font-semibold text-foreground">指派給我的對話</span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => refetch()} data-testid="franchise-button-refresh-conversations">
-            <RefreshCw className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 space-y-3">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
-            </div>
-          ) : !conversations || conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6">
-              <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
-              <p className="text-sm text-muted-foreground">尚無指派對話</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">總部指派對話後將顯示於此</p>
-            </div>
-          ) : (
-            conversations.map((conv) => {
-              const st = statusLabel(conv.status);
-              const hasNew = newMessageConvIds.has(conv.id);
-              return (
-                <div
-                  key={conv.id}
-                  onClick={() => {
-                    setSelectedConvId(conv.id);
-                    setNewMessageConvIds((old) => { const next = new Set(old); next.delete(conv.id); return next; });
-                  }}
-                  className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedConvId === conv.id ? "bg-tiffany/5" : ""} ${hasNew ? "bg-green-50" : ""}`}
-                  data-testid={`franchise-conversation-item-${conv.id}`}
-                >
-                  <div className="relative w-9 h-9 flex-shrink-0">
-                    <div className="w-9 h-9 rounded-full bg-tiffany/20 flex items-center justify-center overflow-hidden">
-                      {conv.pictureUrl ? (
-                        <img src={conv.pictureUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-tiffany text-sm font-bold">{(conv.displayName || conv.lineUserId).charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
-                    {hasNew && (
-                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white" data-testid={`franchise-badge-new-message-${conv.id}`} />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 justify-between">
-                      <span className="text-xs font-semibold text-foreground truncate">{conv.displayName || conv.lineUserId}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${st.color}`}>{st.label}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">{conv.lastMessageText || "（無訊息）"}</p>
-                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">{formatTime(conv.lastMessageAt)}</p>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 border border-gray-200 rounded-xl bg-white flex flex-col min-w-0">
-        {!selectedConv ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <MessageSquare className="w-12 h-12 text-muted-foreground/20 mb-4" />
-            <p className="text-sm text-muted-foreground">請從左側選擇一則對話</p>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-              <div className="w-8 h-8 rounded-full bg-tiffany/20 flex items-center justify-center overflow-hidden">
-                {selectedConv.pictureUrl ? (
-                  <img src={selectedConv.pictureUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-tiffany text-xs font-bold">{(selectedConv.displayName || selectedConv.lineUserId).charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">{selectedConv.displayName || selectedConv.lineUserId}</p>
-                <p className="text-[10px] text-muted-foreground font-mono">{selectedConv.lineUserId}</p>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="franchise-messages-list">
-              {messagesLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-2/3 rounded-lg" />)}
-                </div>
-              ) : !messages || messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-center">
-                  <p className="text-sm text-muted-foreground">尚無訊息紀錄</p>
-                </div>
-              ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
-                    data-testid={`franchise-message-${msg.id}`}
-                  >
-                    <div className={`max-w-[70%] px-3 py-2 rounded-xl text-sm ${msg.direction === "outbound" ? "bg-tiffany text-white rounded-br-sm" : "bg-gray-100 text-foreground rounded-bl-sm"}`}>
-                      <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                      <p className={`text-[10px] mt-1 ${msg.direction === "outbound" ? "text-white/70" : "text-muted-foreground/70"}`}>
-                        {formatTime(msg.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="px-4 py-3 border-t border-gray-100 flex gap-2 items-end">
-              <Textarea
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="輸入回覆訊息..."
-                className="flex-1 min-h-[60px] max-h-[120px] text-sm resize-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (replyText.trim() && !replyMutation.isPending) {
-                      replyMutation.mutate({ convId: selectedConv.id, text: replyText.trim() });
-                    }
-                  }
-                }}
-                data-testid="franchise-input-reply-text"
-              />
-              <Button
-                size="icon"
-                className="h-10 w-10 bg-tiffany hover:bg-tiffany/90 flex-shrink-0"
-                onClick={() => { if (replyText.trim()) replyMutation.mutate({ convId: selectedConv.id, text: replyText.trim() }); }}
-                disabled={!replyText.trim() || replyMutation.isPending}
-                data-testid="franchise-button-send-reply"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }

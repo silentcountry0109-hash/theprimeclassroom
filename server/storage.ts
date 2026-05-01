@@ -5,7 +5,6 @@ import {
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
   textbooks, textbookQuizzes, textbookFiles,
   curriculumUnits, curriculumFiles, curriculumMidtermExams,
-  lineConversations, lineMessages,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -38,8 +37,6 @@ import {
   type CurriculumUnit, type InsertCurriculumUnit,
   type CurriculumFile, type InsertCurriculumFile,
   type CurriculumMidtermExam, type InsertCurriculumMidtermExam,
-  type LineConversation, type InsertLineConversation,
-  type LineMessage, type InsertLineMessage,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
@@ -310,14 +307,6 @@ export interface IStorage {
     coachStats: Array<{ coachId: number; coachName: string; slots: number; bookings: number; confirmedBookings: number; cancelledBookings: number; completedBookings: number; bookedSeats: number }>;
   }>;
 
-  getLineConversations(): Promise<LineConversation[]>;
-  getLineConversationsByAssignee(userId: string): Promise<LineConversation[]>;
-  getLineConversation(id: number): Promise<LineConversation | undefined>;
-  getLineConversationByLineUserId(lineUserId: string): Promise<LineConversation | undefined>;
-  upsertLineConversation(lineUserId: string, data: Partial<InsertLineConversation>): Promise<LineConversation>;
-  updateLineConversation(id: number, data: Partial<InsertLineConversation>): Promise<LineConversation | undefined>;
-  getLineMessages(conversationId: number): Promise<LineMessage[]>;
-  createLineMessage(data: InsertLineMessage): Promise<LineMessage>;
 }
 
 function getTimePeriodCondition(periods: string[]): string {
@@ -3100,51 +3089,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(curriculumMidtermExams).where(eq(curriculumMidtermExams.id, id));
   }
 
-  async getLineConversations(): Promise<LineConversation[]> {
-    return db.select().from(lineConversations).orderBy(desc(lineConversations.lastMessageAt));
-  }
-
-  async getLineConversationsByAssignee(userId: string): Promise<LineConversation[]> {
-    return db.select().from(lineConversations)
-      .where(eq(lineConversations.assignedToUserId, userId))
-      .orderBy(desc(lineConversations.lastMessageAt));
-  }
-
-  async getLineConversation(id: number): Promise<LineConversation | undefined> {
-    const [conv] = await db.select().from(lineConversations).where(eq(lineConversations.id, id));
-    return conv;
-  }
-
-  async getLineConversationByLineUserId(lineUserId: string): Promise<LineConversation | undefined> {
-    const [conv] = await db.select().from(lineConversations).where(eq(lineConversations.lineUserId, lineUserId));
-    return conv;
-  }
-
-  async upsertLineConversation(lineUserId: string, data: Partial<InsertLineConversation>): Promise<LineConversation> {
-    const existing = await this.getLineConversationByLineUserId(lineUserId);
-    if (existing) {
-      const [updated] = await db.update(lineConversations).set(data).where(eq(lineConversations.id, existing.id)).returning();
-      return updated;
-    }
-    const [created] = await db.insert(lineConversations).values({ lineUserId, ...data }).returning();
-    return created;
-  }
-
-  async updateLineConversation(id: number, data: Partial<InsertLineConversation>): Promise<LineConversation | undefined> {
-    const [updated] = await db.update(lineConversations).set(data).where(eq(lineConversations.id, id)).returning();
-    return updated;
-  }
-
-  async getLineMessages(conversationId: number): Promise<LineMessage[]> {
-    return db.select().from(lineMessages)
-      .where(eq(lineMessages.conversationId, conversationId))
-      .orderBy(asc(lineMessages.createdAt));
-  }
-
-  async createLineMessage(data: InsertLineMessage): Promise<LineMessage> {
-    const [msg] = await db.insert(lineMessages).values(data).returning();
-    return msg;
-  }
 }
 
 export const storage = new DatabaseStorage();

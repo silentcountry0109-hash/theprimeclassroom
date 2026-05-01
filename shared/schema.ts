@@ -480,31 +480,3 @@ export type InsertCurriculumFile = z.infer<typeof insertCurriculumFileSchema>;
 export type CurriculumMidtermExam = typeof curriculumMidtermExams.$inferSelect;
 export type InsertCurriculumMidtermExam = z.infer<typeof insertCurriculumMidtermExamSchema>;
 
-export const lineConversations = pgTable("line_conversations", {
-  id: serial("id").primaryKey(),
-  lineUserId: text("line_user_id").notNull().unique(),
-  displayName: text("display_name"),
-  pictureUrl: text("picture_url"),
-  status: text("status").default("open").notNull(),
-  assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
-  lastMessageText: text("last_message_text"),
-  lastMessageAt: timestamp("last_message_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const lineMessages = pgTable("line_messages", {
-  id: serial("id").primaryKey(),
-  conversationId: integer("conversation_id").references(() => lineConversations.id).notNull(),
-  direction: text("direction").notNull(),
-  text: text("text").notNull(),
-  replyToken: text("reply_token"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertLineConversationSchema = createInsertSchema(lineConversations).omit({ id: true, createdAt: true });
-export const insertLineMessageSchema = createInsertSchema(lineMessages).omit({ id: true, createdAt: true });
-
-export type LineConversation = typeof lineConversations.$inferSelect;
-export type InsertLineConversation = z.infer<typeof insertLineConversationSchema>;
-export type LineMessage = typeof lineMessages.$inferSelect;
-export type InsertLineMessage = z.infer<typeof insertLineMessageSchema>;
