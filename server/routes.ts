@@ -4007,8 +4007,8 @@ export async function registerRoutes(
   // === 暫時測試路由：發送 LINE Flex Message 三張範例 ===
   app.post("/api/dev/send-flex-test", async (req, res) => {
     const lineUserId = "Uecb97d0ef5b5bfa232d24893c35bfa42";
-    const channelId = process.env.LINE_CHANNEL_ID || "2009852161";
-    const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
+    const channelId = process.env.LINE_MESSAGING_CHANNEL_ID || "2009852161";
+    const channelSecret = process.env.LINE_MESSAGING_CHANNEL_SECRET || "";
 
     // 每次都取新 token（完全不 cache）
     const tokenRes = await fetch("https://api.line.me/v2/oauth/accessToken", {

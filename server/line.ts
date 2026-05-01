@@ -6,18 +6,10 @@ async function getLineToken(): Promise<string | null> {
   // 如果快取 token 還有 1 小時以上則直接使用
   if (_cachedToken && Date.now() < _tokenExpiresAt - 3600_000) return _cachedToken;
 
-  // 優先用環境變數（若正確設定且不是 32 字元的 secret）
-  const envToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  if (envToken && envToken.length > 50) {
-    _cachedToken = envToken;
-    _tokenExpiresAt = Date.now() + 30 * 24 * 3600_000; // 假設 30 天
-    return _cachedToken;
-  }
-
-  // 自動用 Channel ID + Secret 取 short-lived token
-  const channelId = process.env.LINE_CHANNEL_ID || "2009852161";
-  const channelSecret = process.env.LINE_CHANNEL_SECRET;
-  if (!channelSecret) { console.error("[LINE] 缺少 LINE_CHANNEL_SECRET"); return null; }
+  // 自動用 Messaging API Channel ID + Secret 取 short-lived token
+  const channelId = process.env.LINE_MESSAGING_CHANNEL_ID || "2009852161";
+  const channelSecret = process.env.LINE_MESSAGING_CHANNEL_SECRET;
+  if (!channelSecret) { console.error("[LINE] 缺少 LINE_MESSAGING_CHANNEL_SECRET"); return null; }
 
   try {
     const res = await fetch("https://api.line.me/v2/oauth/accessToken", {
