@@ -10,6 +10,7 @@ export const modules: ModuleMap = {
   "./components/mockups/line-cards/BookingSuccess.tsx": () => import("../components/mockups/line-cards/BookingSuccess.tsx"),
   "./components/mockups/line-cards/CourseCancel.tsx": () => import("../components/mockups/line-cards/CourseCancel.tsx"),
   "./components/mockups/line-cards/PreClassReminder.tsx": () => import("../components/mockups/line-cards/PreClassReminder.tsx"),
+  "./components/mockups/line-cards/TeacherScheduleChange.tsx": () => import("../components/mockups/line-cards/TeacherScheduleChange.tsx"),
   "./components/mockups/line-register/BindLineOfficial.tsx": () => import("../components/mockups/line-register/BindLineOfficial.tsx"),
   "./components/mockups/line-register/FillProfile.tsx": () => import("../components/mockups/line-register/FillProfile.tsx"),
   "./components/mockups/line-register/LineAuth.tsx": () => import("../components/mockups/line-register/LineAuth.tsx"),
