@@ -1,4 +1,6 @@
 const LINE_GREEN = '#06C755';
+const TIFFANY = '#81D8D0';
+const CORAL = '#FFB7B2';
 
 interface FlexMsg {
   avatar: string;
@@ -59,10 +61,10 @@ function FlexBubble({ flex }: { flex: FlexMsg }) {
       <span style={{ fontSize: 10, color: '#aaa', alignSelf: 'flex-end', marginBottom: 2 }}>{flex.time}</span>
       <div style={{ maxWidth: 210, borderRadius: 14, overflow: 'hidden', boxShadow: '0 3px 12px rgba(0,0,0,0.15)' }}>
         <div style={{ background: `linear-gradient(135deg, ${flex.avatarGradient[0]}, ${flex.avatarGradient[1]})`, padding: '10px 13px', display: 'flex', alignItems: 'center', gap: 9 }}>
-          <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', border: '1.5px solid rgba(255,255,255,0.5)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{flex.avatar}</div>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.45)', border: '1.5px solid rgba(255,255,255,0.7)', color: '#1a5c59', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{flex.avatar}</div>
           <div>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: 0.3 }}>{flex.senderName}</div>
-            <div style={{ color: 'rgba(255,255,255,0.78)', fontSize: 10 }}>{flex.senderRole}</div>
+            <div style={{ color: '#1a4a48', fontWeight: 700, fontSize: 12, letterSpacing: 0.3 }}>{flex.senderName}</div>
+            <div style={{ color: '#2d6b68', fontSize: 10 }}>{flex.senderRole}</div>
           </div>
         </div>
         <div style={{ background: '#fff', padding: '11px 13px', fontSize: 12.5, color: '#1a1a1a', lineHeight: 1.65 }}>{flex.body}</div>
@@ -128,12 +130,12 @@ const FLEX_MSGS: Msg[] = [
   { from: 'parent', text: '你好，請問孩子下週五的課可以改時間嗎？', time: '14:20' },
   {
     from: 'staff-flex', time: '14:35',
-    flex: { avatar: '信', avatarGradient: ['#1d4ed8', '#3b82f6'], senderName: '台北信義分校', senderRole: '陳怡君主任', body: '您好！已幫您確認，下週五可改到週六上午 10:00，請放心！😊', time: '14:35' },
+    flex: { avatar: '信', avatarGradient: [TIFFANY, CORAL], senderName: '台北信義分校', senderRole: '陳怡君主任', body: '您好！已幫您確認，下週五可改到週六上午 10:00，請放心！😊', time: '14:35' },
   },
   { from: 'parent', text: '太好了，謝謝！', time: '14:37' },
   {
     from: 'staff-flex', time: '14:38',
-    flex: { avatar: '信', avatarGradient: ['#1d4ed8', '#3b82f6'], senderName: '台北信義分校', senderRole: '陳怡君主任', body: '不客氣！如有任何問題隨時詢問我們，祝孩子學習愉快 🌟', time: '14:38' },
+    flex: { avatar: '信', avatarGradient: [TIFFANY, CORAL], senderName: '台北信義分校', senderRole: '陳怡君主任', body: '不客氣！如有任何問題隨時詢問我們，祝孩子學習愉快 🌟', time: '14:38' },
   },
 ];
 
@@ -162,12 +164,12 @@ export default function StaffReplyVariants() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
           <Phone
             label="方案 A — Flex 卡片署名"
-            labelColor="#1d4ed8" labelBg="#dbeafe"
+            labelColor="#0e7b76" labelBg="#d0f5f3"
             headerColor={LINE_GREEN}
             messages={FLEX_MSGS}
           />
           <div style={{ background: '#fff', borderRadius: 12, padding: '12px 16px', fontSize: 12, color: '#374151', width: 280, boxShadow: '0 2px 8px rgba(0,0,0,0.07)', lineHeight: 1.8 }}>
-            <div style={{ fontWeight: 700, color: '#1d4ed8', marginBottom: 6 }}>✦ 方案 A 特色</div>
+            <div style={{ fontWeight: 700, color: '#0e7b76', marginBottom: 6 }}>✦ 方案 A 特色</div>
             ✅ 分校頭像 + 姓名一目了然<br/>
             ✅ 彩色漸層，品牌感強<br/>
             ✅ 可依分校設定不同顏色<br/>
