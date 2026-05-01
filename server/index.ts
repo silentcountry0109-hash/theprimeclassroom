@@ -7,23 +7,7 @@ import { sendLineMessage } from "./line";
 const app = express();
 const httpServer = createServer(app);
 
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
-}
-
-// LINE Webhook must use express.raw() BEFORE the global JSON parser so that
-// req.body is the raw Buffer, enabling correct HMAC-SHA256 signature verification.
-app.use("/api/line/webhook", express.raw({ type: "*/*" }));
-
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
+app.use(express.json());
 
 app.use(express.urlencoded({ extended: false }));
 
