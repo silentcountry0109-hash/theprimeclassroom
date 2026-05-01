@@ -4025,37 +4025,47 @@ export async function registerRoutes(
     const cancel = buildCourseCancelFlex({ childName: "陳小明", date: "2026/05/03（日）", time: "10:00 – 11:00", teacher: "林老師", credits: 6 });
 
     const flexMessages = [booking, reminder, cancel].map(({ altText, contents }) => ({ type: "flex", altText, contents }));
-    // broadcast 不需要 to 欄位
-    const body = JSON.stringify({ messages: flexMessages });
-    console.log(`[TEST] body len=${body.length}`);
+    // push 直接指定 userId（比 broadcast 更可靠，不需要追蹤者身份）
+    const body = JSON.stringify({ to: lineUserId, messages: flexMessages });
+    console.log(`[TEST] push to=${lineUserId}, body len=${body.length}`);
 
-    // 用 curl 子行程發送；token 和 body 都寫入暫存檔避免 shell 跳脫問題
-    const { execSync } = await import("child_process");
-    const fs = await import("fs");
-    const ts = Date.now();
-    const tmpBody = `/tmp/line-body-${ts}.json`;
-    const tmpToken = `/tmp/line-token-${ts}.txt`;
-    fs.writeFileSync(tmpBody, body, "utf-8");
-    fs.writeFileSync(tmpToken, token, "utf-8");
-    fs.writeFileSync("/tmp/server-token.txt", token, "utf-8"); // 測試用：保留完整 token
-    try {
-      console.log(`[TEST] running curl subprocess with token len=${token.length}`);
-      const curlOut = execSync(
-        `curl -s -w "\\n%{http_code}" -X POST "https://api.line.me/v2/bot/message/broadcast"` +
-        ` -H "Content-Type: application/json"` +
-        ` -H "Authorization: Bearer $LINE_TOKEN"` +
-        ` -d @${tmpBody}`,
-        { timeout: 15000, env: { ...process.env, LINE_TOKEN: token } }
-      ).toString();
-      const lines = curlOut.trim().split("\n");
-      const statusCode = parseInt(lines[lines.length - 1]);
-      const responseBody = lines.slice(0, -1).join("\n");
-      console.log(`[TEST] curl result: ${statusCode} ${responseBody}`);
-      res.json({ ok: statusCode === 200, status: statusCode, body: responseBody, token: token.slice(0,20) + "..." });
-    } finally {
-      try { fs.unlinkSync(tmpBody); } catch {}
-      try { fs.unlinkSync(tmpToken); } catch {}
+    // 用 Node.js fetch 直接發送
+    const pushRes = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body,
+    });
+    const pushBody = await pushRes.text();
+    console.log(`[TEST] push result: ${pushRes.status} ${pushBody}`);
+    // 若 fetch 也失敗，改用 curl 子行程
+    if (!pushRes.ok) {
+      const { execSync } = await import("child_process");
+      const fs = await import("fs");
+      const ts = Date.now();
+      const tmpBody = `/tmp/line-body-${ts}.json`;
+      fs.writeFileSync(tmpBody, body, "utf-8");
+      fs.writeFileSync("/tmp/server-token.txt", token, "utf-8");
+      try {
+        const curlOut = execSync(
+          `curl -s -w "\\n%{http_code}" -X POST "https://api.line.me/v2/bot/message/push"` +
+          ` -H "Content-Type: application/json"` +
+          ` -H "Authorization: Bearer $LINE_TOKEN"` +
+          ` -d @${tmpBody}`,
+          { timeout: 15000, env: { ...process.env, LINE_TOKEN: token } }
+        ).toString();
+        const lines = curlOut.trim().split("\n");
+        const statusCode = parseInt(lines[lines.length - 1]);
+        const responseBody = lines.slice(0, -1).join("\n");
+        console.log(`[TEST] curl fallback: ${statusCode} ${responseBody}`);
+        return res.json({ ok: statusCode === 200, status: statusCode, body: responseBody, via: "curl" });
+      } finally {
+        try { fs.unlinkSync(tmpBody); } catch {}
+      }
     }
+    res.json({ ok: pushRes.ok, status: pushRes.status, body: pushBody, via: "fetch" });
   });
   // === END 暫時測試路由 ===
 
