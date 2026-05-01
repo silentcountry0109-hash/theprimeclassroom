@@ -4466,15 +4466,41 @@ function FranchiseLineInboxTab() {
   const { toast } = useToast();
   const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [newMessageConvIds, setNewMessageConvIds] = useState<Set<number>>(new Set());
+  const prevConvsRef = useRef<LineConversation[] | null>(null);
 
   const { data: conversations, isLoading, refetch } = useQuery<LineConversation[]>({
     queryKey: ["/api/line-inbox/my-conversations"],
+    refetchInterval: 10000,
   });
 
   const { data: messages, isLoading: messagesLoading } = useQuery<LineMessage[]>({
     queryKey: ["/api/line-inbox/conversations", selectedConvId, "messages"],
     enabled: selectedConvId !== null,
+    refetchInterval: selectedConvId !== null ? 10000 : false,
   });
+
+  useEffect(() => {
+    if (!conversations) return;
+    const prev = prevConvsRef.current;
+    if (prev) {
+      const updatedIds = new Set<number>();
+      conversations.forEach((conv) => {
+        if (conv.id === selectedConvId) return;
+        const prevConv = prev.find((p) => p.id === conv.id);
+        if (!prevConv) {
+          updatedIds.add(conv.id);
+        } else if (conv.lastMessageAt && prevConv.lastMessageAt !== conv.lastMessageAt) {
+          updatedIds.add(conv.id);
+        }
+      });
+      if (updatedIds.size > 0) {
+        setNewMessageConvIds((old) => new Set([...old, ...updatedIds]));
+        toast({ title: `有 ${updatedIds.size} 則新訊息`, description: "LINE 收件匣收到新訊息" });
+      }
+    }
+    prevConvsRef.current = conversations;
+  }, [conversations, selectedConvId, toast]);
 
   const selectedConv = conversations?.find((c) => c.id === selectedConvId) ?? null;
 
@@ -4525,18 +4551,27 @@ function FranchiseLineInboxTab() {
           ) : (
             conversations.map((conv) => {
               const st = statusLabel(conv.status);
+              const hasNew = newMessageConvIds.has(conv.id);
               return (
                 <div
                   key={conv.id}
-                  onClick={() => setSelectedConvId(conv.id)}
-                  className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedConvId === conv.id ? "bg-tiffany/5" : ""}`}
+                  onClick={() => {
+                    setSelectedConvId(conv.id);
+                    setNewMessageConvIds((old) => { const next = new Set(old); next.delete(conv.id); return next; });
+                  }}
+                  className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedConvId === conv.id ? "bg-tiffany/5" : ""} ${hasNew ? "bg-green-50" : ""}`}
                   data-testid={`franchise-conversation-item-${conv.id}`}
                 >
-                  <div className="w-9 h-9 rounded-full bg-tiffany/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {conv.pictureUrl ? (
-                      <img src={conv.pictureUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-tiffany text-sm font-bold">{(conv.displayName || conv.lineUserId).charAt(0).toUpperCase()}</span>
+                  <div className="relative w-9 h-9 flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-tiffany/20 flex items-center justify-center overflow-hidden">
+                      {conv.pictureUrl ? (
+                        <img src={conv.pictureUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-tiffany text-sm font-bold">{(conv.displayName || conv.lineUserId).charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                    {hasNew && (
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white" data-testid={`franchise-badge-new-message-${conv.id}`} />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
