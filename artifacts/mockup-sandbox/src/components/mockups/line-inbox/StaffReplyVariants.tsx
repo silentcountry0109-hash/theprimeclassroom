@@ -60,7 +60,7 @@ function FlexBubble({ flex }: { flex: FlexMsg }) {
     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
       <span style={{ fontSize: 10, color: '#aaa', alignSelf: 'flex-end', marginBottom: 2 }}>{flex.time}</span>
       <div style={{ maxWidth: 210, borderRadius: 14, overflow: 'hidden', boxShadow: '0 3px 12px rgba(0,0,0,0.15)' }}>
-        <div style={{ background: TIFFANY, padding: '10px 13px', display: 'flex', alignItems: 'center', gap: 9 }}>
+        <div style={{ background: 'linear-gradient(135deg, #4ab8b0, #a8e8e3)', padding: '10px 13px', display: 'flex', alignItems: 'center', gap: 9 }}>
           <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: '1.5px solid rgba(255,255,255,0.8)', color: '#0e5c59', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{flex.avatar}</div>
           <div>
             <div style={{ color: '#0a3d3b', fontWeight: 700, fontSize: 12, letterSpacing: 0.3 }}>{flex.senderName}</div>
