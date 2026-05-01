@@ -94,8 +94,9 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
+import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode, LineConversation, LineMessage } from "@shared/schema";
 import { Search as SearchIcon } from "lucide-react";
+import { MessageSquare, Send, RefreshCw } from "lucide-react";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS } from "@shared/constants";
 
@@ -106,9 +107,9 @@ interface AdminStats {
   totalBookings: number;
 }
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ initialTab }: { initialTab?: string } = {}) {
   const { user, isLoading: authLoading, logout } = useCredentialAuth();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(initialTab || "overview");
 
   if (authLoading) {
     return (
@@ -137,6 +138,7 @@ export default function AdminDashboard() {
     { id: "shop", label: "商城管理", icon: ShoppingBag },
     { id: "credits", label: "點數管理", icon: Coins },
     { id: "site-editor", label: "官網編輯", icon: Globe },
+    { id: "line-inbox", label: "LINE 收件匣", icon: MessageSquare },
   ];
 
   return (
@@ -207,6 +209,7 @@ export default function AdminDashboard() {
             {activeTab === "shop" && <ShopManagementTab />}
             {activeTab === "credits" && <CreditsManagementTab />}
             {activeTab === "site-editor" && <SiteEditorTab />}
+            {activeTab === "line-inbox" && <LineInboxTab />}
           </main>
         </div>
       </div>
@@ -3930,6 +3933,230 @@ function SiteEditorTab() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LineInboxTab() {
+  const { toast } = useToast();
+  const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+
+  const { data: users } = useQuery<User[]>({ queryKey: ["/api/admin/users"] });
+
+  const { data: conversations, isLoading, refetch } = useQuery<LineConversation[]>({
+    queryKey: ["/api/line-inbox/conversations"],
+  });
+
+  const { data: messages, isLoading: messagesLoading } = useQuery<LineMessage[]>({
+    queryKey: ["/api/line-inbox/conversations", selectedConvId, "messages"],
+    enabled: selectedConvId !== null,
+  });
+
+  const selectedConv = conversations?.find((c) => c.id === selectedConvId) ?? null;
+
+  const assignMutation = useMutation({
+    mutationFn: ({ convId, assignedToUserId, status }: { convId: number; assignedToUserId?: string | null; status?: string }) =>
+      apiRequest("PATCH", `/api/line-inbox/conversations/${convId}`, { assignedToUserId, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/line-inbox/conversations"] });
+      toast({ title: "已更新對話狀態" });
+    },
+    onError: () => toast({ title: "更新失敗", variant: "destructive" }),
+  });
+
+  const replyMutation = useMutation({
+    mutationFn: ({ convId, text }: { convId: number; text: string }) =>
+      apiRequest("POST", `/api/line-inbox/conversations/${convId}/reply`, { text }),
+    onSuccess: () => {
+      setReplyText("");
+      queryClient.invalidateQueries({ queryKey: ["/api/line-inbox/conversations", selectedConvId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/line-inbox/conversations"] });
+      toast({ title: "訊息已傳送" });
+    },
+    onError: () => toast({ title: "傳送失敗", variant: "destructive" }),
+  });
+
+  const directorUsers = users?.filter((u) => u.role === "franchise_admin" || u.role === "admin") ?? [];
+
+  const statusLabel = (s: string) => {
+    if (s === "open") return { label: "未指派", color: "bg-yellow-100 text-yellow-700" };
+    if (s === "assigned") return { label: "已指派", color: "bg-blue-100 text-blue-700" };
+    if (s === "closed") return { label: "已結案", color: "bg-gray-100 text-gray-500" };
+    return { label: s, color: "bg-gray-100 text-gray-500" };
+  };
+
+  const formatTime = (d: string | Date | null | undefined) => {
+    if (!d) return "";
+    return new Date(d).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="flex gap-4 h-[calc(100vh-130px)]">
+      <div className="w-80 flex-shrink-0 border border-gray-200 rounded-xl bg-white flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <span className="text-sm font-semibold text-foreground">LINE 對話列表</span>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => refetch()} data-testid="button-refresh-conversations">
+            <RefreshCw className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 space-y-3">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+            </div>
+          ) : !conversations || conversations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-6">
+              <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">尚無 LINE 對話</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">當用戶傳送訊息後將顯示於此</p>
+            </div>
+          ) : (
+            conversations.map((conv) => {
+              const st = statusLabel(conv.status);
+              return (
+                <div
+                  key={conv.id}
+                  onClick={() => setSelectedConvId(conv.id)}
+                  className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedConvId === conv.id ? "bg-tiffany/5" : ""}`}
+                  data-testid={`conversation-item-${conv.id}`}
+                >
+                  <div className="w-9 h-9 rounded-full bg-tiffany/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {conv.pictureUrl ? (
+                      <img src={conv.pictureUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-tiffany text-sm font-bold">{(conv.displayName || conv.lineUserId).charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 justify-between">
+                      <span className="text-xs font-semibold text-foreground truncate">{conv.displayName || conv.lineUserId}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${st.color}`}>{st.label}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{conv.lastMessageText || "（無訊息）"}</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">{formatTime(conv.lastMessageAt)}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 border border-gray-200 rounded-xl bg-white flex flex-col min-w-0">
+        {!selectedConv ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <MessageSquare className="w-12 h-12 text-muted-foreground/20 mb-4" />
+            <p className="text-sm text-muted-foreground">請從左側選擇一則對話</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-tiffany/20 flex items-center justify-center overflow-hidden">
+                  {selectedConv.pictureUrl ? (
+                    <img src={selectedConv.pictureUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-tiffany text-xs font-bold">{(selectedConv.displayName || selectedConv.lineUserId).charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{selectedConv.displayName || selectedConv.lineUserId}</p>
+                  <p className="text-[10px] text-muted-foreground font-mono">{selectedConv.lineUserId}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={selectedConv.assignedToUserId ?? "__none__"}
+                  onValueChange={(val) => {
+                    const assignId = val === "__none__" ? null : val;
+                    assignMutation.mutate({ convId: selectedConv.id, assignedToUserId: assignId, status: assignId ? "assigned" : "open" });
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs w-40" data-testid="select-assign-director">
+                    <SelectValue placeholder="指派給主任..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">（不指派）</SelectItem>
+                    {directorUsers.map((u) => (
+                      <SelectItem key={u.id} value={u.id} data-testid={`option-director-${u.id}`}>
+                        {u.firstName || u.username || u.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={selectedConv.status}
+                  onValueChange={(val) => assignMutation.mutate({ convId: selectedConv.id, status: val })}
+                >
+                  <SelectTrigger className="h-8 text-xs w-28" data-testid="select-conv-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">未指派</SelectItem>
+                    <SelectItem value="assigned">已指派</SelectItem>
+                    <SelectItem value="closed">已結案</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="messages-list">
+              {messagesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-2/3 rounded-lg" />)}
+                </div>
+              ) : !messages || messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-center">
+                  <p className="text-sm text-muted-foreground">尚無訊息紀錄</p>
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                    data-testid={`message-${msg.id}`}
+                  >
+                    <div className={`max-w-[70%] px-3 py-2 rounded-xl text-sm ${msg.direction === "outbound" ? "bg-tiffany text-white rounded-br-sm" : "bg-gray-100 text-foreground rounded-bl-sm"}`}>
+                      <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                      <p className={`text-[10px] mt-1 ${msg.direction === "outbound" ? "text-white/70" : "text-muted-foreground/70"}`}>
+                        {formatTime(msg.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-4 py-3 border-t border-gray-100 flex gap-2 items-end">
+              <Textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="輸入回覆訊息..."
+                className="flex-1 min-h-[60px] max-h-[120px] text-sm resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (replyText.trim() && !replyMutation.isPending) {
+                      replyMutation.mutate({ convId: selectedConv.id, text: replyText.trim() });
+                    }
+                  }
+                }}
+                data-testid="input-reply-text"
+              />
+              <Button
+                size="icon"
+                className="h-10 w-10 bg-tiffany hover:bg-tiffany/90 flex-shrink-0"
+                onClick={() => { if (replyText.trim()) replyMutation.mutate({ convId: selectedConv.id, text: replyText.trim() }); }}
+                disabled={!replyText.trim() || replyMutation.isPending}
+                data-testid="button-send-reply"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

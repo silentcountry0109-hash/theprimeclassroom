@@ -371,6 +371,218 @@ export async function registerRoutes(
 
   await seedDatabase();
 
+  // ── LINE Webhook (unified: signature verification + inbox storage + account binding) ──
+  app.post("/api/line/webhook", async (req: any, res) => {
+    // 1. Verify LINE signature to reject forged requests
+    const channelSecret = process.env.LINE_CHANNEL_SECRET || process.env.LINE_MESSAGING_CHANNEL_SECRET;
+    if (channelSecret) {
+      const signature = req.headers["x-line-signature"] as string | undefined;
+      const rawBody = req.rawBody as Buffer | undefined;
+      if (!signature || !rawBody) {
+        console.warn("[LINE Webhook] Missing signature or raw body — rejecting request");
+        return res.status(401).json({ message: "Missing signature" });
+      }
+      const hmac = crypto.createHmac("sha256", channelSecret);
+      hmac.update(rawBody);
+      const expected = hmac.digest("base64");
+      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+        console.warn("[LINE Webhook] Signature mismatch — rejecting request");
+        return res.status(401).json({ message: "Invalid signature" });
+      }
+    }
+
+    // Acknowledge immediately (LINE requires 200 within 1 second)
+    res.status(200).json({ ok: true });
+
+    try {
+      const events: any[] = req.body?.events ?? [];
+      for (const event of events) {
+        if (event.type !== "message" || event.message?.type !== "text") continue;
+        const lineUserId: string = event.source?.userId;
+        if (!lineUserId) continue;
+        const text: string = (event.message.text || "").trim();
+        const replyToken: string | undefined = event.replyToken;
+
+        // ── A. Inbox: fetch profile, upsert conversation and store message ──
+        let profile: { displayName?: string; pictureUrl?: string } = {};
+        try {
+          if (channelSecret) {
+            const tokenRes = await fetch("https://api.line.me/v2/oauth/accessToken", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: `grant_type=client_credentials&client_id=${process.env.LINE_MESSAGING_CHANNEL_ID || "2009852161"}&client_secret=${channelSecret}`,
+            });
+            if (tokenRes.ok) {
+              const tokenData = await tokenRes.json() as any;
+              const pr = await fetch(`https://api.line.me/v2/bot/profile/${lineUserId}`, {
+                headers: { Authorization: `Bearer ${tokenData.access_token}` },
+              });
+              if (pr.ok) {
+                const pd = await pr.json() as any;
+                profile = { displayName: pd.displayName, pictureUrl: pd.pictureUrl };
+              }
+            }
+          }
+        } catch {}
+
+        const conv = await storage.upsertLineConversation(lineUserId, {
+          displayName: profile.displayName,
+          pictureUrl: profile.pictureUrl,
+          lastMessageText: text,
+          lastMessageAt: new Date(),
+        });
+        await storage.createLineMessage({
+          conversationId: conv.id,
+          direction: "inbound",
+          text,
+          replyToken: replyToken ?? null,
+        });
+
+        // ── B. Account binding: detect phone-number messages ──
+        const normalized = text.replace(/[\s\-\(\)]/g, "");
+        const phoneRegex = /^09[0-9]{8}$/;
+        if (!phoneRegex.test(normalized)) {
+          // Not a binding attempt — skip binding logic
+          continue;
+        }
+        console.info(`[LINE Binding] Binding attempt from lineUserId=${lineUserId} with phone=${normalized.slice(0, 4)}****`);
+        const [alreadyBound] = await db.select().from(users).where(eq(users.lineUserId, lineUserId)).limit(1);
+        if (alreadyBound) {
+          const name = alreadyBound.firstName || alreadyBound.username || "";
+          if (replyToken) await sendLineReply(replyToken, `${name ? name + " 您好！" : ""}您已完成 LINE 綁定，無需重複操作 ✅`);
+          continue;
+        }
+        const [matchCoach] = await db.select().from(coaches).where(eq(coaches.phone, normalized)).limit(1);
+        let targetUserId: string | null = null;
+        let displayName = "老師";
+        if (matchCoach) {
+          if (!matchCoach.userId) {
+            if (replyToken) await sendLineReply(replyToken, `找到老師「${matchCoach.name}」，但尚未建立系統帳號，請聯絡分校主任協助建立帳號後再綁定。`);
+            continue;
+          }
+          targetUserId = matchCoach.userId;
+          displayName = matchCoach.name || "老師";
+        } else {
+          const [matchUser] = await db.select().from(users).where(
+            and(eq(users.phone, normalized), eq(users.role, "franchise_admin"))
+          ).limit(1);
+          if (matchUser) {
+            targetUserId = matchUser.id;
+            displayName = matchUser.firstName || matchUser.username || "主任";
+          }
+        }
+        if (!targetUserId) {
+          if (replyToken) await sendLineReply(replyToken, `查無手機號碼「${normalized}」對應的老師或分校主任帳號，請確認號碼是否正確，或聯絡分校主任協助。`);
+          continue;
+        }
+        const [targetUser] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+        if (targetUser?.lineUserId) {
+          if (replyToken) await sendLineReply(replyToken, `此手機號碼已完成 LINE 綁定。若需重新綁定，請聯絡分校主任協助解除後再操作。`);
+          continue;
+        }
+        await storage.updateUserLineUserId(targetUserId, lineUserId);
+        if (replyToken) await sendLineReply(replyToken, `✅ 綁定成功！${displayName} 您好，往後課程排班通知、新生預約等重要訊息將直接傳送到這裡。`);
+      }
+    } catch (err) {
+      console.error("[LINE Webhook] Error:", err);
+    }
+  });
+
+  // ── LINE Inbox API ────────────────────────────────────────────────────────
+
+  app.get("/api/line-inbox/conversations", async (req: any, res) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: "未登入" });
+    const user = await authStorage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "hq")) return res.status(403).json({ message: "無權限" });
+    const convs = await storage.getLineConversations();
+    res.json(convs);
+  });
+
+  app.get("/api/line-inbox/my-conversations", async (req: any, res) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: "未登入" });
+    const convs = await storage.getLineConversationsByAssignee(userId);
+    res.json(convs);
+  });
+
+  app.get("/api/line-inbox/conversations/:id/messages", async (req: any, res) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: "未登入" });
+    const convId = parseInt(req.params.id);
+    if (isNaN(convId)) return res.status(400).json({ message: "Invalid ID" });
+    const conv = await storage.getLineConversation(convId);
+    if (!conv) return res.status(404).json({ message: "對話不存在" });
+    const user = await authStorage.getUser(userId);
+    if (!user) return res.status(401).json({ message: "未登入" });
+    if (user.role !== "admin" && user.role !== "hq" && conv.assignedToUserId !== userId) {
+      return res.status(403).json({ message: "無權限" });
+    }
+    const messages = await storage.getLineMessages(convId);
+    res.json(messages);
+  });
+
+  app.patch("/api/line-inbox/conversations/:id", async (req: any, res) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: "未登入" });
+    const user = await authStorage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "hq")) return res.status(403).json({ message: "無權限" });
+    const convId = parseInt(req.params.id);
+    if (isNaN(convId)) return res.status(400).json({ message: "Invalid ID" });
+    const { status, assignedToUserId } = req.body;
+    const updated = await storage.updateLineConversation(convId, { status, assignedToUserId });
+    if (!updated) return res.status(404).json({ message: "對話不存在" });
+
+    if (assignedToUserId) {
+      const assignee = await authStorage.getUser(assignedToUserId);
+      if (assignee) {
+        await storage.createNotification({
+          userId: assignedToUserId,
+          type: "line_inbox_assigned",
+          title: "LINE 客服對話已指派給您",
+          message: `一則來自 ${updated.displayName || updated.lineUserId} 的 LINE 對話已指派給您，請至「LINE 收件匣」查看。`,
+          isRead: false,
+        });
+        if (assignee.lineUserId) {
+          try {
+            await sendLineMessage(assignee.lineUserId, `📋 您有一則新的客服對話待處理\n\n來自：${updated.displayName || updated.lineUserId}\n最新訊息：${updated.lastMessageText || "（無訊息）"}\n\n請登入後台查看 LINE 收件匣。`);
+          } catch (e) {
+            console.error("[LINE] 指派推播失敗:", e);
+          }
+        }
+      }
+    }
+    res.json(updated);
+  });
+
+  app.post("/api/line-inbox/conversations/:id/reply", async (req: any, res) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: "未登入" });
+    const user = await authStorage.getUser(userId);
+    if (!user) return res.status(401).json({ message: "未登入" });
+    const convId = parseInt(req.params.id);
+    if (isNaN(convId)) return res.status(400).json({ message: "Invalid ID" });
+    const conv = await storage.getLineConversation(convId);
+    if (!conv) return res.status(404).json({ message: "對話不存在" });
+    if (user.role !== "admin" && user.role !== "hq" && conv.assignedToUserId !== userId) {
+      return res.status(403).json({ message: "無權限" });
+    }
+    const { text } = req.body;
+    if (!text || typeof text !== "string") return res.status(400).json({ message: "text is required" });
+    await sendLineMessage(conv.lineUserId, text);
+    const msg = await storage.createLineMessage({
+      conversationId: conv.id,
+      direction: "outbound",
+      text,
+      replyToken: null,
+    });
+    await storage.updateLineConversation(conv.id, {
+      lastMessageText: text,
+      lastMessageAt: new Date(),
+    });
+    res.json(msg);
+  });
+
   // ── 臨時測試路由：模擬各種 LINE 通知（僅開發用） ──
   app.get("/api/dev/ping", (_req, res) => { res.json({ ok: true }); });
   app.post("/api/dev/line-test", async (req, res) => {
@@ -1228,80 +1440,6 @@ export async function registerRoutes(
       res.send(lines.join("\r\n"));
     } catch (error) {
       res.status(500).json({ message: "Failed to generate calendar" });
-    }
-  });
-
-  app.post("/api/line/webhook", async (req: any, res) => {
-    try {
-      const channelSecret = process.env.LINE_CHANNEL_SECRET;
-      if (channelSecret) {
-        const signature = req.headers["x-line-signature"] as string;
-        const rawBody = req.rawBody as Buffer | undefined;
-        if (rawBody && signature) {
-          const hmac = crypto.createHmac("sha256", channelSecret);
-          hmac.update(rawBody);
-          const expected = hmac.digest("base64");
-          if (signature !== expected) {
-            console.warn("[LINE Webhook] Signature mismatch — processing anyway");
-          }
-        }
-      }
-      const events: any[] = req.body?.events || [];
-      for (const event of events) {
-        if (event.type !== "message" || event.message?.type !== "text") continue;
-        const lineUserId: string = event.source?.userId;
-        const replyToken: string = event.replyToken;
-        const text: string = (event.message.text || "").trim();
-        if (!lineUserId) continue;
-        const normalized = text.replace(/[\s\-\(\)]/g, "");
-        const phoneRegex = /^09[0-9]{8}$/;
-        if (!phoneRegex.test(normalized)) {
-          await sendLineReply(replyToken, "您好！請傳送您的手機號碼（格式：0912345678）以完成質數教室 LINE 通知綁定。");
-          continue;
-        }
-        const [alreadyBound] = await db.select().from(users).where(eq(users.lineUserId, lineUserId)).limit(1);
-        if (alreadyBound) {
-          const name = alreadyBound.firstName || alreadyBound.username || "";
-          await sendLineReply(replyToken, `${name ? name + " 您好！" : ""}您已完成 LINE 綁定，無需重複操作 ✅`);
-          continue;
-        }
-        // 先從 coaches 表格比對手機號碼（老師手機存在 coaches，不在 users）
-        const [matchCoach] = await db.select().from(coaches).where(eq(coaches.phone, normalized)).limit(1);
-        let targetUserId: string | null = null;
-        let displayName = "老師";
-        if (matchCoach) {
-          if (!matchCoach.userId) {
-            await sendLineReply(replyToken, `找到老師「${matchCoach.name}」，但尚未建立系統帳號，請聯絡分校主任協助建立帳號後再綁定。`);
-            continue;
-          }
-          targetUserId = matchCoach.userId;
-          displayName = matchCoach.name || "老師";
-        } else {
-          // 再從 users 表格比對（分校主任可能有手機號碼）
-          const [matchUser] = await db.select().from(users).where(
-            and(eq(users.phone, normalized), eq(users.role, "franchise_admin"))
-          ).limit(1);
-          if (matchUser) {
-            targetUserId = matchUser.id;
-            displayName = matchUser.firstName || matchUser.username || "主任";
-          }
-        }
-        if (!targetUserId) {
-          await sendLineReply(replyToken, `查無手機號碼「${normalized}」對應的老師或分校主任帳號，請確認號碼是否正確，或聯絡分校主任協助。`);
-          continue;
-        }
-        const [targetUser] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
-        if (targetUser?.lineUserId) {
-          await sendLineReply(replyToken, `此手機號碼已完成 LINE 綁定。若需重新綁定，請聯絡分校主任協助解除後再操作。`);
-          continue;
-        }
-        await storage.updateUserLineUserId(targetUserId, lineUserId);
-        await sendLineReply(replyToken, `✅ 綁定成功！${displayName} 您好，往後課程排班通知、新生預約等重要訊息將直接傳送到這裡。`);
-      }
-      res.status(200).json({ success: true });
-    } catch (error) {
-      console.error("[LINE Webhook] Error:", error);
-      res.status(500).json({ message: "Webhook error" });
     }
   });
 
