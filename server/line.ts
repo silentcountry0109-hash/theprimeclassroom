@@ -191,6 +191,96 @@ function separator(): object {
   return { type: "separator", margin: "sm", color: "#F0F0F0" };
 }
 
+// ── 客服回覆 Flex 卡片（方案 A：Tiffany 漸層，顯示分校＋人員） ──────────────
+export function buildStaffReplyFlex(params: {
+  senderName: string;      // e.g. "陳怡君"
+  senderRole: string;      // e.g. "台北信義分校"
+  messageText: string;
+}): { altText: string; contents: object } {
+  const initial = params.senderRole.charAt(0) || params.senderName.charAt(0) || "質";
+  return {
+    altText: `${params.senderRole} ${params.senderName}：${params.messageText.slice(0, 30)}`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "horizontal",
+        spacing: "md",
+        paddingAll: "12px",
+        background: {
+          type: "linearGradient",
+          angle: "135deg",
+          startColor: "#4ab8b0",
+          endColor: "#a8e8e3",
+        },
+        contents: [
+          {
+            type: "box",
+            layout: "vertical",
+            width: "40px",
+            height: "40px",
+            cornerRadius: "20px",
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "#ffffff66",
+            borderColor: "#ffffffaa",
+            borderWidth: "1.5px",
+            contents: [
+              {
+                type: "text",
+                text: initial,
+                color: "#0a4a47",
+                size: "md",
+                weight: "bold",
+                align: "center",
+              },
+            ],
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            justifyContent: "center",
+            contents: [
+              {
+                type: "text",
+                text: params.senderRole,
+                color: "#0a3d3b",
+                size: "sm",
+                weight: "bold",
+              },
+              {
+                type: "text",
+                text: params.senderName,
+                color: "#1a5c59",
+                size: "xs",
+                margin: "xs",
+              },
+            ],
+          },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "14px",
+        contents: [
+          {
+            type: "text",
+            text: params.messageText,
+            wrap: true,
+            size: "sm",
+            color: "#1a1a1a",
+            lineSpacing: "6px",
+          },
+        ],
+      },
+    },
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export function buildBookingSuccessFlex(params: {
   childName: string;
   date: string;

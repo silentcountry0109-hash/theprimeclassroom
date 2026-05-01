@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineFlexMessages, buildBookingSuccessFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
+import { sendLineFlexMessages, sendLineFlexMessage, buildBookingSuccessFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildStaffReplyFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -569,7 +569,19 @@ export async function registerRoutes(
     }
     const { text } = req.body;
     if (!text || typeof text !== "string") return res.status(400).json({ message: "text is required" });
-    await sendLineMessage(conv.lineUserId, text);
+
+    // 組合發送者名稱與分校角色
+    const senderName = [user.firstName, user.lastName].filter(Boolean).join("") || user.username || "客服人員";
+    let senderRole = "The Prime 質數教室";
+    if (user.franchiseId) {
+      const franchise = await storage.getFranchise(user.franchiseId);
+      if (franchise) senderRole = franchise.name;
+    }
+
+    // 方案 A：Tiffany 漸層 Flex 卡片，家長可看到分校＋人員名稱
+    const flexCard = buildStaffReplyFlex({ senderName, senderRole, messageText: text });
+    await sendLineFlexMessage(conv.lineUserId, flexCard.altText, flexCard.contents);
+
     const msg = await storage.createLineMessage({
       conversationId: conv.id,
       direction: "outbound",
