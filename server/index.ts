@@ -13,6 +13,10 @@ declare module "http" {
   }
 }
 
+// LINE Webhook must use express.raw() BEFORE the global JSON parser so that
+// req.body is the raw Buffer, enabling correct HMAC-SHA256 signature verification.
+app.use("/api/line/webhook", express.raw({ type: "*/*" }));
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {

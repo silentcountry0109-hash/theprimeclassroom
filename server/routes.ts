@@ -373,29 +373,53 @@ export async function registerRoutes(
 
   // ── LINE Webhook (unified: signature verification + inbox storage + account binding) ──
   app.post("/api/line/webhook", async (req: any, res) => {
-    // 1. Verify LINE signature to reject forged requests
-    const channelSecret = process.env.LINE_CHANNEL_SECRET || process.env.LINE_MESSAGING_CHANNEL_SECRET;
-    if (channelSecret) {
-      const signature = req.headers["x-line-signature"] as string | undefined;
-      const rawBody = req.rawBody as Buffer | undefined;
-      if (!signature || !rawBody) {
-        console.warn("[LINE Webhook] Missing signature or raw body — rejecting request");
-        return res.status(401).json({ message: "Missing signature" });
-      }
-      const hmac = crypto.createHmac("sha256", channelSecret);
-      hmac.update(rawBody);
-      const expected = hmac.digest("base64");
-      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-        console.warn("[LINE Webhook] Signature mismatch — rejecting request");
-        return res.status(401).json({ message: "Invalid signature" });
-      }
+    // 1. Verify LINE signature to reject forged requests.
+    // express.raw() is applied to this route before the global JSON parser, so
+    // req.body is the raw Buffer needed for correct HMAC-SHA256 computation.
+    const channelSecret = process.env.LINE_MESSAGING_CHANNEL_SECRET || process.env.LINE_CHANNEL_SECRET;
+    const rawBody = req.body as Buffer | undefined;
+
+    if (!channelSecret) {
+      console.warn("[LINE Webhook] LINE_MESSAGING_CHANNEL_SECRET is not configured — rejecting request to prevent fail-open");
+      return res.status(500).json({ message: "Webhook not configured" });
+    }
+
+    const signature = req.headers["x-line-signature"] as string | undefined;
+    if (!signature || !rawBody || !Buffer.isBuffer(rawBody)) {
+      console.warn("[LINE Webhook] Missing X-Line-Signature header or raw body — rejecting request");
+      return res.status(400).json({ message: "Missing signature" });
+    }
+    const hmac = crypto.createHmac("sha256", channelSecret);
+    hmac.update(rawBody);
+    const expected = hmac.digest("base64");
+    let valid = false;
+    try {
+      valid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    } catch {
+      valid = false;
+    }
+    if (!valid) {
+      console.warn("[LINE Webhook] X-Line-Signature mismatch — rejecting forged request");
+      return res.status(400).json({ message: "Invalid signature" });
     }
 
     // Acknowledge immediately (LINE requires 200 within 1 second)
     res.status(200).json({ ok: true });
 
+    // Parse JSON body from raw Buffer
+    let parsedBody: any = {};
+    if (rawBody && Buffer.isBuffer(rawBody)) {
+      try {
+        parsedBody = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        console.warn("[LINE Webhook] Failed to parse JSON body");
+      }
+    } else if (req.body && typeof req.body === "object") {
+      parsedBody = req.body;
+    }
+
     try {
-      const events: any[] = req.body?.events ?? [];
+      const events: any[] = parsedBody?.events ?? [];
       for (const event of events) {
         if (event.type !== "message" || event.message?.type !== "text") continue;
         const lineUserId: string = event.source?.userId;
