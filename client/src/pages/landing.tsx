@@ -1665,6 +1665,31 @@ function ProcessSection() {
               );
             })}
 
+            {(() => {
+              const robotPositions = [
+                { left: 124, top: -36 },
+                { left: 262, top: 124 },
+                { left: 124, top: 256 },
+                { left: -26, top: 124 },
+              ];
+              const rp = robotPositions[activeStep];
+              return (
+                <motion.div
+                  className="absolute z-30 pointer-events-none"
+                  animate={{ left: rp.left, top: rp.top }}
+                  transition={{ type: "spring", stiffness: 130, damping: 18 }}
+                >
+                  <motion.img
+                    src={robotMascotImg}
+                    alt="質數小助手"
+                    className="w-10 h-10 object-contain drop-shadow-sm"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                </motion.div>
+              );
+            })()}
+
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-16">
               <AnimatePresence mode="wait">
                 <motion.div
