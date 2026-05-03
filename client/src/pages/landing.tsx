@@ -1667,10 +1667,10 @@ function ProcessSection() {
 
             {(() => {
               const robotPositions = [
-                { left: 124, top: -36 },
-                { left: 262, top: 124 },
-                { left: 124, top: 256 },
-                { left: -26, top: 124 },
+                { left: 148, top: -4 },
+                { left: 252, top: 102 },
+                { left: 148, top: 240 },
+                { left: -14, top: 102 },
               ];
               const rp = robotPositions[activeStep];
               return (
@@ -1682,7 +1682,7 @@ function ProcessSection() {
                   <motion.img
                     src={robotMascotImg}
                     alt="質數小助手"
-                    className="w-10 h-10 object-contain drop-shadow-sm"
+                    className="w-14 h-14 object-contain drop-shadow-sm"
                     animate={{ y: [0, -6, 0] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                   />
@@ -1724,15 +1724,15 @@ function ProcessSection() {
 
         <div className="hidden md:block relative">
           <motion.div
-            className="absolute z-20 pointer-events-none -translate-x-1/2"
-            style={{ top: -72 }}
-            animate={{ left: `${(activeStep * 2 + 1) / 8 * 100}%` }}
+            className="absolute z-20 pointer-events-none -translate-y-1/2"
+            style={{ top: 24 }}
+            animate={{ left: `calc(${(activeStep * 2 + 1) / 8 * 100}% + 20px)` }}
             transition={{ type: "spring", stiffness: 120, damping: 18 }}
           >
             <motion.img
               src={robotMascotImg}
               alt="質數小助手"
-              className="w-20 h-20 object-contain drop-shadow-md"
+              className="w-28 h-28 object-contain drop-shadow-md"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             />
