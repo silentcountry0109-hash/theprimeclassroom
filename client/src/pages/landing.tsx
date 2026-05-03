@@ -91,6 +91,10 @@ import teachImg1 from "@assets/螺旋式課程_1776335067651.png";
 import teachImg2 from "@assets/階梯式教學_1776335069419.png";
 import teachImg3 from "@assets/單元評測_1776335072659.png";
 import teachImg4 from "@assets/個別指導・個別進度_1776335074228.png";
+import philIcon1 from "@assets/工作區域_10_1777786048500.png";
+import philIcon2 from "@assets/工作區域_18_1777786055164.png";
+import philIcon3 from "@assets/工作區域_23_1777786057128.png";
+import philIcon4 from "@assets/工作區域_11_1777786058902.png";
 import studentBoy1 from "@assets/student_boy_1.png";
 import studentBoy2 from "@assets/student_boy_2.png";
 import studentGirl1 from "@assets/student_girl_1.png";
@@ -681,10 +685,10 @@ function BrandPhilosophySection() {
   const brandPhil4Desc = useSiteContent("brand.phil4.desc", "明亮舒適的教室環境，讓孩子在輕鬆愉快的氛圍中專注學習");
 
   const philosophies = [
-    { icon: Users, title: brandPhil1Title, description: brandPhil1Desc, color: "tiffany" },
-    { icon: Lightbulb, title: brandPhil2Title, description: brandPhil2Desc, color: "coral" },
-    { icon: Map, title: brandPhil3Title, description: brandPhil3Desc, color: "tiffany" },
-    { icon: Shield, title: brandPhil4Title, description: brandPhil4Desc, color: "coral" },
+    { img: philIcon1, title: brandPhil1Title, description: brandPhil1Desc },
+    { img: philIcon2, title: brandPhil2Title, description: brandPhil2Desc },
+    { img: philIcon3, title: brandPhil3Title, description: brandPhil3Desc },
+    { img: philIcon4, title: brandPhil4Title, description: brandPhil4Desc },
   ];
 
   return (
@@ -725,8 +729,8 @@ function BrandPhilosophySection() {
               transition={{ duration: 0.4, delay: 0.15 + i * 0.1 }}
               data-testid={`card-philosophy-${i}`}
             >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${item.color === "tiffany" ? "bg-tiffany/10" : "bg-coral/10"}`}>
-                <item.icon className={`w-5 h-5 ${item.color === "tiffany" ? "text-tiffany" : "text-coral"}`} />
+              <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <img src={item.img} alt={item.title} className="w-full h-full object-contain" />
               </div>
               <p className="text-sm font-semibold text-foreground mb-1.5">{item.title}</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
