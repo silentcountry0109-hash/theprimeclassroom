@@ -1665,30 +1665,23 @@ function ProcessSection() {
               );
             })}
 
-            {(() => {
-              const robotPositions = [
-                { left: 148, top: -4 },
-                { left: 252, top: 102 },
-                { left: 148, top: 240 },
-                { left: -14, top: 102 },
-              ];
-              const rp = robotPositions[activeStep];
-              return (
-                <motion.div
-                  className="absolute z-30 pointer-events-none"
-                  animate={{ left: rp.left, top: rp.top }}
-                  transition={{ type: "spring", stiffness: 130, damping: 18 }}
-                >
-                  <motion.img
-                    src={robotMascotImg}
-                    alt="質數小助手"
-                    className="w-14 h-14 object-contain drop-shadow-sm"
-                    animate={{ y: [0, -6, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  />
-                </motion.div>
-              );
-            })()}
+            <motion.div
+              className="absolute z-30 pointer-events-none"
+              initial={{ left: 148, top: -4 }}
+              animate={{
+                left: [148, 252, 148, -14][activeStep],
+                top: [-4, 102, 240, 102][activeStep],
+              }}
+              transition={{ type: "spring", stiffness: 130, damping: 18 }}
+            >
+              <motion.img
+                src={robotMascotImg}
+                alt="質數小助手"
+                className="w-14 h-14 object-contain drop-shadow-sm"
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </motion.div>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-16">
               <AnimatePresence mode="wait">
