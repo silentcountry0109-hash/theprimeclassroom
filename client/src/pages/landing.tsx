@@ -152,6 +152,7 @@ function WaveDivider({ from, to }: { from: string; to: string }) {
 
 function PingPongGif({ src, className, alt }: { src: string; className?: string; alt?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
 
   useEffect(() => {
     let animHandle: number;
@@ -193,6 +194,8 @@ function PingPongGif({ src, className, alt }: { src: string; className?: string;
         let idx = 0;
         let lastTime = 0;
 
+        setCanvasReady(true);
+
         const tick = (now: number) => {
           if (cancelled) return;
           const frame = sequence[idx];
@@ -205,16 +208,7 @@ function PingPongGif({ src, className, alt }: { src: string; className?: string;
         };
         animHandle = requestAnimationFrame(tick);
       } catch {
-        // Fallback: render as static image
-        const img = document.createElement("img");
-        img.src = src;
-        img.onload = () => {
-          const canvas = canvasRef.current;
-          if (!canvas || cancelled) return;
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          canvas.getContext("2d")?.drawImage(img, 0, 0);
-        };
+        setCanvasReady(true);
       }
     })();
 
@@ -224,7 +218,21 @@ function PingPongGif({ src, className, alt }: { src: string; className?: string;
     };
   }, [src]);
 
-  return <canvas ref={canvasRef} className={className} aria-label={alt} />;
+  return (
+    <span className={`relative inline-block w-full ${className ?? ""}`} style={{ display: "block" }}>
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-auto object-contain"
+        style={{ display: canvasReady ? "none" : "block" }}
+      />
+      <canvas
+        ref={canvasRef}
+        aria-label={alt}
+        style={{ display: canvasReady ? "block" : "none", width: "100%", height: "auto" }}
+      />
+    </span>
+  );
 }
 
 function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string }) {
