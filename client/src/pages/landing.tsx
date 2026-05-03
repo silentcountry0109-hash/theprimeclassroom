@@ -95,6 +95,7 @@ import philIcon1 from "@assets/工作區域_10_1777786048500.png";
 import philIcon2 from "@assets/工作區域_18_1777786055164.png";
 import philIcon3 from "@assets/工作區域_23_1777786057128.png";
 import philIcon4 from "@assets/工作區域_11_1777786058902.png";
+import robotMascotImg from "@assets/工作區域_2_1777787491905.png";
 import studentBoy1 from "@assets/student_boy_1.png";
 import studentBoy2 from "@assets/student_boy_2.png";
 import studentGirl1 from "@assets/student_girl_1.png";
@@ -1696,52 +1697,69 @@ function ProcessSection() {
           </div>
         </div>
 
-        <div className="hidden md:grid grid-cols-4 gap-8">
+        <div className="hidden md:block relative">
+          <motion.div
+            className="absolute z-20 pointer-events-none"
+            style={{ top: -72, translateX: "-50%" }}
+            animate={{ left: `${(activeStep * 2 + 1) / 8 * 100}%` }}
+            transition={{ type: "spring", stiffness: 120, damping: 18 }}
+          >
+            <motion.img
+              src={robotMascotImg}
+              alt="質數小助手"
+              className="w-20 h-20 object-contain drop-shadow-md"
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </motion.div>
+
+          <div className="grid grid-cols-4 gap-8">
           {steps.map((step, i) => {
-            const isActive = i === activeStep;
-            const isPast = i < activeStep;
-            return (
-              <motion.div
-                key={step.title}
-                className="text-center relative"
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.15 }}
-              >
-                {i < steps.length - 1 && (
-                  <div className="absolute top-14 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
+              const isActive = i === activeStep;
+              const isPast = i < activeStep;
+              return (
+                <motion.div
+                  key={step.title}
+                  className="text-center relative"
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: i * 0.15 }}
+                >
+                  {i < steps.length - 1 && (
+                    <div className="absolute top-14 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
+                      <div
+                        className="h-full bg-tiffany/50 rounded-full transition-all duration-700 ease-in-out"
+                        style={{ width: isPast ? "100%" : isActive ? "50%" : "0%" }}
+                      />
+                    </div>
+                  )}
+                  <div className="relative z-10">
+                    <span className={`text-xs font-bold tracking-widest mb-3 block transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/40"}`}>
+                      {step.number}
+                    </span>
                     <div
-                      className="h-full bg-tiffany/50 rounded-full transition-all duration-700 ease-in-out"
-                      style={{ width: isPast ? "100%" : isActive ? "50%" : "0%" }}
-                    />
+                      className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-5 transition-all duration-500 ${
+                        isActive
+                          ? "bg-tiffany/25 scale-125 shadow-lg ring-2 ring-tiffany/40 -translate-y-2"
+                          : isPast
+                          ? "bg-tiffany/20 scale-100"
+                          : "bg-tiffany/10 scale-100"
+                      }`}
+                    >
+                      <step.icon className={`w-7 h-7 transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/50"}`} />
+                    </div>
+                    <h3 className={`text-base font-semibold mb-2 transition-colors duration-500 ${isActive ? "text-foreground" : "text-foreground/50"}`}>
+                      {step.title}
+                    </h3>
+                    <p className={`text-sm leading-relaxed transition-colors duration-500 ${isActive ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
+                      {step.description}
+                    </p>
                   </div>
-                )}
-                <div className="relative z-10">
-                  <span className={`text-xs font-bold tracking-widest mb-3 block transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/40"}`}>
-                    {step.number}
-                  </span>
-                  <div
-                    className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-5 transition-all duration-500 ${
-                      isActive
-                        ? "bg-tiffany/25 scale-125 shadow-lg ring-2 ring-tiffany/40 -translate-y-2"
-                        : isPast
-                        ? "bg-tiffany/20 scale-100"
-                        : "bg-tiffany/10 scale-100"
-                    }`}
-                  >
-                    <step.icon className={`w-7 h-7 transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/50"}`} />
-                  </div>
-                  <h3 className={`text-base font-semibold mb-2 transition-colors duration-500 ${isActive ? "text-foreground" : "text-foreground/50"}`}>
-                    {step.title}
-                  </h3>
-                  <p className={`text-sm leading-relaxed transition-colors duration-500 ${isActive ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
-                    {step.description}
-                  </p>
-                </div>
-              </motion.div>
-            );
-          })}
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="hidden md:flex items-center justify-center gap-2 mt-10">
