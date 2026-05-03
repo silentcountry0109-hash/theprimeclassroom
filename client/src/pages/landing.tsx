@@ -722,15 +722,15 @@ function BrandPhilosophySection() {
           {philosophies.map((item, i) => (
             <motion.div
               key={item.title}
-              className="text-center p-5 md:p-6 rounded-2xl bg-washi border border-transparent hover:border-tiffany/20 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300"
+              className="group text-center p-5 md:p-6 rounded-2xl bg-washi border border-transparent hover:border-tiffany/20 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: 0.15 + i * 0.1 }}
               data-testid={`card-philosophy-${i}`}
             >
-              <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <img src={item.img} alt={item.title} className="w-full h-full object-contain" />
+              <div className="w-24 h-24 flex items-center justify-center mx-auto mb-4">
+                <img src={item.img} alt={item.title} className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-110" />
               </div>
               <p className="text-sm font-semibold text-foreground mb-1.5">{item.title}</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
