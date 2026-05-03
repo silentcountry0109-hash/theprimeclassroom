@@ -1699,8 +1699,8 @@ function ProcessSection() {
 
         <div className="hidden md:block relative">
           <motion.div
-            className="absolute z-20 pointer-events-none"
-            style={{ top: -72, translateX: "-50%" }}
+            className="absolute z-20 pointer-events-none -translate-x-1/2"
+            style={{ top: -72 }}
             animate={{ left: `${(activeStep * 2 + 1) / 8 * 100}%` }}
             transition={{ type: "spring", stiffness: 120, damping: 18 }}
           >
