@@ -86,7 +86,7 @@ import deco15Img from "@assets/工作區域_15_1776423698456.png";
 import deco10Img from "@assets/工作區域_10_1776423709223.png";
 import deco6Img from "@assets/工作區域_6_1776423712973.png";
 import deco5Img from "@assets/工作區域_5_1776423714787.png";
-import subtitleGif from "@assets/Adobe_Express_-_國小個別指導眼睛_1776335060502.gif";
+import subtitleGif from "@assets/國小個別指導_1777784388983.gif";
 import teachImg1 from "@assets/螺旋式課程_1776335067651.png";
 import teachImg2 from "@assets/階梯式教學_1776335069419.png";
 import teachImg3 from "@assets/單元評測_1776335072659.png";
