@@ -461,6 +461,140 @@ export function buildRecurringBookingFlex(params: {
   };
 }
 
+export function buildManualBookingFlex(params: {
+  childName: string;
+  date: string;
+  time: string;
+  teacher: string;
+  location: string;
+  bookingUrl?: string;
+}): { altText: string; contents: object } {
+  return {
+    altText: `✅ 課程已加排！${params.childName} ${params.date} ${params.time}`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#388E3C",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "✅  課程已加排！", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "The Prime 質數教室", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("孩子", params.childName, "#2E7D32"),
+          separator(),
+          infoRow("📅 日期", params.date),
+          infoRow("🕙 時間", params.time),
+          infoRow("👩‍🏫 老師", params.teacher),
+          infoRow("📍 地點", params.location),
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#388E3C",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "查看預約詳情 →",
+              uri: params.bookingUrl ?? `${BASE}/`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildContactBookFlex(params: {
+  childName: string;
+  teacher: string;
+  date: string;
+  bookingUrl?: string;
+}): { altText: string; contents: object } {
+  return {
+    altText: `📒 聯絡簿通知：${params.childName} 今日課後記錄已填寫`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#E65100",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "📒  聯絡簿通知", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "課後學習記錄已更新", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("孩子", params.childName, "#E65100"),
+          separator(),
+          infoRow("📅 日期", params.date),
+          infoRow("👩‍🏫 老師", params.teacher),
+          separator(),
+          {
+            type: "text",
+            text: "🎯 老師已完成今日課後紀錄，請至 App 查看詳情！",
+            color: "#888888",
+            size: "xs",
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#E65100",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "查看聯絡簿 →",
+              uri: params.bookingUrl ?? `${BASE}/`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
 export function buildCourseCancelFlex(params: {
   childName: string;
   date: string;

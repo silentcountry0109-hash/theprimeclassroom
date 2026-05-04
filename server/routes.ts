@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineFlexMessages, sendLineFlexMessage, buildBookingSuccessFlex, buildRecurringBookingFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
+import { sendLineFlexMessages, sendLineFlexMessage, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -1296,8 +1296,14 @@ export async function registerRoutes(
         if (parentUser?.lineUserId) {
           const newBalance = await storage.getParentBalance(userId);
           const slotEndTime = target.slotEndTime || "";
-          const cancelMsg = `【質數教室】❌ 課程已取消\n日期：${slotDate}\n時間：${slotStartTime}–${slotEndTime}\n點數已退回，剩餘 ${newBalance} 堂`;
-          await sendLineMessage(parentUser.lineUserId, cancelMsg);
+          const flex = buildCourseCancelFlex({
+            childName: target.childName || "孩子",
+            date: slotDate,
+            time: `${slotStartTime}–${slotEndTime}`,
+            teacher: target.coachName || "老師",
+            credits: newBalance,
+          });
+          await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
         }
       } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
 
@@ -2463,8 +2469,19 @@ export async function registerRoutes(
             const [coachRec] = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, slot.coachId));
             coachName = coachRec?.name || "";
           }
-          const msg = `【質數教室】✅ 課程已加排\n日期：${slot.date}\n時間：${slot.startTime}–${slot.endTime}\n${coachName ? `老師：${coachName}\n` : ""}地點：${franchise?.name || "教室"}`;
-          await sendLineMessage(parentUser.lineUserId, msg).catch((e) =>
+          let childDisplayName = walkInName || "";
+          if (!childDisplayName && childId) {
+            const [childRec] = await db.select({ name: children.name }).from(children).where(eq(children.id, parseInt(childId)));
+            childDisplayName = childRec?.name || "孩子";
+          }
+          const flex = buildManualBookingFlex({
+            childName: childDisplayName || "孩子",
+            date: slot.date,
+            time: `${slot.startTime}–${slot.endTime}`,
+            teacher: coachName || "待確認",
+            location: franchise?.name || "教室",
+          });
+          await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents).catch((e) =>
             console.error("[LINE] manual-booking 家長通知失敗:", e)
           );
         }
@@ -2803,8 +2820,13 @@ export async function registerRoutes(
           notifiedParents.add(childRow.parentId);
           const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, childRow.parentId));
           if (parentUser?.lineUserId) {
-            const contactMsg = `【質數教室】📒 聯絡簿通知\n${childRow.name} 今日課後紀錄已填寫\n老師 ${req.coach.name} 已完成記錄\n請至 App 查看詳情`;
-            await sendLineMessage(parentUser.lineUserId, contactMsg);
+            const today = new Date().toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" });
+            const flex = buildContactBookFlex({
+              childName: childRow.name,
+              teacher: req.coach.name,
+              date: today,
+            });
+            await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
           }
         }
       } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
