@@ -1185,6 +1185,8 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     onSuccess: () => {
       toast({ title: "聯絡簿已儲存", description: "家長現在可以看到上課紀錄了" });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/contact-books/slot", slot.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
       onClose();
     },
     onError: () => {

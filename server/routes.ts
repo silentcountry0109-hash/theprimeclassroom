@@ -2690,6 +2690,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "此聯絡簿不屬於您" });
       }
       const updated = await storage.updateContactBook(id, req.body);
+      await storage.updateCoachDailyRecord(existing.coachId, existing.lessonDate);
       res.json(updated);
     } catch (error) {
       console.error("[contact-books PATCH]", error);
