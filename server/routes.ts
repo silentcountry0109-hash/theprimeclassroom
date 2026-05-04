@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineFlexMessages, sendLineFlexMessage, buildBookingSuccessFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
+import { sendLineFlexMessages, sendLineFlexMessage, buildBookingSuccessFlex, buildRecurringBookingFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -1097,8 +1097,15 @@ export async function registerRoutes(
             const [coachRec] = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, slot.coachId));
             coachName = coachRec?.name || "";
           }
-          const parentMsg = `【質數教室】✅ 預約成功！\n日期：${slotDateStr}\n時間：${slotTime}\n${coachName ? `老師：${coachName}\n` : ""}地點：${franchiseName}\n目前剩餘 ${newBalance} 堂`;
-          await sendLineMessage(parentUser.lineUserId, parentMsg);
+          const flex = buildBookingSuccessFlex({
+            childName,
+            date: slotDateStr,
+            time: slotTime,
+            teacher: coachName || "待確認",
+            location: franchiseName,
+            credits: newBalance,
+          });
+          await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
         }
 
         // 點數不足提醒
@@ -1194,9 +1201,15 @@ export async function registerRoutes(
                 return s ? `${s.date} ${s.startTime}–${s.endTime}` : "";
               })
             );
-            const moreCount = successSlotIds.length > 5 ? `\n…等共 ${successSlotIds.length} 堂` : "";
-            const parentMsg = `【質數教室】✅ 連排預約成功！\n${childName} 已預約 ${successSlotIds.length} 堂課程：\n${slotSummary.filter(Boolean).join("\n")}${moreCount}\n目前剩餘 ${newBalance} 堂`;
-            await sendLineMessage(parentUser.lineUserId, parentMsg);
+            const moreCount = Math.max(0, successSlotIds.length - 5);
+            const recurringFlex = buildRecurringBookingFlex({
+              childName,
+              totalCount: successSlotIds.length,
+              slots: slotSummary.filter(Boolean),
+              moreCount,
+              credits: newBalance,
+            });
+            await sendLineFlexMessage(parentUser.lineUserId, recurringFlex.altText, recurringFlex.contents);
 
             if (newBalance <= 1) {
               const warnMsg = newBalance === 0

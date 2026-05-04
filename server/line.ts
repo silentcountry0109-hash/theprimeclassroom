@@ -166,7 +166,9 @@ export async function sendLineReply(replyToken: string, message: string): Promis
   }
 }
 
-const BASE = "https://35b01c9c-e144-4845-804d-493efef1bdbc-00-1f48xp0bjovrd.worf.replit.dev";
+const BASE = process.env.REPLIT_DOMAINS
+  ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+  : process.env.APP_BASE_URL || "https://the-prime-math.replit.app";
 
 function infoRow(label: string, value: string, valueColor = "#2C2C2C", strikethrough = false): object {
   return {
@@ -363,6 +365,94 @@ export function buildPreClassReminderFlex(params: {
             action: {
               type: "uri",
               label: "查看課程資訊 →",
+              uri: params.bookingUrl ?? `${BASE}/`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildRecurringBookingFlex(params: {
+  childName: string;
+  totalCount: number;
+  slots: string[];
+  moreCount: number;
+  credits: number;
+  bookingUrl?: string;
+}): { altText: string; contents: object } {
+  const slotItems = params.slots.map((s) => ({
+    type: "text",
+    text: `• ${s}`,
+    color: "#555555",
+    size: "xs",
+    wrap: true,
+  }));
+  if (params.moreCount > 0) {
+    slotItems.push({
+      type: "text",
+      text: `…等共 ${params.totalCount} 堂`,
+      color: "#AAAAAA",
+      size: "xs",
+      wrap: true,
+    });
+  }
+  return {
+    altText: `✅ 連排預約成功！${params.childName} 共 ${params.totalCount} 堂`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#81D8D0",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "✅  連排預約成功！", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: `${params.childName} 共預約 ${params.totalCount} 堂`, color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("孩子", params.childName, "#4FBDB4"),
+          separator(),
+          ...slotItems,
+          separator(),
+          {
+            type: "box",
+            layout: "horizontal",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "剩餘", color: "#AAAAAA", size: "xs", flex: 0 },
+              { type: "text", text: `🎫 ${params.credits} 堂`, color: "#E65100", size: "xs", weight: "bold", flex: 1 },
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#81D8D0",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "查看預約詳情 →",
               uri: params.bookingUrl ?? `${BASE}/`,
             },
           },
