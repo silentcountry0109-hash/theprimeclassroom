@@ -3945,7 +3945,7 @@ export async function registerRoutes(
     const data = req.method === "POST" ? req.body : req.query;
     const { RtnCode } = data as Record<string, string>;
     const status = RtnCode === "1" ? "success" : "fail";
-    res.redirect(`/parent?tab=credits&payment=${status}`);
+    res.redirect(`/dashboard?tab=credits&payment=${status}`);
   };
   app.get("/api/payment/ecpay/return", handleEcpayReturn);
   app.post("/api/payment/ecpay/return", handleEcpayReturn);
