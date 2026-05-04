@@ -11,13 +11,13 @@ export const modules: ModuleMap = {
   "./components/mockups/line-cards/CourseCancel.tsx": () => import("../components/mockups/line-cards/CourseCancel.tsx"),
   "./components/mockups/line-cards/PreClassReminder.tsx": () => import("../components/mockups/line-cards/PreClassReminder.tsx"),
   "./components/mockups/line-cards/TeacherScheduleChange.tsx": () => import("../components/mockups/line-cards/TeacherScheduleChange.tsx"),
-  "./components/mockups/materials/CoachLibrary.tsx": () => import("../components/mockups/materials/CoachLibrary.tsx"),
-  "./components/mockups/materials/HQUpload.tsx": () => import("../components/mockups/materials/HQUpload.tsx"),
   "./components/mockups/line-register/BindLineOfficial.tsx": () => import("../components/mockups/line-register/BindLineOfficial.tsx"),
   "./components/mockups/line-register/FillProfile.tsx": () => import("../components/mockups/line-register/FillProfile.tsx"),
   "./components/mockups/line-register/LineAuth.tsx": () => import("../components/mockups/line-register/LineAuth.tsx"),
   "./components/mockups/line-register/LineRegisterFlow.tsx": () => import("../components/mockups/line-register/LineRegisterFlow.tsx"),
   "./components/mockups/line-register/LoginPage.tsx": () => import("../components/mockups/line-register/LoginPage.tsx"),
   "./components/mockups/line-register/OtpVerify.tsx": () => import("../components/mockups/line-register/OtpVerify.tsx"),
+  "./components/mockups/materials/CoachLibrary.tsx": () => import("../components/mockups/materials/CoachLibrary.tsx"),
+  "./components/mockups/materials/HQUpload.tsx": () => import("../components/mockups/materials/HQUpload.tsx"),
   "./components/mockups/schedule-picker/SchedulePicker.tsx": () => import("../components/mockups/schedule-picker/SchedulePicker.tsx")
 };
