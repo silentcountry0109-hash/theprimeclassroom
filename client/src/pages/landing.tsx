@@ -86,7 +86,7 @@ import deco15Img from "@assets/工作區域_15_1776423698456.png";
 import deco10Img from "@assets/工作區域_10_1776423709223.png";
 import deco6Img from "@assets/工作區域_6_1776423712973.png";
 import deco5Img from "@assets/工作區域_5_1776423714787.png";
-import subtitleWebp from "@assets/國小個別指導webp版_1777901885456.webp";
+import subtitleAnimatedWebp from "@assets/國小個別指導_pingpong_animated.webp";
 import teachImg1 from "@assets/螺旋式課程_1776335067651.png";
 import teachImg2 from "@assets/階梯式教學_1776335069419.png";
 import teachImg3 from "@assets/單元評測_1776335072659.png";
@@ -497,7 +497,7 @@ function HeroSection() {
           transition={{ duration: 0.6, delay: 1.0 }}
         >
           <img
-            src={subtitleWebp}
+            src={subtitleAnimatedWebp}
             alt="國小數學個別指導"
             className="w-full max-w-lg mx-auto h-auto object-contain"
           />
