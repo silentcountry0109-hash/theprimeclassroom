@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineFlexMessages, sendLineFlexMessage, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
+import { sendLineMessage, sendLineReply, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -19,7 +19,6 @@ import express from "express";
 import { generateCoachHeadshotFromBuffer } from "./gemini-image";
 import { generateFranchiseDescription } from "./gemini-text";
 import { objectStorageClient } from "./replit_integrations/object_storage";
-import { sendLineMessage, sendLineReply } from "./line";
 
 interface PgUniqueViolation {
   code: "23505";
