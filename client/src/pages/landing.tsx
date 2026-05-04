@@ -1681,7 +1681,7 @@ function ProcessSection() {
               <motion.img
                 src={robotMascotImg}
                 alt="質數小助手"
-                className="w-14 h-14 object-contain drop-shadow-sm"
+                className="w-12 h-12 object-contain drop-shadow-sm"
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               />
