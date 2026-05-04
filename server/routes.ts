@@ -739,6 +739,108 @@ export async function registerRoutes(
 
   // ── END LINE Login OAuth ───────────────────────────────────────────────────────
 
+  // ── LINE OA Webhook — Coach / Director account binding ────────────────────────
+  app.post("/api/line/oa-webhook", async (req: any, res) => {
+    // Always respond 200 immediately to satisfy LINE's webhook requirement
+    res.sendStatus(200);
+
+    // ── Signature verification ────────────────────────────────────────────────
+    const channelSecret = process.env.LINE_MESSAGING_CHANNEL_SECRET;
+    if (!channelSecret) {
+      console.error("[LINE OA Webhook] 缺少 LINE_MESSAGING_CHANNEL_SECRET，跳過簽章驗證");
+      return;
+    }
+
+    const signature = req.headers["x-line-signature"] as string | undefined;
+    if (!signature) {
+      console.warn("[LINE OA Webhook] 收到無 x-line-signature 的請求，已忽略");
+      return;
+    }
+
+    const rawBody: Buffer | undefined = req.rawBody;
+    if (!rawBody) {
+      console.warn("[LINE OA Webhook] rawBody 不存在，無法驗證簽章");
+      return;
+    }
+
+    const expected = crypto
+      .createHmac("sha256", channelSecret)
+      .update(rawBody)
+      .digest("base64");
+
+    if (expected !== signature) {
+      console.warn("[LINE OA Webhook] 簽章驗證失敗，已忽略");
+      return;
+    }
+
+    // ── Process events ────────────────────────────────────────────────────────
+    const body = req.body as { events?: any[] };
+    const events: any[] = body.events ?? [];
+
+    for (const event of events) {
+      if (event.type !== "message" || event.message?.type !== "text") continue;
+
+      const lineUserId: string = event.source?.userId;
+      const replyToken: string = event.replyToken;
+      const text: string = (event.message.text ?? "").trim();
+
+      if (!lineUserId || !replyToken) continue;
+
+      // Accept only messages that look like a Taiwan mobile phone number (09XXXXXXXX)
+      if (!/^09\d{8}$/.test(text)) {
+        await sendLineReply(
+          replyToken,
+          "請傳送您在質數教室登記的手機號碼（格式：09XXXXXXXX）以完成 LINE 帳號綁定。"
+        );
+        continue;
+      }
+
+      const phone = text;
+
+      try {
+        const user = await storage.getUserByPhone(phone);
+
+        if (!user) {
+          await sendLineReply(replyToken, "找不到以此手機號碼登記的帳號，請確認號碼是否正確。");
+          continue;
+        }
+
+        if (user.role !== "coach" && user.role !== "franchise_admin") {
+          await sendLineReply(replyToken, "此功能僅供老師及分校主任使用，您的帳號身份不符。");
+          continue;
+        }
+
+        if (user.lineUserId && user.lineUserId === lineUserId) {
+          await sendLineReply(replyToken, "您的 LINE 帳號已完成綁定，無需重複操作。");
+          continue;
+        }
+
+        await storage.updateUserLineUserId(user.id, lineUserId);
+
+        const roleLabel = user.role === "coach" ? "老師" : "分校主任";
+        const displayName = user.firstName
+          ? `${user.lastName ?? ""}${user.firstName}`.trim()
+          : phone;
+        await sendLineReply(
+          replyToken,
+          `✅ 綁定成功！${roleLabel} ${displayName} 的 LINE 帳號已完成綁定。\n之後將透過此帳號接收課程相關通知，謝謝！`
+        );
+        console.log(`[LINE OA Webhook] 綁定成功 userId=${user.id} role=${user.role} lineUserId=${lineUserId}`);
+      } catch (err: unknown) {
+        if (err instanceof LineIdAlreadyBoundError) {
+          await sendLineReply(
+            replyToken,
+            `此 LINE 帳號已被另一個「${err.boundRole}」帳號綁定，無法重複使用。\n如有疑問請聯絡總部管理員。`
+          );
+        } else {
+          console.error("[LINE OA Webhook] 綁定失敗:", err);
+          await sendLineReply(replyToken, "系統發生錯誤，請稍後再試，或聯絡總部管理員。");
+        }
+      }
+    }
+  });
+  // ── END LINE OA Webhook ────────────────────────────────────────────────────
+
   app.post("/api/admin/create-credential-account", isAdmin, async (req: any, res) => {
     try {
       const { userId, username, password } = req.body;
