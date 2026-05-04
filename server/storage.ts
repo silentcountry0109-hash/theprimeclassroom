@@ -39,7 +39,7 @@ import {
   type CurriculumMidtermExam, type InsertCurriculumMidtermExam,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
+import { eq, and, ne, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { sendLineMessage } from "./line";
@@ -1282,6 +1282,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserLineUserId(userId: string, lineUserId: string | null): Promise<void> {
+    if (lineUserId !== null) {
+      const [conflict] = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(and(eq(users.lineUserId, lineUserId), ne(users.id, userId)))
+        .limit(1);
+      if (conflict) {
+        const roleLabel = conflict.role === "coach" ? "老師" : conflict.role === "parent" ? "家長" : conflict.role ?? "其他";
+        throw new Error(`此 LINE 帳號已被一個「${roleLabel}」身份綁定，無法重複使用`);
+      }
+    }
     await db.update(users).set({ lineUserId, updatedAt: new Date() }).where(eq(users.id, userId));
   }
 

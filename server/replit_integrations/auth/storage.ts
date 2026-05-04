@@ -1,6 +1,6 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 // Interface for auth storage operations
 // (IMPORTANT) These user operations are mandatory for Replit Auth.
@@ -8,6 +8,15 @@ export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   getUserByLineUserId(lineUserId: string, role?: string): Promise<User | undefined>;
+}
+
+export class LineIdAlreadyBoundError extends Error {
+  public readonly boundRole: string;
+  constructor(boundRole: string) {
+    super(`此 LINE 帳號已被一個「${boundRole}」身份綁定，無法重複使用`);
+    this.name = "LineIdAlreadyBoundError";
+    this.boundRole = boundRole;
+  }
 }
 
 class AuthStorage implements IAuthStorage {
@@ -25,6 +34,18 @@ class AuthStorage implements IAuthStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    if (userData.lineUserId) {
+      const existing = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(and(eq(users.lineUserId, userData.lineUserId), ne(users.id, userData.id ?? "")))
+        .limit(1);
+      if (existing.length > 0) {
+        const roleLabel = existing[0].role === "coach" ? "老師" : existing[0].role === "parent" ? "家長" : existing[0].role ?? "其他";
+        throw new LineIdAlreadyBoundError(roleLabel);
+      }
+    }
+
     const { lineRegistrationComplete: _lr, ...updateFields } = userData;
     const [user] = await db
       .insert(users)

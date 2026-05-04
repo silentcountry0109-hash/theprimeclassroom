@@ -649,6 +649,11 @@ export async function registerRoutes(
       let user = await authStorage.getUserByLineUserId(profile.userId, "parent");
 
       if (!user) {
+        const anyExisting = await authStorage.getUserByLineUserId(profile.userId);
+        if (anyExisting) {
+          console.warn(`[LINE OAuth] LINE ID ${profile.userId} already bound to role=${anyExisting.role}, blocking parent login`);
+          return res.redirect("/parent-login?error=line_id_taken");
+        }
         user = await authStorage.upsertUser({
           id: `line-${profile.userId}`,
           lineUserId: profile.userId,
