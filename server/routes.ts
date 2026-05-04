@@ -2435,6 +2435,12 @@ export async function registerRoutes(
       await storage.updateUserLineUserId(coach.userId, null);
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof LineIdAlreadyBoundError) {
+        return res.status(409).json({ message: error.message });
+      }
+      if (isPgUniqueViolation(error) && error.constraint?.includes("line_user_id")) {
+        return res.status(409).json({ message: "此 LINE 帳號已被其他使用者綁定" });
+      }
       res.status(500).json({ message: "解除 LINE 綁定失敗" });
     }
   });
