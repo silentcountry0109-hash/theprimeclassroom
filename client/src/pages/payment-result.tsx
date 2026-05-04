@@ -1,12 +1,19 @@
 import { useLocation } from "wouter";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { queryClient } from "@/lib/queryClient";
 
 export default function PaymentResult() {
   const [, navigate] = useLocation();
   const params = new URLSearchParams(window.location.search);
   const status = params.get("status");
   const isSuccess = status === "success";
+
+  const goToCredits = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/parent/transactions"] });
+    navigate("/dashboard?tab=credits");
+  };
 
   return (
     <div className="min-h-screen bg-washi flex items-center justify-center p-4">
@@ -27,7 +34,7 @@ export default function PaymentResult() {
             <Button
               data-testid="button-go-to-dashboard"
               className="w-full bg-tiffany hover:bg-tiffany/90 text-white"
-              onClick={() => navigate("/dashboard?tab=credits")}
+              onClick={goToCredits}
             >
               查看我的點數
               <ArrowRight className="ml-2 w-4 h-4" />
@@ -50,7 +57,7 @@ export default function PaymentResult() {
               <Button
                 data-testid="button-retry-payment"
                 className="w-full bg-tiffany hover:bg-tiffany/90 text-white"
-                onClick={() => navigate("/dashboard?tab=credits")}
+                onClick={goToCredits}
               >
                 重新購買
                 <ArrowRight className="ml-2 w-4 h-4" />
