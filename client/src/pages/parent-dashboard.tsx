@@ -239,19 +239,10 @@ export default function ParentDashboard() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    const payment = params.get("payment");
     if (tab) setActiveTab(tab);
-    if (payment === "success") {
-      toast({ title: "付款成功！", description: "堂數已加值至您的帳戶，感謝您的購買。" });
-      queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/parent/transactions"] });
-    } else if (payment === "fail") {
-      toast({ title: "付款失敗", description: "付款未完成，請重試或聯繫總部。", variant: "destructive" });
-    }
-    if (tab || payment) {
+    if (tab) {
       const url = new URL(window.location.href);
       url.searchParams.delete("tab");
-      url.searchParams.delete("payment");
       window.history.replaceState({}, "", url.toString());
     }
   }, []);

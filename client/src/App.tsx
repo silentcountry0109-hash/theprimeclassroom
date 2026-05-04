@@ -18,6 +18,7 @@ import ClassroomDetail from "@/pages/classroom-detail";
 import CoachDashboard from "@/pages/coach-dashboard";
 import ParentRegisterAddFriend from "@/pages/parent-register-add-friend";
 import ParentRegisterVerifyPhone from "@/pages/parent-register-verify-phone";
+import PaymentResult from "@/pages/payment-result";
 
 function LoadingScreen() {
   return (
@@ -77,6 +78,7 @@ function Router() {
       <Route path="/coach-dashboard" component={CoachDashboard} />
       <Route path="/parent-register/add-friend" component={ParentRegisterAddFriend} />
       <Route path="/parent-register/verify-phone" component={ParentRegisterVerifyPhone} />
+      <Route path="/payment-result" component={PaymentResult} />
       <Route component={NotFound} />
     </Switch>
   );
