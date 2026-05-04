@@ -895,6 +895,11 @@ function CreditsTab() {
     discount: number;
   } | null>(null);
 
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/parent/transactions"] });
+  }, []);
+
   const purchaseMutation = useMutation({
     mutationFn: async ({ packageId, couponCode: code }: { packageId: number; couponCode?: string }) => {
       const res = await apiRequest("POST", "/api/payment/ecpay/create", { packageId, couponId: code || undefined });
