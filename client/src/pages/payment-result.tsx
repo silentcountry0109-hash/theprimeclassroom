@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { CheckCircle, XCircle, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function PaymentResult() {
@@ -14,7 +14,11 @@ export default function PaymentResult() {
         {isSuccess ? (
           <>
             <div className="flex justify-center mb-4">
-              <CheckCircle className="w-16 h-16 text-green-500" />
+              <img
+                src="/ip-character.png"
+                alt="付款成功"
+                className="w-32 h-32 object-contain"
+              />
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-2">付款成功！</h1>
             <p className="text-gray-500 mb-6">
@@ -32,7 +36,11 @@ export default function PaymentResult() {
         ) : (
           <>
             <div className="flex justify-center mb-4">
-              <XCircle className="w-16 h-16 text-red-400" />
+              <img
+                src="/ip-cancel.png"
+                alt="付款未完成"
+                className="w-32 h-32 object-contain"
+              />
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-2">付款未完成</h1>
             <p className="text-gray-500 mb-6">
