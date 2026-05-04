@@ -1631,7 +1631,19 @@ function BookingFlowTab() {
       setStep("detail");
     },
     onError: (error: Error) => {
-      toast({ title: "週期預約失敗", description: error.message, variant: "destructive" });
+      const rawMsg = error.message || "";
+      let msg = rawMsg;
+      try {
+        const jsonStr = rawMsg.replace(/^\d+:\s*/, "");
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.message) msg = parsed.message;
+      } catch {}
+      const isInsufficientCredits = msg.includes("堂數不足") || msg.includes("INSUFFICIENT_CREDITS");
+      toast({
+        title: isInsufficientCredits ? "堂數不足" : "週期預約失敗",
+        description: isInsufficientCredits ? "您的堂數餘額不足，請先購買堂數後再預約課程。" : msg,
+        variant: "destructive",
+      });
     },
   });
 

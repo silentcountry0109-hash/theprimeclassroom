@@ -109,9 +109,18 @@ export default function ClassroomDetail() {
       setSelectedChild("");
     },
     onError: (error: Error) => {
+      const rawMsg = error.message || "";
+      let msg = rawMsg;
+      try {
+        const jsonStr = rawMsg.replace(/^\d+:\s*/, "");
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.message) msg = parsed.message;
+      } catch {}
+      const isInsufficientCredits = msg.includes("堂數不足") || msg.includes("INSUFFICIENT_CREDITS");
+      const isTimeConflict = msg.includes("時間衝突");
       toast({
-        title: "預約失敗",
-        description: error.message,
+        title: isInsufficientCredits ? "堂數不足" : isTimeConflict ? "時間衝突" : "預約失敗",
+        description: isInsufficientCredits ? "您的堂數餘額不足，請先購買堂數後再預約課程。" : msg,
         variant: "destructive",
       });
     },

@@ -1130,7 +1130,7 @@ export async function registerRoutes(
       } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
       res.json(booking);
     } catch (error: any) {
-      res.status(400).json({ message: error.message || "Failed to create booking" });
+      res.status(500).json({ message: error.message || "預約失敗，請稍後再試" });
     }
   });
 
@@ -1210,7 +1210,7 @@ export async function registerRoutes(
 
       res.json({ results });
     } catch (error: any) {
-      res.status(400).json({ message: error.message || "Failed to create recurring bookings" });
+      res.status(500).json({ message: error.message || "預約失敗，請稍後再試" });
     }
   });
 
