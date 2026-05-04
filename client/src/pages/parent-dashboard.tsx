@@ -1603,7 +1603,7 @@ function BookingFlowTab() {
       const isTimeConflict = msg.includes("時間衝突");
       toast({
         title: isInsufficientCredits ? "堂數不足" : isTimeConflict ? "時間衝突" : "預約失敗",
-        description: isInsufficientCredits ? "您的堂數餘額不足，請先購買堂數後再預約課程。" : msg,
+        description: msg,
         variant: "destructive",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
@@ -1655,7 +1655,7 @@ function BookingFlowTab() {
       const isInsufficientCredits = msg.includes("堂數不足") || msg.includes("INSUFFICIENT_CREDITS");
       toast({
         title: isInsufficientCredits ? "堂數不足" : "週期預約失敗",
-        description: isInsufficientCredits ? "您的堂數餘額不足，請先購買堂數後再預約課程。" : msg,
+        description: msg,
         variant: "destructive",
       });
     },

@@ -120,7 +120,7 @@ export default function ClassroomDetail() {
       const isTimeConflict = msg.includes("時間衝突");
       toast({
         title: isInsufficientCredits ? "堂數不足" : isTimeConflict ? "時間衝突" : "預約失敗",
-        description: isInsufficientCredits ? "您的堂數餘額不足，請先購買堂數後再預約課程。" : msg,
+        description: msg,
         variant: "destructive",
       });
     },
