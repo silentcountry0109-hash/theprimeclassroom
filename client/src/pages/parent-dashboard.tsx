@@ -5,6 +5,7 @@ import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getDefaultClassroomImage } from "@/lib/default-images";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1605,6 +1606,15 @@ function BookingFlowTab() {
         title: isInsufficientCredits ? "堂數不足" : isTimeConflict ? "時間衝突" : "預約失敗",
         description: msg,
         variant: "destructive",
+        action: isInsufficientCredits ? (
+          <ToastAction
+            altText="前往購買"
+            data-testid="button-buy-credits"
+            onClick={() => { window.location.href = "/parent-dashboard?tab=credits"; }}
+          >
+            前往購買
+          </ToastAction>
+        ) : undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
     },
@@ -1657,6 +1667,15 @@ function BookingFlowTab() {
         title: isInsufficientCredits ? "堂數不足" : "週期預約失敗",
         description: msg,
         variant: "destructive",
+        action: isInsufficientCredits ? (
+          <ToastAction
+            altText="前往購買"
+            data-testid="button-buy-credits-recurring"
+            onClick={() => { window.location.href = "/parent-dashboard?tab=credits"; }}
+          >
+            前往購買
+          </ToastAction>
+        ) : undefined,
       });
     },
   });

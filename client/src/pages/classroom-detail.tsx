@@ -42,6 +42,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import type { Franchise, Coach, Child } from "@shared/schema";
 import { DAY_LABELS } from "@shared/constants";
 
@@ -122,6 +123,15 @@ export default function ClassroomDetail() {
         title: isInsufficientCredits ? "堂數不足" : isTimeConflict ? "時間衝突" : "預約失敗",
         description: msg,
         variant: "destructive",
+        action: isInsufficientCredits ? (
+          <ToastAction
+            altText="前往購買"
+            data-testid="button-buy-credits"
+            onClick={() => { window.location.href = "/parent-dashboard?tab=credits"; }}
+          >
+            前往購買
+          </ToastAction>
+        ) : undefined,
       });
     },
   });
