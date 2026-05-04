@@ -239,11 +239,25 @@ export default function ParentDashboard() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
+    const payment = params.get("payment");
     if (tab) setActiveTab(tab);
-    if (tab) {
+    if (tab || payment) {
       const url = new URL(window.location.href);
       url.searchParams.delete("tab");
+      url.searchParams.delete("payment");
       window.history.replaceState({}, "", url.toString());
+    }
+    if (payment === "success") {
+      toast({
+        title: "付款成功！",
+        description: "堂數已成功加值至您的帳戶，感謝您的購買。",
+      });
+    } else if (payment === "fail") {
+      toast({
+        title: "付款未完成",
+        description: "付款流程未完成或遭取消，您的帳戶點數未變動。如有疑問請聯繫我們。",
+        variant: "destructive",
+      });
     }
   }, []);
 
