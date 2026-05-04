@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { authStorage } from "./replit_integrations/auth/storage";
+import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sendLineFlexMessages, sendLineFlexMessage, buildBookingSuccessFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
 import { seedDatabase } from "./seed";
@@ -672,6 +672,14 @@ export async function registerRoutes(
         return res.redirect("/parent-register/add-friend");
       });
     } catch (err) {
+      if (err instanceof LineIdAlreadyBoundError) {
+        console.warn("[LINE OAuth] Duplicate LINE ID detected:", err.message);
+        return res.redirect("/parent-login?error=line_id_taken");
+      }
+      if (isPgUniqueViolation(err) && err.constraint?.includes("line_user_id")) {
+        console.warn("[LINE OAuth] DB unique constraint violation on line_user_id (race condition)");
+        return res.redirect("/parent-login?error=line_id_taken");
+      }
       console.error("[LINE OAuth] Callback error:", err);
       res.redirect("/parent-login?error=line_server");
     }
