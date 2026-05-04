@@ -166,9 +166,8 @@ export async function sendLineReply(replyToken: string, message: string): Promis
   }
 }
 
-const BASE = process.env.REPLIT_DOMAINS
-  ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
-  : process.env.APP_BASE_URL || "https://the-prime-math.replit.app";
+const BASE = process.env.APP_BASE_URL
+  || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
 
 function infoRow(label: string, value: string, valueColor = "#2C2C2C", strikethrough = false): object {
   return {
