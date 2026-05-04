@@ -89,7 +89,7 @@ export default function ParentRegisterVerifyPhone() {
     setVerifyLoading(true);
     try {
       await apiRequest("POST", "/api/auth/line/confirm-otp", { phone, otp: otpValue });
-      await queryClient.invalidateQueries({ queryKey: ["/api/credential-user"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/credential-user"] });
       toast({ title: "驗證成功！", description: "歡迎加入質數教室" });
       navigate("/dashboard");
     } catch (e: any) {

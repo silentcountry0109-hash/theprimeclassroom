@@ -25,7 +25,7 @@ export function useCredentialAuth() {
       await fetch("/api/credential-logout", { method: "POST", credentials: "include" });
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/credential-user"], null);
+      queryClient.removeQueries({ queryKey: ["/api/credential-user"] });
     },
   });
 
