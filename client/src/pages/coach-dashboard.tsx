@@ -121,7 +121,7 @@ export default function CoachDashboard() {
   const { data: overdueTasks = [] } = useQuery<{ date: string; totalSlots: number; checkedInSlots: number; contactBookSlots: number }[]>({
     queryKey: ["/api/coach/overdue-tasks"],
     enabled: !!userData,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   const localDateStr = () => {
@@ -130,7 +130,10 @@ export default function CoachDashboard() {
   };
 
   useEffect(() => {
-    if (overdueTasks.length === 0) return;
+    if (overdueTasks.length === 0) {
+      setShowOverdueAlert(false);
+      return;
+    }
     const seenKey = `overdue-alert-seen-${localDateStr()}`;
     if (sessionStorage.getItem(seenKey)) return;
     setShowOverdueAlert(true);
@@ -560,6 +563,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
       toast({ title: "點名成功", description: "學生已標記為出席" });
     },
     onError: (error: any) => {
@@ -574,6 +578,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
       toast({ title: "已取消", description: "學生狀態已恢復為待點名" });
     },
     onError: (error: any) => {
@@ -588,6 +593,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
       toast({ title: "已標記未到", description: "學生已標記為缺席" });
     },
     onError: (error: any) => {
