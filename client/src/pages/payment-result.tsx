@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { CheckCircle, XCircle, ArrowRight, Phone } from "lucide-react";
+import { CheckCircle, XCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function PaymentResult() {
@@ -48,18 +48,27 @@ export default function PaymentResult() {
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
               <Button
-                data-testid="button-contact-support"
+                data-testid="button-back-to-account"
                 variant="outline"
                 className="w-full"
                 onClick={() => navigate("/dashboard")}
               >
-                <Phone className="mr-2 w-4 h-4" />
                 回到帳戶
               </Button>
             </div>
           </>
         )}
-        <p className="text-xs text-gray-400 mt-6">
+        <p className="text-xs text-gray-400 mt-4">
+          若尚未登入，請先
+          <button
+            className="underline mx-1"
+            onClick={() => navigate("/parent-login")}
+          >
+            重新登入
+          </button>
+          後查看帳戶
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
           質數教室 · 如有疑問請聯繫您的分校
         </p>
       </div>
