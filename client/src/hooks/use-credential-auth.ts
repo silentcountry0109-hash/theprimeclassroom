@@ -18,6 +18,7 @@ export function useCredentialAuth() {
     queryFn: fetchCredentialUser,
     retry: false,
     staleTime: 1000 * 60 * 5,
+    refetchOnMount: true,
   });
 
   const logoutMutation = useMutation({
