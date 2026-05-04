@@ -19,8 +19,5 @@ export const modules: ModuleMap = {
   "./components/mockups/line-register/OtpVerify.tsx": () => import("../components/mockups/line-register/OtpVerify.tsx"),
   "./components/mockups/materials/CoachLibrary.tsx": () => import("../components/mockups/materials/CoachLibrary.tsx"),
   "./components/mockups/materials/HQUpload.tsx": () => import("../components/mockups/materials/HQUpload.tsx"),
-  "./components/mockups/line-inbox/AdminInbox.tsx": () => import("../components/mockups/line-inbox/AdminInbox.tsx"),
-  "./components/mockups/line-inbox/FranchiseInbox.tsx": () => import("../components/mockups/line-inbox/FranchiseInbox.tsx"),
-  "./components/mockups/line-inbox/StaffReplyVariants.tsx": () => import("../components/mockups/line-inbox/StaffReplyVariants.tsx"),
   "./components/mockups/schedule-picker/SchedulePicker.tsx": () => import("../components/mockups/schedule-picker/SchedulePicker.tsx")
 };
