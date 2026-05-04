@@ -396,6 +396,20 @@ function CalendarTab({ coachId, initialDate, onInitialDateConsumed }: { coachId:
     refetchOnWindowFocus: true,
   });
 
+  const { data: monthlyRecords = [] } = useQuery<any[]>({
+    queryKey: ["/api/coach/monthly-records", year, month],
+    enabled: !!coachId,
+    staleTime: 0,
+  });
+
+  const completedDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of monthlyRecords) {
+      if (r.isComplete && r.totalSlots > 0) set.add(r.date);
+    }
+    return set;
+  }, [monthlyRecords]);
+
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
 
@@ -456,26 +470,29 @@ function CalendarTab({ coachId, initialDate, onInitialDateConsumed }: { coachId:
               const hasSlots = !!slotsByDate[dateStr];
               const isSelected = selectedDate === dateStr;
               const isToday = dateStr === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+              const isDayComplete = completedDates.has(dateStr);
 
               return (
                 <button
                   key={day}
                   onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                   className={`h-12 sm:h-16 border-b border-r border-gray-50 flex flex-col items-center justify-center gap-0.5 transition-colors relative ${
-                    isSelected ? "bg-tiffany/10" : hasSlots ? "hover:bg-gray-50" : ""
+                    isSelected ? "bg-tiffany/10" : isDayComplete ? "bg-green-50/60 hover:bg-green-50" : hasSlots ? "hover:bg-gray-50" : ""
                   }`}
                   data-testid={`calendar-day-${dateStr}`}
                 >
                   <span className={`text-sm ${isToday ? "w-6 h-6 rounded-full bg-tiffany text-white flex items-center justify-center text-xs font-bold" : isSelected ? "text-tiffany font-semibold" : "text-foreground"}`}>
                     {day}
                   </span>
-                  {hasSlots && (
+                  {isDayComplete ? (
+                    <CheckCircle className="w-2.5 h-2.5 text-green-500" data-testid={`icon-day-complete-${dateStr}`} />
+                  ) : hasSlots ? (
                     <div className="flex gap-0.5">
                       {slotsByDate[dateStr].slice(0, 3).map((_, idx) => (
                         <div key={idx} className="w-1 h-1 rounded-full bg-tiffany" />
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </button>
               );
             })}
@@ -564,6 +581,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
       toast({ title: "點名成功", description: "學生已標記為出席" });
     },
     onError: (error: any) => {
@@ -579,6 +597,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
       toast({ title: "已取消", description: "學生狀態已恢復為待點名" });
     },
     onError: (error: any) => {
@@ -594,6 +613,7 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
       queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
       toast({ title: "已標記未到", description: "學生已標記為缺席" });
     },
     onError: (error: any) => {
@@ -770,10 +790,30 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
 }
 
 function DailyProgressCard({ coachId, date }: { coachId: number; date: string }) {
+  const { toast } = useToast();
   const { data: record, isLoading } = useQuery<any>({
     queryKey: ["/api/coach/daily-record", date],
     enabled: !!coachId,
   });
+
+  const prevIsComplete = useRef<boolean | null>(null);
+  const prevDate = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (prevDate.current !== date) {
+      prevDate.current = date;
+      prevIsComplete.current = record ? record.isComplete : null;
+      return;
+    }
+    if (!record || record.totalSlots === 0) return;
+    if (prevIsComplete.current === false && record.isComplete === true) {
+      toast({
+        title: "今日課程紀錄已全部完成",
+        description: "點名與聯絡簿均已完成，辛苦了！",
+      });
+    }
+    prevIsComplete.current = record.isComplete;
+  }, [record?.isComplete, date]);
 
   if (isLoading) return <Skeleton className="h-16 w-full rounded-xl" />;
   if (!record || record.totalSlots === 0) return null;
@@ -1193,6 +1233,7 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
       queryClient.invalidateQueries({ queryKey: ["/api/coach/contact-books/slot", slot.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
       queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
       onClose();
     },
     onError: () => {
