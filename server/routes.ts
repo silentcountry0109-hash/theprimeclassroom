@@ -646,7 +646,7 @@ export async function registerRoutes(
       }
       const profile = await profileRes.json() as { userId: string; displayName: string; pictureUrl?: string };
 
-      let user = await authStorage.getUserByLineUserId(profile.userId);
+      let user = await authStorage.getUserByLineUserId(profile.userId, "parent");
 
       if (!user) {
         user = await authStorage.upsertUser({
