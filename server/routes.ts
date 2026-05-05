@@ -1096,6 +1096,7 @@ export async function registerRoutes(
             const [coachRec] = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, slot.coachId));
             coachName = coachRec?.name || "";
           }
+          const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
           const flex = buildBookingSuccessFlex({
             childName,
             date: slotDateStr,
@@ -1103,6 +1104,7 @@ export async function registerRoutes(
             teacher: coachName || "待確認",
             location: franchiseName,
             credits: newBalance,
+            bookingUrl: `${appBase}/dashboard?tab=bookings&bookingId=${booking.id}`,
           });
           await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
         }
@@ -1201,12 +1203,14 @@ export async function registerRoutes(
               })
             );
             const moreCount = Math.max(0, successSlotIds.length - 5);
+            const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
             const recurringFlex = buildRecurringBookingFlex({
               childName,
               totalCount: successSlotIds.length,
               slots: slotSummary.filter(Boolean),
               moreCount,
               credits: newBalance,
+              bookingUrl: `${appBase}/dashboard?tab=bookings`,
             });
             await sendLineFlexMessage(parentUser.lineUserId, recurringFlex.altText, recurringFlex.contents);
 
@@ -2473,12 +2477,14 @@ export async function registerRoutes(
             const [childRec] = await db.select({ name: children.name }).from(children).where(eq(children.id, parseInt(childId)));
             childDisplayName = childRec?.name || "孩子";
           }
+          const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
           const flex = buildManualBookingFlex({
             childName: childDisplayName || "孩子",
             date: slot.date,
             time: `${slot.startTime}–${slot.endTime}`,
             teacher: coachName || "待確認",
             location: franchise?.name || "教室",
+            bookingUrl: `${appBase}/dashboard?tab=bookings`,
           });
           await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents).catch((e) =>
             console.error("[LINE] manual-booking 家長通知失敗:", e)

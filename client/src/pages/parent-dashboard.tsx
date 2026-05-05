@@ -223,6 +223,7 @@ export default function ParentDashboard() {
   const { user: credUser, isLoading: credLoading, logout: credLogout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [highlightBookingId, setHighlightBookingId] = useState<number | null>(null);
 
   const isLoading = replitLoading || credLoading;
   const user = credUser || replitUser;
@@ -241,11 +242,15 @@ export default function ParentDashboard() {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
     const payment = params.get("payment");
+    const bookingId = params.get("bookingId");
     if (tab) setActiveTab(tab);
-    if (tab || payment) {
+    if (bookingId && !tab) setActiveTab("bookings");
+    if (bookingId) setHighlightBookingId(parseInt(bookingId));
+    if (tab || payment || bookingId) {
       const url = new URL(window.location.href);
       url.searchParams.delete("tab");
       url.searchParams.delete("payment");
+      url.searchParams.delete("bookingId");
       window.history.replaceState({}, "", url.toString());
     }
     if (payment === "success") {
@@ -518,7 +523,7 @@ export default function ParentDashboard() {
         )}
         {activeTab === "book" && <BookingFlowTab />}
         {activeTab === "children" && <ChildrenTab />}
-        {activeTab === "bookings" && <BookingsTab />}
+        {activeTab === "bookings" && <BookingsTab highlightBookingId={highlightBookingId} />}
         {activeTab === "credits" && <CreditsTab />}
         {activeTab === "contact-book" && <ContactBookTab />}
         {activeTab === "shop" && <ShopTab />}
@@ -3088,11 +3093,20 @@ function CancelBookingDialog({
   );
 }
 
-function BookingsTab() {
+function BookingsTab({ highlightBookingId }: { highlightBookingId?: number | null }) {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "completed" | "cancelled">("all");
   const [cancelTarget, setCancelTarget] = useState<BookingWithDetails | null>(null);
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!highlightBookingId) return;
+    const timer = setTimeout(() => {
+      const el = document.querySelector(`[data-testid="card-booking-${highlightBookingId}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [highlightBookingId]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -3431,7 +3445,9 @@ function BookingsTab() {
                     <div
                       key={booking.id}
                       className={`bg-white rounded-xl border p-3.5 transition-colors ${
-                        booking.status === "confirmed" ? "border-gray-100 hover:border-tiffany/30" : "border-gray-50 opacity-75"
+                        booking.id === highlightBookingId
+                          ? "border-tiffany ring-2 ring-tiffany/30 shadow-sm"
+                          : booking.status === "confirmed" ? "border-gray-100 hover:border-tiffany/30" : "border-gray-50 opacity-75"
                       }`}
                       data-testid={`card-booking-${booking.id}`}
                     >
