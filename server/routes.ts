@@ -1066,7 +1066,7 @@ export async function registerRoutes(
       }
       const balance = await storage.getParentBalance(userId);
       if (balance < 1) {
-        return res.status(400).json({ message: `堂數不足（目前剩餘 ${balance} 堂，需要 1 堂）`, code: "INSUFFICIENT_CREDITS" });
+        return res.status(400).json({ message: `堂數不足（目前剩餘 ${balance} 堂，需要 1 堂）`, code: "INSUFFICIENT_CREDITS", currentBalance: balance, required: 1 });
       }
       const booking = await storage.createBooking({
         slotId: req.body.slotId,
@@ -1155,7 +1155,7 @@ export async function registerRoutes(
       const taiwanToday = new Date(taiwanTodayStr + "T00:00:00+08:00");
       const balance = await storage.getParentBalance(userId);
       if (balance < slotIds.length) {
-        return res.status(400).json({ message: `堂數不足（目前剩餘 ${balance} 堂，需要 ${slotIds.length} 堂）`, code: "INSUFFICIENT_CREDITS" });
+        return res.status(400).json({ message: `堂數不足（目前剩餘 ${balance} 堂，需要 ${slotIds.length} 堂）`, code: "INSUFFICIENT_CREDITS", currentBalance: balance, required: slotIds.length });
       }
       const results: { slotId: number; success: boolean; message?: string }[] = [];
       for (const slotId of slotIds) {
