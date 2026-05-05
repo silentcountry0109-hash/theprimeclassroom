@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineMessage, sendLineReply, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex } from "./line";
+import { sendLineMessage, sendLineReply, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, getLineToken } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -802,30 +802,30 @@ export async function registerRoutes(
     // ── Signature verification ────────────────────────────────────────────────
     const channelSecret = process.env.LINE_MESSAGING_CHANNEL_SECRET;
     if (!channelSecret) {
-      console.error("[LINE OA Webhook] 缺少 LINE_MESSAGING_CHANNEL_SECRET，跳過簽章驗證");
-      return;
-    }
+      // 缺少 secret 時跳過簽章驗證並繼續處理事件（不做 return）
+      console.warn("[LINE OA Webhook] 缺少 LINE_MESSAGING_CHANNEL_SECRET，跳過簽章驗證（請設定此環境變數以啟用安全性驗證）");
+    } else {
+      const signature = req.headers["x-line-signature"] as string | undefined;
+      if (!signature) {
+        console.warn("[LINE OA Webhook] 收到無 x-line-signature 的請求，已忽略");
+        return;
+      }
 
-    const signature = req.headers["x-line-signature"] as string | undefined;
-    if (!signature) {
-      console.warn("[LINE OA Webhook] 收到無 x-line-signature 的請求，已忽略");
-      return;
-    }
+      const rawBody: Buffer | undefined = req.rawBody;
+      if (!rawBody) {
+        console.warn("[LINE OA Webhook] rawBody 不存在，無法驗證簽章");
+        return;
+      }
 
-    const rawBody: Buffer | undefined = req.rawBody;
-    if (!rawBody) {
-      console.warn("[LINE OA Webhook] rawBody 不存在，無法驗證簽章");
-      return;
-    }
+      const expected = crypto
+        .createHmac("sha256", channelSecret)
+        .update(rawBody)
+        .digest("base64");
 
-    const expected = crypto
-      .createHmac("sha256", channelSecret)
-      .update(rawBody)
-      .digest("base64");
-
-    if (expected !== signature) {
-      console.warn("[LINE OA Webhook] 簽章驗證失敗，已忽略");
-      return;
+      if (expected !== signature) {
+        console.warn("[LINE OA Webhook] 簽章驗證失敗，已忽略");
+        return;
+      }
     }
 
     // ── Process events ────────────────────────────────────────────────────────
@@ -843,28 +843,32 @@ export async function registerRoutes(
 
       // Accept only messages that look like a Taiwan mobile phone number (09XXXXXXXX)
       if (!/^09\d{8}$/.test(text)) {
-        await sendLineReply(
+        sendLineReply(
           replyToken,
           "請傳送您在質數教室登記的手機號碼（格式：09XXXXXXXX）以完成 LINE 帳號綁定。"
-        );
+        ).catch(() => {});
         continue;
       }
 
       const phone = text;
+      const lineUserIdPrefix = lineUserId.slice(0, 8);
+      console.log(`[LINE OA Webhook] 收到手機號碼 ${phone}，lineUserId=${lineUserIdPrefix}…`);
 
       try {
-        // 優先以手機查 coach 或 franchise_admin 帳號（避免與同手機號的家長帳號衝突）
+        // Layer 1: 優先以手機查 users.phone 中 coach/franchise_admin 帳號（避免與家長帳號衝突）
         const [staffUser] = await db.select().from(users)
           .where(and(eq(users.phone, phone), or(eq(users.role, "coach"), eq(users.role, "franchise_admin"))))
           .limit(1);
         let user: Awaited<ReturnType<typeof storage.getUserByPhone>> = staffUser;
+        console.log(`[LINE OA Webhook] 第一層查詢（users.phone）: ${staffUser ? `找到 ${staffUser.role} userId=${staffUser.id}` : "無結果"}`);
 
-        // Fallback：若 users.phone 查無結果，再查 coaches.phone（相容舊資料）
+        // Layer 2: Fallback → coaches.phone（相容舊資料 / users.phone 尚未同步的老師）
         if (!user) {
           const [coachRec] = await db.select().from(coaches).where(and(eq(coaches.phone, phone), eq(coaches.isActive, true))).limit(1);
+          console.log(`[LINE OA Webhook] 第二層查詢（coaches.phone）: ${coachRec ? `找到 coachId=${coachRec.id} userId=${coachRec.userId ?? "空"}` : "無結果"}`);
           if (coachRec) {
             if (!coachRec.userId) {
-              await sendLineReply(replyToken, "此手機號碼對應的老師尚未建立系統帳號，請聯絡分校管理員。");
+              sendLineReply(replyToken, "此手機號碼對應的老師尚未建立系統帳號，請聯絡分校管理員。").catch(() => {});
               continue;
             }
             const [coachUser] = await db.select().from(users).where(eq(users.id, coachRec.userId)).limit(1);
@@ -872,15 +876,16 @@ export async function registerRoutes(
           }
         }
 
-        // Fallback：若仍查無結果，再查 franchises.phone（相容主任帳號建立時未寫入 users.phone 的情況）
+        // Layer 3: Fallback → franchises.phone（相容主任帳號 users.phone 未寫入的情況）
         if (!user) {
           const [franchiseRec] = await db.select().from(franchises).where(eq(franchises.phone, phone)).limit(1);
+          console.log(`[LINE OA Webhook] 第三層查詢（franchises.phone）: ${franchiseRec ? `找到 franchiseId=${franchiseRec.id}` : "無結果"}`);
           if (franchiseRec) {
             const [adminUser] = await db.select().from(users)
               .where(and(eq(users.franchiseId, franchiseRec.id), eq(users.role, "franchise_admin")))
               .limit(1);
             if (!adminUser) {
-              await sendLineReply(replyToken, "尚未建立系統帳號，請聯絡總部管理員。");
+              sendLineReply(replyToken, "尚未建立系統帳號，請聯絡總部管理員。").catch(() => {});
               continue;
             }
             user = adminUser;
@@ -888,40 +893,47 @@ export async function registerRoutes(
         }
 
         if (!user) {
-          await sendLineReply(replyToken, "找不到以此手機號碼登記的帳號，請確認號碼是否正確。");
+          console.log(`[LINE OA Webhook] 查無帳號 phone=${phone}`);
+          sendLineReply(replyToken, "找不到以此手機號碼登記的帳號，請確認號碼是否正確。").catch(() => {});
           continue;
         }
 
         if (user.role !== "coach" && user.role !== "franchise_admin") {
-          await sendLineReply(replyToken, "此功能僅供老師及分校主任使用，您的帳號身份不符。");
+          console.log(`[LINE OA Webhook] 帳號身份不符 userId=${user.id} role=${user.role}`);
+          sendLineReply(replyToken, "此功能僅供老師及分校主任使用，您的帳號身份不符。").catch(() => {});
           continue;
         }
 
         if (user.lineUserId && user.lineUserId === lineUserId) {
-          await sendLineReply(replyToken, "您的 LINE 帳號已完成綁定，無需重複操作。");
+          console.log(`[LINE OA Webhook] 已綁定 userId=${user.id}`);
+          sendLineReply(replyToken, "您的 LINE 帳號已完成綁定，無需重複操作。").catch(() => {});
           continue;
         }
 
+        // DB 綁定（優先於 LINE 回覆，確保綁定動作不受 reply 失敗影響）
         await storage.updateUserLineUserId(user.id, lineUserId);
+        console.log(`[LINE OA Webhook] ✅ 綁定成功 userId=${user.id} role=${user.role} lineUserId=${lineUserIdPrefix}…`);
 
+        // LINE 回覆（非同步，失敗不影響已完成的 DB 綁定）
         const roleLabel = user.role === "coach" ? "老師" : "分校主任";
         const displayName = user.firstName
           ? `${user.lastName ?? ""}${user.firstName}`.trim()
           : phone;
-        await sendLineReply(
+        sendLineReply(
           replyToken,
           `✅ 綁定成功！${roleLabel} ${displayName} 的 LINE 帳號已完成綁定。\n之後將透過此帳號接收課程相關通知，謝謝！`
-        );
-        console.log(`[LINE OA Webhook] 綁定成功 userId=${user.id} role=${user.role} lineUserId=${lineUserId}`);
+        ).catch((e) => console.error(`[LINE OA Webhook] 綁定成功，但 LINE 回覆失敗 userId=${user!.id}:`, e));
+
       } catch (err: unknown) {
         if (err instanceof LineIdAlreadyBoundError) {
-          await sendLineReply(
+          console.warn(`[LINE OA Webhook] LINE ID 衝突 boundRole=${err.boundRole} phone=${phone}`);
+          sendLineReply(
             replyToken,
             `此 LINE 帳號已被另一個「${err.boundRole}」帳號綁定，無法重複使用。\n如有疑問請聯絡總部管理員。`
-          );
+          ).catch(() => {});
         } else {
           console.error("[LINE OA Webhook] 綁定失敗:", err);
-          await sendLineReply(replyToken, "系統發生錯誤，請稍後再試，或聯絡總部管理員。");
+          sendLineReply(replyToken, "系統發生錯誤，請稍後再試，或聯絡總部管理員。").catch(() => {});
         }
       }
     }
@@ -2675,6 +2687,83 @@ export async function registerRoutes(
       res.status(500).json({ message: "補丁失敗" });
     }
   });
+
+  // ── LINE 綁定診斷 API ─────────────────────────────────────────────────────
+  app.get("/api/admin/line-diagnostics", isAdmin, async (req: any, res) => {
+    const phone = ((req.query.phone as string) ?? "").trim();
+    if (!phone) return res.status(400).json({ message: "請提供 phone 參數" });
+
+    // 確認 LINE Access Token 是否可取得
+    let tokenOk = false;
+    try {
+      const tok = await getLineToken();
+      tokenOk = !!tok;
+    } catch { tokenOk = false; }
+
+    // Layer 1: users.phone 中的 coach / franchise_admin
+    const [layer1] = await db
+      .select({ id: users.id, role: users.role, lineUserId: users.lineUserId, firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .where(and(eq(users.phone, phone), or(eq(users.role, "coach"), eq(users.role, "franchise_admin"))))
+      .limit(1);
+
+    if (layer1) {
+      return res.json({
+        found: true, layer: 1,
+        userId: layer1.id, role: layer1.role,
+        name: layer1.firstName ? `${layer1.lastName ?? ""}${layer1.firstName}`.trim() : "(無姓名)",
+        alreadyBound: !!layer1.lineUserId,
+        lineUserId: layer1.lineUserId ? layer1.lineUserId.slice(0, 8) + "…" : null,
+        tokenOk,
+      });
+    }
+
+    // Layer 2: coaches.phone
+    const [coachRec] = await db.select().from(coaches)
+      .where(and(eq(coaches.phone, phone), eq(coaches.isActive, true))).limit(1);
+    if (coachRec) {
+      if (!coachRec.userId) {
+        return res.json({ found: false, layer: 2, reason: "老師記錄存在但尚未連結系統帳號（需建立帳號）", tokenOk });
+      }
+      const [coachUser] = await db
+        .select({ id: users.id, role: users.role, lineUserId: users.lineUserId, firstName: users.firstName, lastName: users.lastName })
+        .from(users).where(eq(users.id, coachRec.userId)).limit(1);
+      if (coachUser) {
+        return res.json({
+          found: true, layer: 2,
+          userId: coachUser.id, role: coachUser.role,
+          name: coachUser.firstName ? `${coachUser.lastName ?? ""}${coachUser.firstName}`.trim() : "(無姓名)",
+          alreadyBound: !!coachUser.lineUserId,
+          lineUserId: coachUser.lineUserId ? coachUser.lineUserId.slice(0, 8) + "…" : null,
+          tokenOk,
+        });
+      }
+    }
+
+    // Layer 3: franchises.phone
+    const [franchiseRec] = await db.select().from(franchises).where(eq(franchises.phone, phone)).limit(1);
+    if (franchiseRec) {
+      const [adminUser] = await db
+        .select({ id: users.id, role: users.role, lineUserId: users.lineUserId, firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(and(eq(users.franchiseId, franchiseRec.id), eq(users.role, "franchise_admin")))
+        .limit(1);
+      if (adminUser) {
+        return res.json({
+          found: true, layer: 3,
+          userId: adminUser.id, role: adminUser.role,
+          name: adminUser.firstName ? `${adminUser.lastName ?? ""}${adminUser.firstName}`.trim() : "(無姓名)",
+          alreadyBound: !!adminUser.lineUserId,
+          lineUserId: adminUser.lineUserId ? adminUser.lineUserId.slice(0, 8) + "…" : null,
+          tokenOk,
+        });
+      }
+      return res.json({ found: false, layer: 3, reason: "分校記錄存在但尚未連結主任帳號", tokenOk });
+    }
+
+    return res.json({ found: false, layer: 0, reason: "三層查詢（users.phone / coaches.phone / franchises.phone）均無結果", tokenOk });
+  });
+  // ── END LINE 綁定診斷 ─────────────────────────────────────────────────────
 
   app.delete("/api/franchise-admin/coaches/:id/line", isFranchiseAdmin, async (req: any, res) => {
     try {

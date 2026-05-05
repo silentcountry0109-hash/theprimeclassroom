@@ -2,7 +2,7 @@
 let _cachedToken: string | null = null;
 let _tokenExpiresAt = 0;
 
-async function getLineToken(): Promise<string | null> {
+export async function getLineToken(): Promise<string | null> {
   // 如果快取 token 還有 1 小時以上則直接使用
   if (_cachedToken && Date.now() < _tokenExpiresAt - 3600_000) return _cachedToken;
 

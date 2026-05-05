@@ -92,6 +92,8 @@ import {
   AlertCircle,
   Clock as ClockIcon,
   RotateCcw,
+  MessageCircle,
+  Link2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
@@ -3937,9 +3939,23 @@ function SiteEditorTab() {
   );
 }
 
+interface LineDiagResult {
+  found: boolean;
+  layer?: number;
+  userId?: string;
+  role?: string;
+  name?: string;
+  alreadyBound?: boolean;
+  lineUserId?: string | null;
+  tokenOk: boolean;
+  reason?: string;
+}
+
 function SystemToolsTab() {
   const { toast } = useToast();
   const [backfillResult, setBackfillResult] = useState<{ message: string; updated: number } | null>(null);
+  const [diagPhone, setDiagPhone] = useState("");
+  const [diagResult, setDiagResult] = useState<LineDiagResult | null>(null);
 
   const backfillMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/backfill-coach-phones"),
@@ -3950,6 +3966,19 @@ function SystemToolsTab() {
     },
     onError: () => {
       toast({ title: "補丁失敗", description: "請稍後再試", variant: "destructive" });
+    },
+  });
+
+  const diagMutation = useMutation({
+    mutationFn: async (phone: string) => {
+      const res = await apiRequest("GET", `/api/admin/line-diagnostics?phone=${encodeURIComponent(phone)}`);
+      return res.json() as Promise<LineDiagResult>;
+    },
+    onSuccess: (data) => {
+      setDiagResult(data);
+    },
+    onError: () => {
+      toast({ title: "診斷失敗", description: "請稍後再試", variant: "destructive" });
     },
   });
 
@@ -3990,6 +4019,72 @@ function SystemToolsTab() {
           <RotateCcw className={`w-4 h-4 mr-1.5 ${backfillMutation.isPending ? "animate-spin" : ""}`} />
           {backfillMutation.isPending ? "補丁中..." : "立即執行補丁"}
         </Button>
+      </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-5 mt-4">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+            <MessageCircle className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">LINE 綁定診斷</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              輸入手機號碼，確認 LINE Webhook 能否找到對應的老師或主任帳號，以及目前 LINE Access Token 狀態。
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <Input
+            placeholder="09XXXXXXXX"
+            value={diagPhone}
+            onChange={(e) => { setDiagPhone(e.target.value); setDiagResult(null); }}
+            className="max-w-48"
+            data-testid="input-line-diag-phone"
+          />
+          <Button
+            onClick={() => diagMutation.mutate(diagPhone)}
+            disabled={diagMutation.isPending || !/^09\d{8}$/.test(diagPhone)}
+            data-testid="button-line-diag-query"
+          >
+            <Link2 className={`w-4 h-4 mr-1.5 ${diagMutation.isPending ? "animate-spin" : ""}`} />
+            {diagMutation.isPending ? "查詢中…" : "查詢"}
+          </Button>
+        </div>
+
+        {diagResult && (
+          <div
+            className={`rounded-md border px-4 py-3 text-sm space-y-1 ${diagResult.found ? "bg-green-50 border-green-100 text-green-900" : "bg-red-50 border-red-100 text-red-900"}`}
+            data-testid="text-line-diag-result"
+          >
+            {diagResult.found ? (
+              <>
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                  查到帳號（第 {diagResult.layer} 層查詢）
+                </p>
+                <p>姓名：{diagResult.name}　角色：{diagResult.role === "coach" ? "老師" : "分校主任"}</p>
+                <p>
+                  LINE 綁定狀態：
+                  {diagResult.alreadyBound
+                    ? <span className="text-blue-700 font-medium">已綁定（{diagResult.lineUserId}）</span>
+                    : <span className="text-amber-700 font-medium">尚未綁定</span>}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  查無帳號
+                </p>
+                <p className="text-red-800">{diagResult.reason}</p>
+              </>
+            )}
+            <p className={diagResult.tokenOk ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
+              LINE Access Token：{diagResult.tokenOk ? "✅ 正常" : "❌ 無法取得（請確認 LINE 金鑰設定）"}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
