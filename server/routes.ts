@@ -416,6 +416,15 @@ export async function registerRoutes(
   backfillLineFreeTrial().catch((e) => console.error("[Backfill] 啟動補丁失敗：", e));
   registerAuthRoutes(app);
 
+  // ── 啟動時確認 LINE Messaging API 金鑰是否設定 ──────────────────────────
+  if (!process.env.LINE_MESSAGING_CHANNEL_SECRET) {
+    console.warn(
+      "[LINE 安全性警告] LINE_MESSAGING_CHANNEL_SECRET 未設定！" +
+      " Webhook 將跳過簽章驗證，任何人都能偽造 LINE 事件。" +
+      " 請在環境變數中設定此金鑰以啟用安全性驗證。"
+    );
+  }
+
   // Legacy: serve files uploaded before the App Storage migration (e.g. coach photoUrl = "/uploads/xxx.jpg").
   // New uploads go to GCS; this route remains only for backward compatibility with existing DB records.
   app.use("/uploads", express.static(uploadsDir));
@@ -2695,6 +2704,7 @@ export async function registerRoutes(
   app.get("/api/admin/line-diagnostics", isAdmin, async (req: any, res) => {
     const phone = ((req.query.phone as string) ?? "").trim();
     if (!phone) return res.status(400).json({ message: "請提供 phone 參數" });
+    if (!/^09\d{8}$/.test(phone)) return res.status(400).json({ message: "手機號碼格式錯誤，請使用 09XXXXXXXX 格式" });
 
     // 確認 LINE Access Token 是否可取得
     let tokenOk = false;
