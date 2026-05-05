@@ -2484,7 +2484,7 @@ export async function registerRoutes(
             time: `${slot.startTime}–${slot.endTime}`,
             teacher: coachName || "待確認",
             location: franchise?.name || "教室",
-            bookingUrl: `${appBase}/dashboard?tab=bookings`,
+            bookingUrl: `${appBase}/dashboard?tab=bookings${result.id ? `&bookingId=${result.id}` : ""}`,
           });
           await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents).catch((e) =>
             console.error("[LINE] manual-booking 家長通知失敗:", e)

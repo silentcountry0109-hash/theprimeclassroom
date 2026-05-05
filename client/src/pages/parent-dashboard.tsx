@@ -243,9 +243,10 @@ export default function ParentDashboard() {
     const tab = params.get("tab");
     const payment = params.get("payment");
     const bookingId = params.get("bookingId");
+    const parsedBookingId = bookingId ? parseInt(bookingId, 10) : NaN;
     if (tab) setActiveTab(tab);
-    if (bookingId && !tab) setActiveTab("bookings");
-    if (bookingId) setHighlightBookingId(parseInt(bookingId));
+    if (Number.isFinite(parsedBookingId) && !tab) setActiveTab("bookings");
+    if (Number.isFinite(parsedBookingId)) setHighlightBookingId(parsedBookingId);
     if (tab || payment || bookingId) {
       const url = new URL(window.location.href);
       url.searchParams.delete("tab");
