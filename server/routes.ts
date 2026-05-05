@@ -729,6 +729,29 @@ export async function registerRoutes(
         .where(eq(users.id, userId))
         .returning();
       if (!updated) return res.status(404).json({ message: "找不到使用者" });
+
+      // 贈送免費體驗堂數（若尚未建立過點數記錄）
+      const [existingBalance] = await db.select().from(creditBalances).where(eq(creditBalances.parentId, userId));
+      if (!existingBalance) {
+        const [freePurchase] = await db.insert(creditPurchases).values({
+          parentId: userId,
+          credits: 2,
+          originalAmount: 0,
+          discountAmount: 0,
+          finalAmount: 0,
+          paymentMethod: "free_trial",
+          paymentStatus: "completed",
+        }).returning();
+        await db.insert(creditBalances).values({
+          parentId: userId,
+          purchaseId: freePurchase.id,
+          originalCredits: 2,
+          remainingCredits: 2,
+          expiresAt: null,
+        });
+        console.log(`[LINE Register] 已贈送 2 堂免費體驗給 ${userId}`);
+      }
+
       const { passwordHash: _, ...safeUser } = updated;
       req.session.save(() => res.json({ ...safeUser }));
     } catch (err) {
