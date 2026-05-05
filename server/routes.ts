@@ -980,7 +980,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/create-franchise-director", isAdmin, async (req: any, res) => {
     try {
-      const { franchiseId, username, password, firstName, lastName } = req.body;
+      const { franchiseId, username, password, firstName, lastName, phone } = req.body;
       if (!franchiseId || !username || !password) {
         return res.status(400).json({ message: "缺少必要欄位" });
       }
@@ -1002,11 +1002,27 @@ export async function registerRoutes(
         franchiseId,
         username,
         passwordHash: hash,
+        ...(phone ? { phone } : {}),
       }).returning();
       const { passwordHash: _, ...safeUser } = newUser;
       res.json(safeUser);
     } catch (error) {
       res.status(500).json({ message: "建立主任帳號失敗" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/phone", isAdmin, async (req: any, res) => {
+    try {
+      const { phone } = req.body;
+      const [updated] = await db.update(users)
+        .set({ phone: phone || null, updatedAt: new Date() })
+        .where(eq(users.id, req.params.id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "找不到使用者" });
+      const { passwordHash: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(500).json({ message: "更新手機號碼失敗" });
     }
   });
 

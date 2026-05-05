@@ -684,6 +684,7 @@ function FranchisesTab() {
   const [showDialog, setShowDialog] = useState(false);
   const [showDirectorDialog, setShowDirectorDialog] = useState(false);
   const [directorFranchise, setDirectorFranchise] = useState<Franchise | null>(null);
+  const [dirPhone, setDirPhone] = useState("");
   const [dirUsername, setDirUsername] = useState("");
   const [dirPassword, setDirPassword] = useState("");
   const [dirFirstName, setDirFirstName] = useState("");
@@ -723,7 +724,7 @@ function FranchisesTab() {
   };
 
   const createDirectorMutation = useMutation({
-    mutationFn: async (data: { franchiseId: number; username: string; password: string; firstName: string }) => {
+    mutationFn: async (data: { franchiseId: number; username: string; password: string; firstName: string; phone?: string }) => {
       const res = await apiRequest("POST", "/api/admin/create-franchise-director", data);
       return res.json();
     },
@@ -1076,7 +1077,7 @@ function FranchisesTab() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDirectorDialog} onOpenChange={(open) => { if (!open) { setDirectorFranchise(null); setDirUsername(""); setDirPassword(""); } setShowDirectorDialog(open); }}>
+      <Dialog open={showDirectorDialog} onOpenChange={(open) => { if (!open) { setDirectorFranchise(null); setDirUsername(""); setDirPassword(""); setDirPhone(""); } setShowDirectorDialog(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>開設分校主任帳號</DialogTitle>
@@ -1099,6 +1100,10 @@ function FranchisesTab() {
                 <Label>登入密碼 *</Label>
                 <Input type="password" value={dirPassword} onChange={(e) => setDirPassword(e.target.value)} placeholder="設定密碼（至少 6 個字元）" className="mt-1.5" data-testid="input-director-password" />
               </div>
+              <div>
+                <Label>手機號碼</Label>
+                <Input value={dirPhone} onChange={(e) => setDirPhone(e.target.value)} placeholder="09xx-xxx-xxx（選填）" className="mt-1.5" data-testid="input-director-phone" />
+              </div>
               <p className="text-xs text-muted-foreground">主任帳號建立後，可從網站首頁底部的「分校管理」進入分校管理後台</p>
             </div>
           )}
@@ -1112,6 +1117,7 @@ function FranchisesTab() {
                     username: dirUsername,
                     password: dirPassword,
                     firstName: dirFirstName,
+                    phone: dirPhone,
                   });
                 }
               }}
@@ -1628,6 +1634,7 @@ function UsersTab() {
   const [newFranchiseId, setNewFranchiseId] = useState<number>(0);
   const [credUsername, setCredUsername] = useState("");
   const [credPassword, setCredPassword] = useState("");
+  const [credPhone, setCredPhone] = useState("");
   const [parentExpanded, setParentExpanded] = useState(false);
   const [parentSearch, setParentSearch] = useState("");
   const parentSectionRef = useRef<HTMLDivElement>(null);
@@ -1665,9 +1672,24 @@ function UsersTab() {
       setSelectedUser(null);
       setCredUsername("");
       setCredPassword("");
+      setCredPhone("");
     },
     onError: (err: any) => {
       toast({ title: err.message || "建立帳號失敗", variant: "destructive" });
+    },
+  });
+
+  const updatePhoneMutation = useMutation({
+    mutationFn: async ({ userId, phone }: { userId: string; phone: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/phone`, { phone });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "手機號碼已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "更新失敗", variant: "destructive" });
     },
   });
 
@@ -1682,6 +1704,7 @@ function UsersTab() {
     setSelectedUser(u);
     setCredUsername(u.username || "");
     setCredPassword("");
+    setCredPhone(u.phone || "");
     setShowCredentialDialog(true);
   };
 
@@ -1927,7 +1950,7 @@ function UsersTab() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCredentialDialog} onOpenChange={(open) => { if (!open) { setSelectedUser(null); setCredUsername(""); setCredPassword(""); } setShowCredentialDialog(open); }}>
+      <Dialog open={showCredentialDialog} onOpenChange={(open) => { if (!open) { setSelectedUser(null); setCredUsername(""); setCredPassword(""); setCredPhone(""); } setShowCredentialDialog(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>設定登入帳號密碼</DialogTitle>
@@ -1963,10 +1986,36 @@ function UsersTab() {
                   data-testid="input-credential-password"
                 />
               </div>
+              {selectedUser.role === "franchise_admin" && (
+                <div>
+                  <Label>手機號碼</Label>
+                  <Input
+                    value={credPhone}
+                    onChange={(e) => setCredPhone(e.target.value)}
+                    placeholder="09xx-xxx-xxx（選填）"
+                    className="mt-1.5"
+                    data-testid="input-credential-phone"
+                  />
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCredentialDialog(false)}>取消</Button>
+            {selectedUser?.role === "franchise_admin" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (selectedUser) {
+                    updatePhoneMutation.mutate({ userId: selectedUser.id, phone: credPhone });
+                  }
+                }}
+                disabled={updatePhoneMutation.isPending}
+                data-testid="button-update-phone"
+              >
+                {updatePhoneMutation.isPending ? "更新中..." : "僅更新手機"}
+              </Button>
+            )}
             <Button
               onClick={() => {
                 if (selectedUser && credUsername && credPassword) {
