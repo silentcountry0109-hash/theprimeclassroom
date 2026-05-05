@@ -1723,6 +1723,8 @@ function UsersTab() {
   const operationalUsers = userList.filter((u) => ["admin", "franchise_admin"].includes(u.role || ""));
   const coachUsers = userList.filter((u) => u.role === "coach");
   const parentUsers = userList.filter((u) => u.role === "parent");
+  const coachFilledPhoneCount = coachUsers.filter((u) => u.phone?.trim()).length;
+  const coachMissingPhoneCount = coachUsers.length - coachFilledPhoneCount;
   const filteredParents = parentSearch.trim()
     ? parentUsers.filter((u) => {
         const q = parentSearch.toLowerCase();
@@ -1764,8 +1766,20 @@ function UsersTab() {
           <p className="text-xs text-muted-foreground mt-0.5">
             {u.email || "無 Email"}
             {u.username && <span className="ml-2 text-tiffany">帳號: {u.username}</span>}
-            {showPhone && u.phone && <span className="ml-2">📱 {u.phone}</span>}
           </p>
+          {showPhone && (
+            <div className="flex items-center gap-1.5 mt-1">
+              {u.phone?.trim() ? (
+                <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full" data-testid={`phone-status-filled-${u.id}`}>
+                  <Phone className="w-3 h-3" />{u.phone.trim()}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full" data-testid={`phone-status-missing-${u.id}`}>
+                  <Phone className="w-3 h-3" />未填手機
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {showButtons && (
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1838,16 +1852,28 @@ function UsersTab() {
 
           {/* Section 2: Coach accounts */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm font-semibold text-foreground">教練帳號</h2>
               <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{coachUsers.length} 人</span>
               <span className="text-xs text-muted-foreground">（由各分校主任管理）</span>
+              {coachUsers.length > 0 && (
+                <>
+                  <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full" data-testid="coach-phone-filled-count">
+                    已填手機 {coachFilledPhoneCount} 人
+                  </span>
+                  {coachMissingPhoneCount > 0 && (
+                    <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full" data-testid="coach-phone-missing-count">
+                      未填 {coachMissingPhoneCount} 人
+                    </span>
+                  )}
+                </>
+              )}
             </div>
             {coachUsers.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">尚無教練帳號</p>
             ) : (
               <div className="space-y-2">
-                {coachUsers.map((u) => renderUserRow(u, { showButtons: false }))}
+                {coachUsers.map((u) => renderUserRow(u, { showButtons: false, showPhone: true }))}
               </div>
             )}
           </div>
