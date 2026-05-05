@@ -10,7 +10,7 @@ import crypto from "crypto";
 import twilio from "twilio";
 import { users } from "@shared/models/auth";
 import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, or, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
 import path from "path";
@@ -853,19 +853,23 @@ export async function registerRoutes(
       const phone = text;
 
       try {
-        // Step 1: 先查 coaches 表（老師帳號手機存在 coaches.phone，而非 users.phone）
-        let user: Awaited<ReturnType<typeof storage.getUserByPhone>> = undefined;
-        const [coachRec] = await db.select().from(coaches).where(and(eq(coaches.phone, phone), eq(coaches.isActive, true))).limit(1);
-        if (coachRec) {
-          if (!coachRec.userId) {
-            await sendLineReply(replyToken, "此手機號碼對應的老師尚未建立系統帳號，請聯絡分校管理員。");
-            continue;
+        // 優先以手機查 coach 或 franchise_admin 帳號（避免與同手機號的家長帳號衝突）
+        const [staffUser] = await db.select().from(users)
+          .where(and(eq(users.phone, phone), or(eq(users.role, "coach"), eq(users.role, "franchise_admin"))))
+          .limit(1);
+        let user: Awaited<ReturnType<typeof storage.getUserByPhone>> = staffUser;
+
+        // Fallback：若 users.phone 查無結果，再查 coaches.phone（相容舊資料）
+        if (!user) {
+          const [coachRec] = await db.select().from(coaches).where(and(eq(coaches.phone, phone), eq(coaches.isActive, true))).limit(1);
+          if (coachRec) {
+            if (!coachRec.userId) {
+              await sendLineReply(replyToken, "此手機號碼對應的老師尚未建立系統帳號，請聯絡分校管理員。");
+              continue;
+            }
+            const [coachUser] = await db.select().from(users).where(eq(users.id, coachRec.userId)).limit(1);
+            user = coachUser;
           }
-          const [coachUser] = await db.select().from(users).where(eq(users.id, coachRec.userId)).limit(1);
-          user = coachUser;
-        } else {
-          // Fallback：查 users.phone（適用分校主任或未來手機存於 users 的情境）
-          user = await storage.getUserByPhone(phone);
         }
 
         if (!user) {
@@ -2585,6 +2589,9 @@ export async function registerRoutes(
         const linkedUserId = existingCoachWithPhone.userId;
         const [linkedUser] = await db.select().from(users).where(eq(users.id, linkedUserId));
         if (linkedUser) {
+          if (!linkedUser.phone && coach.phone) {
+            await db.update(users).set({ phone: coach.phone, updatedAt: new Date() }).where(eq(users.id, linkedUserId));
+          }
           const updated = await storage.createCoachAccount(coachId, linkedUserId);
           return res.json({ ...updated, accountUsername: linkedUser.username, linked: true });
         }
@@ -2610,6 +2617,7 @@ export async function registerRoutes(
         role: "coach",
         franchiseId: req.franchiseId,
         mustChangePassword: true,
+        phone: coach.phone,
       });
 
       const updated = await storage.createCoachAccount(coachId, userId);
@@ -2629,6 +2637,27 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "解除連結失敗" });
+    }
+  });
+
+  // One-time backfill: sync coaches.phone -> users.phone for existing accounts
+  app.post("/api/admin/backfill-coach-phones", isAdmin, async (_req, res) => {
+    try {
+      const allCoaches = await db.select().from(coaches)
+        .where(and(isNotNull(coaches.userId), isNotNull(coaches.phone)));
+      let updated = 0;
+      for (const coach of allCoaches) {
+        if (!coach.userId || !coach.phone) continue;
+        const [user] = await db.select({ id: users.id, phone: users.phone })
+          .from(users).where(eq(users.id, coach.userId)).limit(1);
+        if (user && !user.phone) {
+          await db.update(users).set({ phone: coach.phone, updatedAt: new Date() }).where(eq(users.id, coach.userId));
+          updated++;
+        }
+      }
+      res.json({ message: `已補丁 ${updated} 筆老師帳號的手機號碼`, updated });
+    } catch (error) {
+      res.status(500).json({ message: "補丁失敗" });
     }
   });
 
