@@ -140,9 +140,9 @@ export async function sendLineFlexMessages(
   }
 }
 
-export async function sendLineReply(replyToken: string, message: string): Promise<void> {
+export async function sendLineReply(replyToken: string, message: string): Promise<boolean> {
   const token = await getLineToken();
-  if (!token) { console.error("[LINE Reply] No access token"); return; }
+  if (!token) { console.error("[LINE Reply] No access token, cannot send reply"); return false; }
   try {
     const res = await fetch("https://api.line.me/v2/bot/message/reply", {
       method: "POST",
@@ -158,11 +158,13 @@ export async function sendLineReply(replyToken: string, message: string): Promis
     if (!res.ok) {
       const body = await res.text();
       console.error(`[LINE Reply] API error ${res.status}:`, body);
-    } else {
-      console.log("[LINE Reply] Sent OK:", message.slice(0, 30));
+      return false;
     }
+    console.log("[LINE Reply] Sent OK:", message.slice(0, 30));
+    return true;
   } catch (err) {
     console.error("[LINE Reply] Failed:", err);
+    return false;
   }
 }
 

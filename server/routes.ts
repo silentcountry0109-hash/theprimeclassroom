@@ -914,15 +914,18 @@ export async function registerRoutes(
         await storage.updateUserLineUserId(user.id, lineUserId);
         console.log(`[LINE OA Webhook] ✅ 綁定成功 userId=${user.id} role=${user.role} lineUserId=${lineUserIdPrefix}…`);
 
-        // LINE 回覆（非同步，失敗不影響已完成的 DB 綁定）
+        // LINE 回覆（DB 綁定已完成，回覆失敗不影響綁定結果但須記錄）
         const roleLabel = user.role === "coach" ? "老師" : "分校主任";
         const displayName = user.firstName
           ? `${user.lastName ?? ""}${user.firstName}`.trim()
           : phone;
-        sendLineReply(
+        const replySent = await sendLineReply(
           replyToken,
           `✅ 綁定成功！${roleLabel} ${displayName} 的 LINE 帳號已完成綁定。\n之後將透過此帳號接收課程相關通知，謝謝！`
-        ).catch((e) => console.error(`[LINE OA Webhook] 綁定成功，但 LINE 回覆失敗 userId=${user!.id}:`, e));
+        );
+        if (!replySent) {
+          console.error(`[LINE OA Webhook] 綁定成功，但 LINE 回覆失敗 userId=${user.id} role=${user.role} lineUserId=${lineUserIdPrefix}…`);
+        }
 
       } catch (err: unknown) {
         if (err instanceof LineIdAlreadyBoundError) {
