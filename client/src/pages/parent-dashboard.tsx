@@ -1639,7 +1639,7 @@ function BookingFlowTab() {
       const isTimeConflict = msg.includes("時間衝突");
       const insufficientDescription = isInsufficientCredits
         ? currentBalance !== undefined
-          ? `目前餘額：${currentBalance} 堂${required !== undefined ? `，本次需要：${required} 堂` : ""}，請購買更多堂數後再預約。`
+          ? `您目前剩餘 ${currentBalance} 堂${required !== undefined ? `，本次需要 ${required} 堂` : ""}，請購買更多堂數後再預約。`
           : msg
         : msg;
       toast({
@@ -1709,7 +1709,7 @@ function BookingFlowTab() {
       const isInsufficientCredits = msg.includes("堂數不足") || msg.includes("INSUFFICIENT_CREDITS");
       const insufficientDescription = isInsufficientCredits
         ? currentBalance !== undefined
-          ? `目前餘額：${currentBalance} 堂${required !== undefined ? `，本次需要：${required} 堂` : ""}，請購買更多堂數後再預約。`
+          ? `您目前剩餘 ${currentBalance} 堂${required !== undefined ? `，本次需要 ${required} 堂` : ""}，請購買更多堂數後再預約。`
           : msg
         : msg;
       toast({
