@@ -289,6 +289,13 @@ export default function ParentDashboard() {
 
   const unreadCount = unreadData?.count || 0;
 
+  const { data: headerWallet } = useQuery<WalletData>({
+    ...WALLET_QUERY_OPTIONS,
+    enabled: !!user && user.role === "parent",
+  });
+
+  const headerBalance = headerWallet?.balance ?? null;
+
   const markReadMutation = useMutation({
     mutationFn: async (id: number) => { await apiRequest("PATCH", `/api/notifications/${id}/read`); },
     onSuccess: () => {
@@ -415,6 +422,16 @@ export default function ParentDashboard() {
                   {typedUser.firstName}
                 </span>
               </div>
+              {headerBalance !== null && (
+                <button
+                  onClick={() => setActiveTab("credits")}
+                  className="hidden sm:flex items-center gap-1.5 bg-tiffany/8 hover:bg-tiffany/15 border border-tiffany/20 rounded-full px-2.5 py-1 transition-colors"
+                  data-testid="button-header-wallet"
+                >
+                  <Wallet className="w-3.5 h-3.5 text-tiffany" />
+                  <span className="text-xs font-semibold text-tiffany" data-testid="text-header-balance">{headerBalance} 堂</span>
+                </button>
+              )}
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -836,15 +853,20 @@ interface WalletData {
   expiringBalances: { credits: number; expiresAt: string; daysLeft: number }[];
 }
 
+const WALLET_QUERY_OPTIONS = {
+  queryKey: ["/api/parent/wallet"] as const,
+  staleTime: 60 * 1000,
+  refetchOnWindowFocus: true,
+  refetchInterval: 5 * 60 * 1000,
+} as const;
+
 interface PackagesData {
   packages: CreditPackage[];
   promotions: Promotion[];
 }
 
 function WalletOverviewCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { data: wallet, isLoading } = useQuery<WalletData>({
-    queryKey: ["/api/parent/wallet"],
-  });
+  const { data: wallet, isLoading } = useQuery<WalletData>(WALLET_QUERY_OPTIONS);
 
   if (isLoading) {
     return <Skeleton className="h-28 rounded-xl" />;
@@ -934,9 +956,7 @@ function CreditsTab() {
     },
   });
 
-  const { data: wallet, isLoading: walletLoading } = useQuery<WalletData>({
-    queryKey: ["/api/parent/wallet"],
-  });
+  const { data: wallet, isLoading: walletLoading } = useQuery<WalletData>(WALLET_QUERY_OPTIONS);
 
   const { data: packagesData, isLoading: packagesLoading } = useQuery<PackagesData>({
     queryKey: ["/api/credit-packages"],
