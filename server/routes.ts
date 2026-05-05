@@ -357,11 +357,63 @@ const isCoach: RequestHandler = async (req: any, res, next) => {
   next();
 };
 
+/** 以 transaction 原子性地贈送 2 堂免費體驗堂數（冪等：已有記錄則跳過） */
+async function grantFreeTrialIfNeeded(parentId: string): Promise<void> {
+  const [existing] = await db.select({ id: creditBalances.id }).from(creditBalances).where(eq(creditBalances.parentId, parentId));
+  if (existing) return;
+  await db.transaction(async (tx) => {
+    const [freePurchase] = await tx.insert(creditPurchases).values({
+      parentId,
+      credits: 2,
+      originalAmount: 0,
+      discountAmount: 0,
+      finalAmount: 0,
+      paymentMethod: "free_trial",
+      paymentStatus: "completed",
+    }).returning();
+    await tx.insert(creditBalances).values({
+      parentId,
+      purchaseId: freePurchase.id,
+      originalCredits: 2,
+      remainingCredits: 2,
+      expiresAt: null,
+    });
+    console.log(`[LINE Register] 已贈送 2 堂免費體驗給 ${parentId}`);
+  });
+}
+
+/**
+ * 補丁：修復已完成 LINE 手機驗證但缺少免費堂數的舊帳號。
+ * 冪等 — 使用 NOT EXISTS 避免重複贈送。伺服器啟動時自動執行一次。
+ */
+async function backfillLineFreeTrial(): Promise<void> {
+  try {
+    // 使用 RAW SQL 確保 NOT EXISTS 完全冪等
+    const { rows } = await db.execute<{ id: string }>(
+      `SELECT u.id FROM users u
+       LEFT JOIN credit_balances cb ON cb.parent_id = u.id
+       WHERE u.role = 'parent' AND u.line_registration_complete = true AND cb.id IS NULL`
+    );
+    if (rows.length === 0) {
+      console.log("[Backfill] LINE 帳號免費堂數檢查完成，無需補發");
+      return;
+    }
+    console.log(`[Backfill] 發現 ${rows.length} 個 LINE 帳號缺少免費堂數，開始補發…`);
+    for (const row of rows) {
+      await grantFreeTrialIfNeeded(row.id);
+    }
+    console.log("[Backfill] LINE 帳號免費堂數補發完成");
+  } catch (err) {
+    console.error("[Backfill] 補發免費堂數時發生錯誤：", err);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   await setupAuth(app);
+  backfillLineFreeTrial().catch((e) => console.error("[Backfill] 啟動補丁失敗：", e));
   registerAuthRoutes(app);
 
   // Legacy: serve files uploaded before the App Storage migration (e.g. coach photoUrl = "/uploads/xxx.jpg").
@@ -730,27 +782,8 @@ export async function registerRoutes(
         .returning();
       if (!updated) return res.status(404).json({ message: "找不到使用者" });
 
-      // 贈送免費體驗堂數（若尚未建立過點數記錄）
-      const [existingBalance] = await db.select().from(creditBalances).where(eq(creditBalances.parentId, userId));
-      if (!existingBalance) {
-        const [freePurchase] = await db.insert(creditPurchases).values({
-          parentId: userId,
-          credits: 2,
-          originalAmount: 0,
-          discountAmount: 0,
-          finalAmount: 0,
-          paymentMethod: "free_trial",
-          paymentStatus: "completed",
-        }).returning();
-        await db.insert(creditBalances).values({
-          parentId: userId,
-          purchaseId: freePurchase.id,
-          originalCredits: 2,
-          remainingCredits: 2,
-          expiresAt: null,
-        });
-        console.log(`[LINE Register] 已贈送 2 堂免費體驗給 ${userId}`);
-      }
+      // 贈送免費體驗堂數（若尚未建立過點數記錄，以 transaction 確保原子性）
+      await grantFreeTrialIfNeeded(userId);
 
       const { passwordHash: _, ...safeUser } = updated;
       req.session.save(() => res.json({ ...safeUser }));
