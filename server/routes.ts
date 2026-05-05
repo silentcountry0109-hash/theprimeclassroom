@@ -853,7 +853,20 @@ export async function registerRoutes(
       const phone = text;
 
       try {
-        const user = await storage.getUserByPhone(phone);
+        // Step 1: 先查 coaches 表（老師帳號手機存在 coaches.phone，而非 users.phone）
+        let user: Awaited<ReturnType<typeof storage.getUserByPhone>> = undefined;
+        const [coachRec] = await db.select().from(coaches).where(and(eq(coaches.phone, phone), eq(coaches.isActive, true))).limit(1);
+        if (coachRec) {
+          if (!coachRec.userId) {
+            await sendLineReply(replyToken, "此手機號碼對應的老師尚未建立系統帳號，請聯絡分校管理員。");
+            continue;
+          }
+          const [coachUser] = await db.select().from(users).where(eq(users.id, coachRec.userId)).limit(1);
+          user = coachUser;
+        } else {
+          // Fallback：查 users.phone（適用分校主任或未來手機存於 users 的情境）
+          user = await storage.getUserByPhone(phone);
+        }
 
         if (!user) {
           await sendLineReply(replyToken, "找不到以此手機號碼登記的帳號，請確認號碼是否正確。");
