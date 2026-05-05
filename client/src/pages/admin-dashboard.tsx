@@ -137,6 +137,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string } =
     { id: "shop", label: "商城管理", icon: ShoppingBag },
     { id: "credits", label: "點數管理", icon: Coins },
     { id: "site-editor", label: "官網編輯", icon: Globe },
+    { id: "tools", label: "系統工具", icon: RotateCcw },
   ];
 
   return (
@@ -207,6 +208,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string } =
             {activeTab === "shop" && <ShopManagementTab />}
             {activeTab === "credits" && <CreditsManagementTab />}
             {activeTab === "site-editor" && <SiteEditorTab />}
+            {activeTab === "tools" && <SystemToolsTab />}
           </main>
         </div>
       </div>
@@ -3930,6 +3932,64 @@ function SiteEditorTab() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SystemToolsTab() {
+  const { toast } = useToast();
+  const [backfillResult, setBackfillResult] = useState<{ message: string; updated: number } | null>(null);
+
+  const backfillMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/backfill-coach-phones"),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      setBackfillResult(data);
+      toast({ title: "補丁完成", description: data.message });
+    },
+    onError: () => {
+      toast({ title: "補丁失敗", description: "請稍後再試", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="max-w-2xl">
+      <h1 className="text-xl font-semibold text-foreground mb-1" data-testid="text-tools-title">
+        系統工具
+      </h1>
+      <p className="text-sm text-muted-foreground mb-6">
+        一次性資料補丁與系統維護工具
+      </p>
+
+      <div className="bg-white rounded-md border border-gray-100 p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+            <Phone className="w-4 h-4 text-tiffany" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">老師手機號碼補丁</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              將老師資料中的手機號碼同步至對應的系統帳號。僅會補丁尚未設定手機號碼的帳號，不會覆蓋已有資料。伺服器啟動時也會自動執行一次。
+            </p>
+          </div>
+        </div>
+
+        {backfillResult && (
+          <div className="flex items-center gap-2 mb-4 text-sm text-green-700 bg-green-50 border border-green-100 rounded-md px-3 py-2" data-testid="text-backfill-result">
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{backfillResult.message}</span>
+          </div>
+        )}
+
+        <Button
+          onClick={() => backfillMutation.mutate()}
+          disabled={backfillMutation.isPending}
+          data-testid="button-backfill-coach-phones"
+        >
+          <RotateCcw className={`w-4 h-4 mr-1.5 ${backfillMutation.isPending ? "animate-spin" : ""}`} />
+          {backfillMutation.isPending ? "補丁中..." : "立即執行補丁"}
+        </Button>
       </div>
     </div>
   );

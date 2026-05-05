@@ -61,6 +61,28 @@ app.use((req, res, next) => {
     log(`auto-completed ${completedCount} expired bookings`);
   }
 
+  // Startup migration: backfill coaches.phone -> users.phone for existing accounts
+  try {
+    const { db } = await import("./db");
+    const { coaches, users } = await import("@shared/schema");
+    const { and, isNotNull, eq } = await import("drizzle-orm");
+    const allCoaches = await db.select().from(coaches)
+      .where(and(isNotNull(coaches.userId), isNotNull(coaches.phone)));
+    let backfilled = 0;
+    for (const coach of allCoaches) {
+      if (!coach.userId || !coach.phone) continue;
+      const [user] = await db.select({ id: users.id, phone: users.phone })
+        .from(users).where(eq(users.id, coach.userId)).limit(1);
+      if (user && !user.phone) {
+        await db.update(users).set({ phone: coach.phone, updatedAt: new Date() }).where(eq(users.id, coach.userId));
+        backfilled++;
+      }
+    }
+    log(`startup backfill: synced phone for ${backfilled} coach account(s)`);
+  } catch (e) {
+    log(`startup backfill failed: ${e}`);
+  }
+
   setInterval(async () => {
     try {
       const count = await storage.completeExpiredBookings();
