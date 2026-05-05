@@ -348,8 +348,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCoach(id: number, data: Partial<InsertCoach>): Promise<Coach> {
-    const [updated] = await db.update(coaches).set(data).where(eq(coaches.id, id)).returning();
-    return updated;
+    return db.transaction(async (tx) => {
+      const [updated] = await tx.update(coaches).set(data).where(eq(coaches.id, id)).returning();
+      if (data.phone !== undefined && updated?.userId) {
+        await tx.update(users).set({ phone: data.phone }).where(eq(users.id, updated.userId));
+      }
+      return updated;
+    });
   }
 
   async deleteCoach(id: number): Promise<void> {
