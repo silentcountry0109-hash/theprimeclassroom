@@ -872,6 +872,21 @@ export async function registerRoutes(
           }
         }
 
+        // Fallback：若仍查無結果，再查 franchises.phone（相容主任帳號建立時未寫入 users.phone 的情況）
+        if (!user) {
+          const [franchiseRec] = await db.select().from(franchises).where(eq(franchises.phone, phone)).limit(1);
+          if (franchiseRec) {
+            const [adminUser] = await db.select().from(users)
+              .where(and(eq(users.franchiseId, franchiseRec.id), eq(users.role, "franchise_admin")))
+              .limit(1);
+            if (!adminUser) {
+              await sendLineReply(replyToken, "尚未建立系統帳號，請聯絡總部管理員。");
+              continue;
+            }
+            user = adminUser;
+          }
+        }
+
         if (!user) {
           await sendLineReply(replyToken, "找不到以此手機號碼登記的帳號，請確認號碼是否正確。");
           continue;
