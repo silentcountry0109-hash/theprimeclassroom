@@ -1638,6 +1638,8 @@ function UsersTab() {
   const [parentExpanded, setParentExpanded] = useState(false);
   const [parentSearch, setParentSearch] = useState("");
   const parentSectionRef = useRef<HTMLDivElement>(null);
+  const [inlinePhoneUserId, setInlinePhoneUserId] = useState<string | null>(null);
+  const [inlinePhoneValue, setInlinePhoneValue] = useState("");
 
   const { data: userList = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -1768,15 +1770,67 @@ function UsersTab() {
             {u.username && <span className="ml-2 text-tiffany">帳號: {u.username}</span>}
           </p>
           {showPhone && (
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {u.phone?.trim() ? (
                 <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full" data-testid={`phone-status-filled-${u.id}`}>
                   <Phone className="w-3 h-3" />{u.phone.trim()}
                 </span>
+              ) : inlinePhoneUserId === u.id ? (
+                <div className="flex items-center gap-1" data-testid={`inline-phone-form-${u.id}`}>
+                  <input
+                    type="tel"
+                    value={inlinePhoneValue}
+                    onChange={(e) => setInlinePhoneValue(e.target.value)}
+                    placeholder="09xx-xxx-xxx"
+                    className="text-xs border border-tiffany/50 rounded px-2 py-0.5 outline-none focus:ring-1 focus:ring-tiffany w-36"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !updatePhoneMutation.isPending && inlinePhoneValue.trim()) {
+                        updatePhoneMutation.mutate({ userId: u.id, phone: inlinePhoneValue.trim() }, {
+                          onSuccess: () => setInlinePhoneUserId(null),
+                        });
+                      } else if (e.key === "Escape") {
+                        setInlinePhoneUserId(null);
+                      }
+                    }}
+                    data-testid={`input-inline-phone-${u.id}`}
+                  />
+                  <button
+                    className="text-xs text-white bg-tiffany hover:bg-tiffany/80 px-2 py-0.5 rounded disabled:opacity-50"
+                    onClick={() => {
+                      if (!inlinePhoneValue.trim()) return;
+                      updatePhoneMutation.mutate({ userId: u.id, phone: inlinePhoneValue.trim() }, {
+                        onSuccess: () => setInlinePhoneUserId(null),
+                      });
+                    }}
+                    disabled={updatePhoneMutation.isPending || !inlinePhoneValue.trim()}
+                    data-testid={`button-inline-phone-save-${u.id}`}
+                  >
+                    儲存
+                  </button>
+                  <button
+                    className="text-xs text-gray-500 hover:text-gray-700 px-1 py-0.5"
+                    onClick={() => setInlinePhoneUserId(null)}
+                    data-testid={`button-inline-phone-cancel-${u.id}`}
+                  >
+                    取消
+                  </button>
+                </div>
               ) : (
-                <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full" data-testid={`phone-status-missing-${u.id}`}>
-                  <Phone className="w-3 h-3" />未填手機
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full" data-testid={`phone-status-missing-${u.id}`}>
+                    <Phone className="w-3 h-3" />未填手機
+                  </span>
+                  {u.role === "coach" && (
+                    <button
+                      className="text-xs text-tiffany hover:text-tiffany/70 border border-tiffany/40 hover:border-tiffany/70 px-2 py-0.5 rounded-full transition-colors"
+                      onClick={() => { setInlinePhoneUserId(u.id); setInlinePhoneValue(""); }}
+                      data-testid={`button-fill-phone-${u.id}`}
+                    >
+                      補填
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
