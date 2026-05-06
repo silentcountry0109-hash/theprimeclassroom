@@ -1929,6 +1929,22 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/admin/users/:userId/line", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const [targetUser] = await db.select({ id: users.id, role: users.role, lineUserId: users.lineUserId }).from(users).where(eq(users.id, userId)).limit(1);
+      if (!targetUser) return res.status(404).json({ message: "找不到此帳號" });
+      if (!["coach", "franchise_admin"].includes(targetUser.role || "")) {
+        return res.status(400).json({ message: "只能解除老師或分校主任的 LINE 綁定" });
+      }
+      if (!targetUser.lineUserId) return res.status(400).json({ message: "此帳號尚未綁定 LINE" });
+      await storage.updateUserLineUserId(userId, null);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "解除 LINE 綁定失敗" });
+    }
+  });
+
   app.get("/api/franchise-admin/managed-franchises", isFranchiseAdmin, async (req: any, res) => {
     try {
       const user = req.currentUser;

@@ -4085,6 +4085,9 @@ function SystemToolsTab() {
   const [backfillResult, setBackfillResult] = useState<{ message: string; updated: number } | null>(null);
   const [diagPhone, setDiagPhone] = useState("");
   const [diagResult, setDiagResult] = useState<LineDiagResult | null>(null);
+  const [lineUnbindSearch, setLineUnbindSearch] = useState("");
+  const [lineUnbindTarget, setLineUnbindTarget] = useState<User | null>(null);
+  const [showLineUnbindDialog, setShowLineUnbindDialog] = useState(false);
 
   const backfillMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/backfill-coach-phones"),
@@ -4110,6 +4113,51 @@ function SystemToolsTab() {
       toast({ title: "診斷失敗", description: "請稍後再試", variant: "destructive" });
     },
   });
+
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const lineUnbindMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/users/${userId}/line`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "LINE 綁定已解除", description: `已成功解除 ${lineUnbindTarget?.firstName || ""} ${lineUnbindTarget?.lastName || ""} 的 LINE 綁定` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setShowLineUnbindDialog(false);
+      setLineUnbindTarget(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "解除失敗", description: err.message || "請稍後再試", variant: "destructive" });
+      setShowLineUnbindDialog(false);
+    },
+  });
+
+  const roleLabelsTools: Record<string, string> = {
+    admin: "總部管理員",
+    franchise_admin: "分校主任",
+    coach: "老師",
+    parent: "家長",
+  };
+
+  const lineBindableUsers = allUsers.filter((u) =>
+    ["coach", "franchise_admin"].includes(u.role || "")
+  );
+
+  const filteredLineUsers = lineUnbindSearch.trim()
+    ? lineBindableUsers.filter((u) => {
+        const q = lineUnbindSearch.toLowerCase();
+        return (
+          (u.firstName || "").toLowerCase().includes(q) ||
+          (u.lastName || "").toLowerCase().includes(q) ||
+          (u.username || "").toLowerCase().includes(q) ||
+          (u.phone || "").includes(q) ||
+          (u.email || "").toLowerCase().includes(q)
+        );
+      })
+    : lineBindableUsers;
 
   return (
     <div className="max-w-2xl">
@@ -4215,6 +4263,94 @@ function SystemToolsTab() {
           </div>
         )}
       </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-5 mt-4">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+            <X className="w-4 h-4 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">手動解除 LINE 綁定</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              搜尋老師或分校主任帳號，並解除其 LINE 綁定。操作後對方需重新完成綁定流程才能收到 LINE 通知。
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <Input
+            placeholder="搜尋姓名、帳號、手機或 Email…"
+            value={lineUnbindSearch}
+            onChange={(e) => setLineUnbindSearch(e.target.value)}
+            data-testid="input-line-unbind-search"
+          />
+        </div>
+
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {filteredLineUsers.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-line-unbind-empty">
+              {lineUnbindSearch.trim() ? "查無符合帳號" : "目前無老師或主任帳號"}
+            </p>
+          )}
+          {filteredLineUsers.map((u) => (
+            <div key={u.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md border border-gray-100 bg-gray-50" data-testid={`row-line-unbind-${u.id}`}>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {u.firstName || ""} {u.lastName || ""}
+                  {!u.firstName && !u.lastName && <span className="text-muted-foreground">未命名</span>}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {roleLabelsTools[u.role || ""] || u.role}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {u.username ? `帳號: ${u.username}` : u.email || ""}
+                  {u.phone ? ` · ${u.phone}` : ""}
+                </p>
+              </div>
+              {u.lineUserId ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0 text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => { setLineUnbindTarget(u); setShowLineUnbindDialog(true); }}
+                  data-testid={`button-line-unbind-${u.id}`}
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />解除綁定
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-foreground flex-shrink-0 px-2" data-testid={`text-line-unbound-${u.id}`}>尚未綁定</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <AlertDialog open={showLineUnbindDialog} onOpenChange={setShowLineUnbindDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認解除 LINE 綁定</AlertDialogTitle>
+            <AlertDialogDescription>
+              確定要解除
+              <span className="font-semibold text-foreground mx-1">
+                {lineUnbindTarget?.firstName || ""} {lineUnbindTarget?.lastName || ""}
+                {!lineUnbindTarget?.firstName && !lineUnbindTarget?.lastName ? "此帳號" : ""}
+              </span>
+              的 LINE 綁定嗎？解除後對方將無法收到 LINE 通知，需重新完成綁定流程。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-line-unbind-cancel">取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => lineUnbindTarget && lineUnbindMutation.mutate(lineUnbindTarget.id)}
+              disabled={lineUnbindMutation.isPending}
+              data-testid="button-line-unbind-confirm"
+            >
+              {lineUnbindMutation.isPending ? "解除中…" : "確認解除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
