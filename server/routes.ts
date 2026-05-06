@@ -729,7 +729,7 @@ export async function registerRoutes(
         if (user!.lineRegistrationComplete) {
           return res.redirect("/dashboard");
         }
-        return res.redirect("/parent-register/add-friend");
+        return res.redirect("/parent-register/verify-phone");
       });
     } catch (err) {
       if (err instanceof LineIdAlreadyBoundError) {
