@@ -1312,7 +1312,20 @@ export class DatabaseStorage implements IStorage {
         throw new LineIdAlreadyBoundError(roleLabel);
       }
     }
-    await db.update(users).set({ lineUserId, updatedAt: new Date() }).where(eq(users.id, userId));
+    try {
+      await db.update(users).set({ lineUserId, updatedAt: new Date() }).where(eq(users.id, userId));
+    } catch (err: unknown) {
+      // 保留 race condition 保護：即使 schema 層已無全域 unique，若未來 DB 仍有同 role 複合 unique，確保不會靜默失敗
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        (err as Record<string, unknown>).code === "23505"
+      ) {
+        console.warn("[updateUserLineUserId] DB unique constraint race condition on line_user_id");
+        throw new LineIdAlreadyBoundError("相同身分");
+      }
+      throw err;
+    }
   }
 
   async getBookingsByFranchise(franchiseId: number): Promise<any[]> {
