@@ -140,6 +140,38 @@ export async function sendLineFlexMessages(
   }
 }
 
+export async function sendLineReplyFlex(
+  replyToken: string,
+  altText: string,
+  contents: object
+): Promise<boolean> {
+  const token = await getLineToken();
+  if (!token) { console.error("[LINE Reply Flex] No access token, cannot send reply"); return false; }
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        replyToken,
+        messages: [{ type: "flex", altText, contents }],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`[LINE Reply Flex] API error ${res.status}:`, body);
+      return false;
+    }
+    console.log("[LINE Reply Flex] Sent OK:", altText);
+    return true;
+  } catch (err) {
+    console.error("[LINE Reply Flex] Failed:", err);
+    return false;
+  }
+}
+
 export async function sendLineReply(replyToken: string, message: string): Promise<boolean> {
   const token = await getLineToken();
   if (!token) { console.error("[LINE Reply] No access token, cannot send reply"); return false; }
@@ -590,6 +622,160 @@ export function buildContactBookFlex(params: {
               label: "查看聯絡簿 →",
               uri: params.bookingUrl ?? `${BASE}/`,
             },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildWelcomeBindingFlex(): { altText: string; contents: object } {
+  return {
+    altText: "歡迎加入質數教室！請依步驟完成帳號綁定",
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#81D8D0",
+        paddingAll: "14px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              {
+                type: "text",
+                text: "👋  歡迎加入質數教室！",
+                color: "#FFFFFF",
+                size: "sm",
+                weight: "bold",
+                flex: 1,
+              },
+            ],
+          },
+          {
+            type: "text",
+            text: "The Prime 質數教室",
+            color: "#FFFFFFBB",
+            size: "xxs",
+            margin: "xs",
+          },
+        ],
+      },
+      hero: {
+        type: "image",
+        url: `${BASE}/ip-character.png`,
+        size: "full",
+        aspectMode: "fit",
+        aspectRatio: "3:2",
+        backgroundColor: "#E8FAF9",
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        paddingAll: "14px",
+        contents: [
+          {
+            type: "text",
+            text: "完成帳號綁定，即可收到課程通知！",
+            color: "#2C2C2C",
+            size: "sm",
+            weight: "bold",
+            wrap: true,
+          },
+          {
+            type: "separator",
+            margin: "sm",
+            color: "#F0F0F0",
+          },
+          {
+            type: "text",
+            text: "📋 綁定步驟",
+            color: "#4FBDB4",
+            size: "sm",
+            weight: "bold",
+            margin: "sm",
+          },
+          {
+            type: "text",
+            text: "① 直接在這個聊天室輸入您在質數教室登記的手機號碼",
+            color: "#555555",
+            size: "xs",
+            wrap: true,
+          },
+          {
+            type: "text",
+            text: "② 系統自動驗證並完成綁定",
+            color: "#555555",
+            size: "xs",
+            wrap: true,
+            margin: "xs",
+          },
+          {
+            type: "text",
+            text: "③ 之後即可收到課程提醒、聯絡簿等通知",
+            color: "#555555",
+            size: "xs",
+            wrap: true,
+            margin: "xs",
+          },
+          {
+            type: "separator",
+            margin: "sm",
+            color: "#F0F0F0",
+          },
+          {
+            type: "text",
+            text: "📌 手機號碼格式範例",
+            color: "#4FBDB4",
+            size: "sm",
+            weight: "bold",
+            margin: "sm",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            backgroundColor: "#F4FFFE",
+            cornerRadius: "6px",
+            paddingAll: "8px",
+            margin: "xs",
+            contents: [
+              {
+                type: "text",
+                text: "0912345678",
+                color: "#2C2C2C",
+                size: "md",
+                weight: "bold",
+                align: "center",
+              },
+            ],
+          },
+          {
+            type: "text",
+            text: "（09 開頭，共 10 位數，不含空格或符號）",
+            color: "#AAAAAA",
+            size: "xxs",
+            wrap: true,
+            margin: "xs",
+            align: "center",
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "text",
+            text: "請直接在下方輸入您的手機號碼 ↓",
+            color: "#4FBDB4",
+            size: "xs",
+            align: "center",
+            weight: "bold",
           },
         ],
       },

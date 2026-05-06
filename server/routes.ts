@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineMessage, sendLineReply, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, getLineToken } from "./line";
+import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, getLineToken } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -842,13 +842,26 @@ export async function registerRoutes(
     const events: any[] = body.events ?? [];
 
     for (const event of events) {
-      if (event.type !== "message" || event.message?.type !== "text") continue;
-
       const lineUserId: string = event.source?.userId;
       const replyToken: string = event.replyToken;
+
+      if (!lineUserId) continue;
+
+      // ── follow event: 老師第一次加入 LINE OA 好友時，傳送歡迎綁定說明 ──────
+      if (event.type === "follow") {
+        console.log(`[LINE OA Webhook] follow 事件，lineUserId=${lineUserId.slice(0, 8)}…`);
+        if (replyToken) {
+          const welcome = buildWelcomeBindingFlex();
+          sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
+        }
+        continue;
+      }
+
+      if (event.type !== "message" || event.message?.type !== "text") continue;
+
       const text: string = (event.message.text ?? "").trim();
 
-      if (!lineUserId || !replyToken) continue;
+      if (!replyToken) continue;
 
       // Accept only messages that look like a Taiwan mobile phone number (09XXXXXXXX)
       if (!/^09\d{8}$/.test(text)) {
