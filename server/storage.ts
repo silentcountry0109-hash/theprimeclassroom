@@ -1289,31 +1289,30 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserLineUserId(userId: string, lineUserId: string | null): Promise<void> {
     if (lineUserId !== null) {
+      // 取得目前帳號的 role，以便只檢查「同 role 衝突」
+      const [currentUser] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const currentRole = currentUser?.role ?? null;
+
+      // 只有同身分（role）才算重複綁定衝突；不同身分允許共用同一 LINE ID
       const [conflict] = await db
         .select({ id: users.id, role: users.role })
         .from(users)
-        .where(and(eq(users.lineUserId, lineUserId), ne(users.id, userId)))
+        .where(and(
+          eq(users.lineUserId, lineUserId),
+          ne(users.id, userId),
+          currentRole ? eq(users.role, currentRole) : sql`true`
+        ))
         .limit(1);
       if (conflict) {
         const roleLabel = conflict.role === "coach" ? "老師" : conflict.role === "parent" ? "家長" : conflict.role === "franchise_admin" ? "分校主任" : conflict.role ?? "其他";
         throw new LineIdAlreadyBoundError(roleLabel);
       }
     }
-    try {
-      await db.update(users).set({ lineUserId, updatedAt: new Date() }).where(eq(users.id, userId));
-    } catch (err: unknown) {
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        (err as Record<string, unknown>).code === "23505" &&
-        typeof (err as Record<string, unknown>).constraint === "string" &&
-        ((err as Record<string, unknown>).constraint as string).includes("line_user_id")
-      ) {
-        console.warn("[updateUserLineUserId] DB unique constraint race condition on line_user_id");
-        throw new LineIdAlreadyBoundError("其他");
-      }
-      throw err;
-    }
+    await db.update(users).set({ lineUserId, updatedAt: new Date() }).where(eq(users.id, userId));
   }
 
   async getBookingsByFranchise(franchiseId: number): Promise<any[]> {

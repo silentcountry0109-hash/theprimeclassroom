@@ -35,13 +35,17 @@ class AuthStorage implements IAuthStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     if (userData.lineUserId) {
+      // 只檢查相同 role 的衝突；不同身分允許共用同一 LINE ID
+      const conditions = userData.role
+        ? and(eq(users.lineUserId, userData.lineUserId), ne(users.id, userData.id ?? ""), eq(users.role, userData.role))
+        : and(eq(users.lineUserId, userData.lineUserId), ne(users.id, userData.id ?? ""));
       const existing = await db
         .select({ id: users.id, role: users.role })
         .from(users)
-        .where(and(eq(users.lineUserId, userData.lineUserId), ne(users.id, userData.id ?? "")))
+        .where(conditions)
         .limit(1);
       if (existing.length > 0) {
-        const roleLabel = existing[0].role === "coach" ? "老師" : existing[0].role === "parent" ? "家長" : existing[0].role ?? "其他";
+        const roleLabel = existing[0].role === "coach" ? "老師" : existing[0].role === "parent" ? "家長" : existing[0].role === "franchise_admin" ? "分校主任" : existing[0].role ?? "其他";
         throw new LineIdAlreadyBoundError(roleLabel);
       }
     }

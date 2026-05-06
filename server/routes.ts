@@ -938,10 +938,10 @@ export async function registerRoutes(
 
       } catch (err: unknown) {
         if (err instanceof LineIdAlreadyBoundError) {
-          console.warn(`[LINE OA Webhook] LINE ID 衝突 boundRole=${err.boundRole} phone=${phone}`);
+          console.warn(`[LINE OA Webhook] LINE ID 衝突（相同身分） boundRole=${err.boundRole} phone=${phone}`);
           sendLineReply(
             replyToken,
-            `此 LINE 帳號已被另一個「${err.boundRole}」帳號綁定，無法重複使用。\n如有疑問請聯絡總部管理員。`
+            `此 LINE 帳號已被另一個「${err.boundRole}」帳號綁定，無法再綁定相同身分的帳號。\n如有疑問請聯絡總部管理員。`
           ).catch(() => {});
         } else {
           console.error("[LINE OA Webhook] 綁定失敗:", err);
