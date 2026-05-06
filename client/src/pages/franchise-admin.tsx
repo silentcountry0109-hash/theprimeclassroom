@@ -1793,8 +1793,10 @@ function CoachesTab() {
   const [uploadingCoachId, setUploadingCoachId] = useState<number | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [pendingUploadCoachId, setPendingUploadCoachId] = useState<number | null>(null);
+  const [lineFilter, setLineFilter] = useState<"all" | "bound" | "unbound">("all");
 
-  const { data: coaches = [], isLoading } = useQuery<Coach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
+  type EnrichedCoach = Coach & { accountUsername: string | null; lineUserId: string | null };
+  const { data: coaches = [], isLoading } = useQuery<EnrichedCoach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async ({ coachId, file }: { coachId: number; file: File }) => {
@@ -2048,6 +2050,27 @@ function CoachesTab() {
         </Button>
       </div>
 
+      {!isLoading && coaches.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="text-xs text-muted-foreground">LINE 篩選：</span>
+          {(["all", "bound", "unbound"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setLineFilter(f)}
+              data-testid={`filter-line-${f}`}
+              className={`text-xs px-3 py-1 rounded-full border transition-colors ${lineFilter === f ? "bg-tiffany text-white border-tiffany" : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany"}`}
+            >
+              {f === "all" ? "全部" : f === "bound" ? "已綁定 LINE" : "尚未綁定"}
+              {f !== "all" && (
+                <span className="ml-1 opacity-70">
+                  ({coaches.filter(c => f === "bound" ? !!c.lineUserId : !c.lineUserId).length})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
       ) : coaches.length === 0 ? (
@@ -2077,8 +2100,19 @@ function CoachesTab() {
             e.target.value = "";
           }}
         />
-        <div className="space-y-3">
-          {coaches.map((coach) => (
+        {(() => {
+          const filteredCoaches = lineFilter === "all" ? coaches : coaches.filter(c => lineFilter === "bound" ? !!c.lineUserId : !c.lineUserId);
+          return (
+            <>
+              {filteredCoaches.length === 0 && (
+                <div className="text-center py-10 bg-white rounded-md border border-gray-100 mb-3" data-testid="coaches-filter-empty">
+                  <p className="text-sm text-muted-foreground">
+                    {lineFilter === "bound" ? "目前沒有已綁定 LINE 的老師" : "所有老師都已綁定 LINE"}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-3">
+                {filteredCoaches.map((coach) => (
             <div key={coach.id} className={`bg-white rounded-md border p-4 flex items-center gap-4 ${coach.isActive === false ? "border-gray-200 opacity-60" : "border-gray-100"}`} data-testid={`franchise-coach-${coach.id}`}>
               <div className="relative shrink-0 group">
                 {coach.photoUrl ? (
@@ -2125,14 +2159,14 @@ function CoachesTab() {
                   )}
                   {coach.userId ? (
                     <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-account-status-${coach.id}`}>
-                      <ShieldCheck className="w-3 h-3" />{(coach as any).accountUsername || "帳號已建立"}
+                      <ShieldCheck className="w-3 h-3" />{coach.accountUsername || "帳號已建立"}
                     </span>
                   ) : (
                     <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" data-testid={`coach-account-status-${coach.id}`}>
                       未建立帳號
                     </span>
                   )}
-                  {(coach as any).lineUserId ? (
+                  {coach.lineUserId ? (
                     <span className="text-xs bg-[#06C755]/10 text-[#06C755] px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-line-status-${coach.id}`}>
                       <MessageSquare className="w-3 h-3" />LINE 已綁定
                     </span>
@@ -2178,14 +2212,14 @@ function CoachesTab() {
                       title="解除帳號連結"
                       data-testid={`button-unlink-account-coach-${coach.id}`}
                       onClick={() => {
-                        const username = (coach as any).accountUsername || "此帳號";
+                        const username = coach.accountUsername || "此帳號";
                         if (!confirm(`確定要解除「${coach.name}」與帳號「${username}」的連結嗎？\n\n解除後老師將無法登入，可重新依手機號碼建立或串聯帳號。`)) return;
                         unlinkAccountMutation.mutate(coach.id);
                       }}
                     >
                       <Unlink className="w-4 h-4" />
                     </Button>
-                    {(coach as any).lineUserId && (
+                    {coach.lineUserId && (
                       <Button
                         variant="outline"
                         size="icon"
@@ -2214,8 +2248,11 @@ function CoachesTab() {
                 </Button>
               </div>
             </div>
-          ))}
-        </div>
+                ))}
+              </div>
+            </>
+          );
+        })()}
         </>
       )}
 
