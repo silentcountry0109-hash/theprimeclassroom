@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=Shippori+Mincho:wght@400;500;600&display=swap');
+
+:root {
+  --background: 40 6% 97%;
+  --foreground: 220 9% 32%;
+  --border: 40 6% 91%;
+  --card: 40 6% 95%;
+  --card-foreground: 220 9% 32%;
+  --primary: 176 45% 32%;
+  --primary-foreground: 176 45% 96%;
+  --muted: 40 8% 88%;
+  --muted-foreground: 220 8% 38%;
+  --input: 220 9% 50%;
+  --ring: 176 45% 66%;
+  --radius: 0.5rem;
+  --font-sans: 'Noto Sans TC', sans-serif;
+  --font-serif: 'Shippori Mincho', serif;
+  --tiffany: #81D8D0;
+  --coral: #FFB7B2;
+}
+
+body {
+  font-family: 'Noto Sans TC', sans-serif;
+  background-color: hsl(40 6% 97%);
+  color: hsl(220 9% 32%);
+}
