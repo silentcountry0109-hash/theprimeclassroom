@@ -660,7 +660,7 @@ export async function registerRoutes(
       url.searchParams.set("redirect_uri", redirectUri);
       url.searchParams.set("scope", "profile openid");
       url.searchParams.set("state", state);
-      url.searchParams.set("bot_prompt", "normal");
+      url.searchParams.set("bot_prompt", "aggressive");
       res.redirect(url.toString());
     });
   });
