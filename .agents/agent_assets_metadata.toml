@@ -24,3 +24,9 @@ id = "7el82UOt6HjxyE6GiRMBC"
 uri = "file://attached_assets/screenshots/35b01c9c-e144-4845-804d-493efef1bdbc-00-1f48xp0bjovrd_worf_replit_dev_mockup_preview_credits-purchase_CreditsPage.png"
 type = "image"
 title = "堂數購買頁面模擬圖"
+
+[[outputs]]
+id = "9BgR_27MHTViXpth5Ce8q"
+uri = "file://teacher-growth-ladder.pdf"
+type = "pdf"
+title = "教師成長階梯招募文件"
