@@ -330,6 +330,11 @@ export default function ParentDashboard() {
     return null;
   }
 
+  if (user.lineRegistrationComplete === false) {
+    window.location.href = "/parent-register/verify-phone";
+    return null;
+  }
+
   const handleLogout = async () => {
     if (isCredentialUser) {
       await fetch("/api/credential-logout", { method: "POST", credentials: "include" });

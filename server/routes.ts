@@ -10,7 +10,7 @@ import crypto from "crypto";
 import twilio from "twilio";
 import { users } from "@shared/models/auth";
 import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
-import { eq, and, or, isNotNull } from "drizzle-orm";
+import { eq, and, or, isNotNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
 import path from "path";
@@ -309,6 +309,9 @@ const isCredentialOrAuth: RequestHandler = async (req: any, res, next) => {
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const user = await authStorage.getUser(userId);
   if (!user) return res.status(401).json({ message: "Unauthorized" });
+  if (user.role === "parent" && user.lineRegistrationComplete === false) {
+    return res.status(403).json({ message: "請先完成電話驗證", code: "PHONE_VERIFICATION_REQUIRED" });
+  }
   req.currentUser = user;
   next();
 };
@@ -2001,6 +2004,11 @@ export async function registerRoutes(
       }
       if (!targetUser.lineUserId) return res.status(400).json({ message: "此帳號尚未綁定 LINE" });
       await storage.updateUserLineUserId(userId, null);
+      if (targetUser.role === "parent") {
+        await db.execute(
+          sql`DELETE FROM sessions WHERE sess->>'credentialUserId' = ${userId}`
+        );
+      }
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "解除 LINE 綁定失敗" });
