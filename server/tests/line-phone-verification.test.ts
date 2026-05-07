@@ -125,6 +125,56 @@ describe("isCredentialOrAuth middleware — LINE 電話驗證守衛", () => {
   });
 });
 
+type HttpMethod = "get" | "post" | "patch" | "delete";
+
+function invoke(method: HttpMethod, path: string) {
+  const agent = request(testApp);
+  const dispatchers: Record<HttpMethod, (url: string) => ReturnType<typeof agent.get>> = {
+    get: agent.get.bind(agent),
+    post: agent.post.bind(agent),
+    patch: agent.patch.bind(agent),
+    delete: agent.delete.bind(agent),
+  };
+  return dispatchers[method](path);
+}
+
+describe("isCredentialOrAuth middleware — 批次驗證多個受保護家長 API", () => {
+  const protectedEndpoints: Array<{ method: HttpMethod; path: string; label: string }> = [
+    { method: "get",  path: "/api/bookings",              label: "GET /api/bookings" },
+    { method: "post", path: "/api/bookings",              label: "POST /api/bookings" },
+    { method: "get",  path: "/api/parent/wallet",         label: "GET /api/parent/wallet" },
+    { method: "get",  path: "/api/parent/transactions",   label: "GET /api/parent/transactions" },
+    { method: "get",  path: "/api/orders",                label: "GET /api/orders" },
+    { method: "post", path: "/api/orders",                label: "POST /api/orders" },
+    { method: "get",  path: "/api/notifications",         label: "GET /api/notifications" },
+    { method: "get",  path: "/api/favorite-franchises",   label: "GET /api/favorite-franchises" },
+    { method: "post", path: "/api/parent/validate-coupon",label: "POST /api/parent/validate-coupon" },
+  ];
+
+  it.each(protectedEndpoints)(
+    "lineRegistrationComplete=false 時，$label 回傳 403 及 PHONE_VERIFICATION_REQUIRED",
+    async ({ method, path }) => {
+      const s = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const parent = await createParent(s, { lineRegistrationComplete: false });
+      createdUserIds.push(parent.id);
+
+      const res = await invoke(method, path).set(authAs(parent.id));
+
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe("PHONE_VERIFICATION_REQUIRED");
+      expect(res.body.message).toBe("請先完成電話驗證");
+    },
+  );
+
+  it.each(protectedEndpoints)(
+    "未帶認證標頭時，$label 回傳 401",
+    async ({ method, path }) => {
+      const res = await invoke(method, path);
+      expect(res.status).toBe(401);
+    },
+  );
+});
+
 describe("DELETE /api/admin/users/:userId/line — 管理員清除 LINE 綁定", () => {
   it("清除 LINE 綁定後，該家長的 session 被刪除", async () => {
     const s = `${Date.now().toString(36)}c`;
