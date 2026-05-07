@@ -4143,7 +4143,7 @@ function SystemToolsTab() {
   };
 
   const lineBindableUsers = allUsers.filter((u) =>
-    ["coach", "franchise_admin"].includes(u.role || "")
+    ["coach", "franchise_admin", "parent"].includes(u.role || "")
   );
 
   const filteredLineUsers = lineUnbindSearch.trim()
@@ -4272,7 +4272,7 @@ function SystemToolsTab() {
           <div>
             <h2 className="text-sm font-semibold text-foreground">手動解除 LINE 綁定</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              搜尋老師或分校主任帳號，並解除其 LINE 綁定。操作後對方需重新完成綁定流程才能收到 LINE 通知。
+              搜尋老師、分校主任或家長帳號，並解除其 LINE 綁定。操作後對方需重新完成綁定流程才能收到 LINE 通知。
             </p>
           </div>
         </div>
@@ -4289,7 +4289,7 @@ function SystemToolsTab() {
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {filteredLineUsers.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-line-unbind-empty">
-              {lineUnbindSearch.trim() ? "查無符合帳號" : "目前無老師或主任帳號"}
+              {lineUnbindSearch.trim() ? "查無符合帳號" : "目前無可解除綁定的帳號"}
             </p>
           )}
           {filteredLineUsers.map((u) => (

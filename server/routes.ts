@@ -1934,8 +1934,8 @@ export async function registerRoutes(
       const { userId } = req.params;
       const [targetUser] = await db.select({ id: users.id, role: users.role, lineUserId: users.lineUserId }).from(users).where(eq(users.id, userId)).limit(1);
       if (!targetUser) return res.status(404).json({ message: "找不到此帳號" });
-      if (!["coach", "franchise_admin"].includes(targetUser.role || "")) {
-        return res.status(400).json({ message: "只能解除老師或分校主任的 LINE 綁定" });
+      if (!["coach", "franchise_admin", "parent"].includes(targetUser.role || "")) {
+        return res.status(400).json({ message: "只能解除老師、分校主任或家長的 LINE 綁定" });
       }
       if (!targetUser.lineUserId) return res.status(400).json({ message: "此帳號尚未綁定 LINE" });
       await storage.updateUserLineUserId(userId, null);
