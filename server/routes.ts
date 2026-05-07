@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, getLineToken } from "./line";
+import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, getLineToken } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -855,8 +855,15 @@ export async function registerRoutes(
           console.error("[LINE OA Webhook] 更新 lineOaFollowed 失敗:", e)
         );
         if (replyToken) {
-          const welcome = buildWelcomeBindingFlex();
-          sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
+          // 依使用者 role 傳送對應歡迎訊息
+          const existingUser = await storage.getUserByLineUserId(lineUserId).catch(() => undefined);
+          if (existingUser?.role === "parent") {
+            const welcome = buildParentWelcomeFlex();
+            sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
+          } else {
+            const welcome = buildWelcomeBindingFlex();
+            sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
+          }
         }
         continue;
       }
