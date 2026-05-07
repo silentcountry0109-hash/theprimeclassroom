@@ -94,6 +94,8 @@ import {
   RotateCcw,
   MessageCircle,
   Link2,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
@@ -1637,6 +1639,7 @@ function UsersTab() {
   const [credPhone, setCredPhone] = useState("");
   const [parentExpanded, setParentExpanded] = useState(false);
   const [parentSearch, setParentSearch] = useState("");
+  const [parentLineFilter, setParentLineFilter] = useState<"all" | "followed" | "not_followed">("all");
   const parentSectionRef = useRef<HTMLDivElement>(null);
   const [inlinePhoneUserId, setInlinePhoneUserId] = useState<string | null>(null);
   const [inlinePhoneValue, setInlinePhoneValue] = useState("");
@@ -1727,18 +1730,21 @@ function UsersTab() {
   const parentUsers = userList.filter((u) => u.role === "parent");
   const coachFilledPhoneCount = coachUsers.filter((u) => u.phone?.trim()).length;
   const coachMissingPhoneCount = coachUsers.length - coachFilledPhoneCount;
-  const filteredParents = parentSearch.trim()
-    ? parentUsers.filter((u) => {
-        const q = parentSearch.toLowerCase();
-        return (
-          (u.firstName || "").toLowerCase().includes(q) ||
-          (u.lastName || "").toLowerCase().includes(q) ||
-          (u.email || "").toLowerCase().includes(q) ||
-          (u.username || "").toLowerCase().includes(q) ||
-          (u.phone || "").includes(q)
-        );
-      })
-    : parentUsers;
+  const parentLineFollowed = parentUsers.filter((u) => u.lineUserId && u.lineOaFollowed);
+  const parentLineNotFollowed = parentUsers.filter((u) => u.lineUserId && !u.lineOaFollowed);
+  const filteredParents = parentUsers.filter((u) => {
+    if (parentLineFilter === "followed" && !u.lineOaFollowed) return false;
+    if (parentLineFilter === "not_followed" && (u.lineOaFollowed || !u.lineUserId)) return false;
+    if (!parentSearch.trim()) return true;
+    const q = parentSearch.toLowerCase();
+    return (
+      (u.firstName || "").toLowerCase().includes(q) ||
+      (u.lastName || "").toLowerCase().includes(q) ||
+      (u.email || "").toLowerCase().includes(q) ||
+      (u.username || "").toLowerCase().includes(q) ||
+      (u.phone || "").includes(q)
+    );
+  });
 
   const renderUserRow = (u: User, opts: { showButtons?: boolean; showPhone?: boolean } = {}) => {
     const { showButtons = true, showPhone = false } = opts;
@@ -1831,6 +1837,17 @@ function UsersTab() {
                     </button>
                   )}
                 </div>
+              )}
+              {u.role === "parent" && u.lineUserId && (
+                u.lineOaFollowed ? (
+                  <span className="inline-flex items-center gap-1 text-xs bg-[#06C755]/10 text-[#06C755] border border-[#06C755]/20 px-2 py-0.5 rounded-full" data-testid={`parent-line-followed-${u.id}`}>
+                    <UserCheck className="w-3 h-3" />LINE 已加好友
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full" data-testid={`parent-line-not-followed-${u.id}`}>
+                    <UserX className="w-3 h-3" />LINE 尚未加好友
+                  </span>
+                )
               )}
             </div>
           )}
@@ -1951,6 +1968,19 @@ function UsersTab() {
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
                   共 {parentUsers.length} 位家長，HQ 通常不需要修改家長帳號。家長可自行在個人資料頁更新資訊。
                 </p>
+                <div className="flex gap-2 flex-wrap">
+                  {(["all", "followed", "not_followed"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setParentLineFilter(f)}
+                      className={`text-xs px-3 py-1 rounded-full border transition-colors ${parentLineFilter === f ? "bg-[#06C755] text-white border-[#06C755]" : "bg-white text-gray-600 border-gray-200 hover:border-[#06C755]/50"}`}
+                      data-testid={`parent-line-filter-${f}`}
+                    >
+                      {f === "all" ? `全部（${parentUsers.length}）` : f === "followed" ? `已加好友（${parentLineFollowed.length}）` : `尚未加好友（${parentLineNotFollowed.length}）`}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">LINE 好友狀態由 Webhook 即時更新；既有帳號在下次互動前可能顯示「尚未加好友」。</p>
                 <div className="relative">
                   <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input

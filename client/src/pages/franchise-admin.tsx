@@ -79,6 +79,8 @@ import {
   Loader2,
   Pencil,
   MessageSquare,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -4174,12 +4176,23 @@ function StudentsTab() {
                         {!student.parentId && <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full" data-testid={`badge-walkin-student-${student.id}`}>臨時</span>}
                         {student.school && <span className="text-xs text-muted-foreground">{student.school}</span>}
                       </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
                         {student.studentCode && <span>編碼：{student.studentCode}</span>}
                         <span>家長：{student.parentName}</span>
                         <span className="flex items-center gap-0.5">
                           <Phone className="w-3 h-3" />{student.parentPhone || "未填寫"}
                         </span>
+                        {student.parentLineUserId && (
+                          student.parentLineOaFollowed ? (
+                            <span className="inline-flex items-center gap-0.5 text-[#06C755]" data-testid={`parent-line-followed-student-${student.id}`}>
+                              <UserCheck className="w-3 h-3" />LINE 已加好友
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-amber-500" data-testid={`parent-line-not-followed-student-${student.id}`}>
+                              <UserX className="w-3 h-3" />LINE 尚未加好友
+                            </span>
+                          )
+                        )}
                       </div>
                     </div>
                   </div>

@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   mustChangePassword: boolean("must_change_password").default(false),
   lineUserId: varchar("line_user_id"),
   lineRegistrationComplete: boolean("line_registration_complete").default(false),
+  lineOaFollowed: boolean("line_oa_followed").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

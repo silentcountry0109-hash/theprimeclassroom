@@ -847,13 +847,26 @@ export async function registerRoutes(
 
       if (!lineUserId) continue;
 
-      // ── follow event: 老師第一次加入 LINE OA 好友時，傳送歡迎綁定說明 ──────
+      // ── follow event: 使用者加入 LINE OA 好友 ───────────────────────────────
       if (event.type === "follow") {
         console.log(`[LINE OA Webhook] follow 事件，lineUserId=${lineUserId.slice(0, 8)}…`);
+        // 更新好友狀態（若此 lineUserId 已與某帳號綁定）
+        storage.updateUserLineOaFollowed(lineUserId, true).catch((e) =>
+          console.error("[LINE OA Webhook] 更新 lineOaFollowed 失敗:", e)
+        );
         if (replyToken) {
           const welcome = buildWelcomeBindingFlex();
           sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
         }
+        continue;
+      }
+
+      // ── unfollow event: 使用者封鎖或刪除 LINE OA 好友 ──────────────────────
+      if (event.type === "unfollow") {
+        console.log(`[LINE OA Webhook] unfollow 事件，lineUserId=${lineUserId.slice(0, 8)}…`);
+        storage.updateUserLineOaFollowed(lineUserId, false).catch((e) =>
+          console.error("[LINE OA Webhook] 更新 lineOaFollowed 失敗:", e)
+        );
         continue;
       }
 

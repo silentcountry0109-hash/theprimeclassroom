@@ -123,6 +123,7 @@ export interface IStorage {
   updateUserRole(id: string, role: string, franchiseId: number | null): Promise<User>;
   getUserByPhone(phone: string): Promise<User | undefined>;
   updateUserLineUserId(userId: string, lineUserId: string | null): Promise<void>;
+  updateUserLineOaFollowed(lineUserId: string, followed: boolean): Promise<void>;
   getBookingsByFranchise(franchiseId: number): Promise<any[]>;
   getFranchiseStats(franchiseId: number): Promise<{
     totalCoaches: number;
@@ -791,7 +792,7 @@ export class DatabaseStorage implements IStorage {
     const result = [];
     for (const row of allStudents) {
       const [parent] = row.parentId
-        ? await db.select({ firstName: users.firstName, lastName: users.lastName, phone: users.phone }).from(users).where(eq(users.id, row.parentId))
+        ? await db.select({ firstName: users.firstName, lastName: users.lastName, phone: users.phone, lineUserId: users.lineUserId, lineOaFollowed: users.lineOaFollowed }).from(users).where(eq(users.id, row.parentId))
         : [null];
       const [countRow] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -802,6 +803,8 @@ export class DatabaseStorage implements IStorage {
         ...row,
         parentName: parent ? `${parent.lastName || ""}${parent.firstName || ""}`.trim() || "未設定" : "未設定",
         parentPhone: parent?.phone || null,
+        parentLineUserId: parent?.lineUserId || null,
+        parentLineOaFollowed: parent?.lineOaFollowed ?? false,
         bookingCount: countRow?.count || 0,
       });
     }
@@ -1285,6 +1288,13 @@ export class DatabaseStorage implements IStorage {
   async getUserByPhone(phone: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
     return user;
+  }
+
+  async updateUserLineOaFollowed(lineUserId: string, followed: boolean): Promise<void> {
+    await db.update(users).set({
+      lineOaFollowed: followed,
+      updatedAt: new Date(),
+    }).where(eq(users.lineUserId, lineUserId));
   }
 
   async updateUserLineUserId(userId: string, lineUserId: string | null): Promise<void> {
