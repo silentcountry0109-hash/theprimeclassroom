@@ -180,6 +180,7 @@ export interface IStorage {
 
   getAllSiteContent(): Promise<SiteContent[]>;
   getSiteContent(sectionKey: string): Promise<SiteContent | undefined>;
+  getSiteContentByKeys(keys: string[]): Promise<Record<string, string>>;
   upsertSiteContent(sectionKey: string, value: string): Promise<SiteContent>;
   promoteAllGrades(): Promise<number>;
 
@@ -1695,6 +1696,14 @@ export class DatabaseStorage implements IStorage {
   async getSiteContent(sectionKey: string): Promise<SiteContent | undefined> {
     const [row] = await db.select().from(siteContent).where(eq(siteContent.sectionKey, sectionKey));
     return row;
+  }
+
+  async getSiteContentByKeys(keys: string[]): Promise<Record<string, string>> {
+    if (keys.length === 0) return {};
+    const rows = await db.select().from(siteContent).where(inArray(siteContent.sectionKey, keys));
+    const result: Record<string, string> = {};
+    rows.forEach((r) => { result[r.sectionKey] = r.value; });
+    return result;
   }
 
   async upsertSiteContent(sectionKey: string, value: string): Promise<SiteContent> {

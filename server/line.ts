@@ -629,9 +629,26 @@ export function buildContactBookFlex(params: {
   };
 }
 
-export function buildWelcomeBindingFlex(): { altText: string; contents: object } {
+export interface CoachWelcomeConfig {
+  altText?: string;
+  headerTitle?: string;
+  bodySubtitle?: string;
+  step1?: string;
+  step2?: string;
+  step3?: string;
+  footerHint?: string;
+}
+
+export function buildWelcomeBindingFlex(cfg: CoachWelcomeConfig = {}): { altText: string; contents: object } {
+  const altText = cfg.altText || "歡迎加入質數教室！請依步驟完成帳號綁定";
+  const headerTitle = cfg.headerTitle || "👋  歡迎加入質數教室！";
+  const bodySubtitle = cfg.bodySubtitle || "完成帳號綁定，即可收到課程通知！";
+  const step1 = cfg.step1 || "① 直接在這個聊天室輸入您在質數教室登記的手機號碼";
+  const step2 = cfg.step2 || "② 系統自動驗證並完成綁定";
+  const step3 = cfg.step3 || "③ 之後即可收到課程提醒、聯絡簿等通知";
+  const footerHint = cfg.footerHint || "請直接在下方輸入您的手機號碼 ↓";
   return {
-    altText: "歡迎加入質數教室！請依步驟完成帳號綁定",
+    altText,
     contents: {
       type: "bubble",
       size: "kilo",
@@ -647,7 +664,7 @@ export function buildWelcomeBindingFlex(): { altText: string; contents: object }
             contents: [
               {
                 type: "text",
-                text: "👋  歡迎加入質數教室！",
+                text: headerTitle,
                 color: "#FFFFFF",
                 size: "sm",
                 weight: "bold",
@@ -680,7 +697,7 @@ export function buildWelcomeBindingFlex(): { altText: string; contents: object }
         contents: [
           {
             type: "text",
-            text: "完成帳號綁定，即可收到課程通知！",
+            text: bodySubtitle,
             color: "#2C2C2C",
             size: "sm",
             weight: "bold",
@@ -701,14 +718,14 @@ export function buildWelcomeBindingFlex(): { altText: string; contents: object }
           },
           {
             type: "text",
-            text: "① 直接在這個聊天室輸入您在質數教室登記的手機號碼",
+            text: step1,
             color: "#555555",
             size: "xs",
             wrap: true,
           },
           {
             type: "text",
-            text: "② 系統自動驗證並完成綁定",
+            text: step2,
             color: "#555555",
             size: "xs",
             wrap: true,
@@ -716,7 +733,7 @@ export function buildWelcomeBindingFlex(): { altText: string; contents: object }
           },
           {
             type: "text",
-            text: "③ 之後即可收到課程提醒、聯絡簿等通知",
+            text: step3,
             color: "#555555",
             size: "xs",
             wrap: true,
@@ -771,7 +788,7 @@ export function buildWelcomeBindingFlex(): { altText: string; contents: object }
         contents: [
           {
             type: "text",
-            text: "請直接在下方輸入您的手機號碼 ↓",
+            text: footerHint,
             color: "#4FBDB4",
             size: "xs",
             align: "center",
@@ -921,9 +938,32 @@ export function buildNewVisitorWelcomeFlex(): { altText: string; contents: objec
   };
 }
 
-export function buildParentWelcomeFlex(): { altText: string; contents: object } {
+export interface ParentWelcomeConfig {
+  altText?: string;
+  headerTitle?: string;
+  bodyIntro?: string;
+  bullet1?: string;
+  bullet2?: string;
+  bullet3?: string;
+  bullet4?: string;
+  footerNote?: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+}
+
+export function buildParentWelcomeFlex(cfg: ParentWelcomeConfig = {}): { altText: string; contents: object } {
+  const altText = cfg.altText || "歡迎加入質數教室 LINE！立即預約免費診斷課程";
+  const headerTitle = cfg.headerTitle || "🎉  歡迎加入質數教室！";
+  const bodyIntro = cfg.bodyIntro || "感謝您關注質數教室！\n我們提供專業的小學數學補教服務，讓孩子愛上數學 🧮";
+  const bullet1 = cfg.bullet1 || "• 免費診斷課程，了解孩子學習狀況";
+  const bullet2 = cfg.bullet2 || "• 彈性預約，選擇最適合的上課時段";
+  const bullet3 = cfg.bullet3 || "• 即時堂數管理，掌握剩餘課程";
+  const bullet4 = cfg.bullet4 || "• 課後聯絡簿，掌握孩子學習進度";
+  const footerNote = cfg.footerNote || "💬 有任何問題，歡迎直接在這裡留言，我們會盡快回覆您！";
+  const ctaLabel = cfg.ctaLabel || "立即預約免費診斷 →";
+  const ctaUrl = cfg.ctaUrl || `${BASE}/`;
   return {
-    altText: "歡迎加入質數教室 LINE！立即預約免費診斷課程",
+    altText,
     contents: {
       type: "bubble",
       size: "kilo",
@@ -939,7 +979,7 @@ export function buildParentWelcomeFlex(): { altText: string; contents: object } 
             contents: [
               {
                 type: "text",
-                text: "🎉  歡迎加入質數教室！",
+                text: headerTitle,
                 color: "#FFFFFF",
                 size: "sm",
                 weight: "bold",
@@ -972,7 +1012,7 @@ export function buildParentWelcomeFlex(): { altText: string; contents: object } 
         contents: [
           {
             type: "text",
-            text: "感謝您關注質數教室！\n我們提供專業的小學數學補教服務，讓孩子愛上數學 🧮",
+            text: bodyIntro,
             color: "#2C2C2C",
             size: "sm",
             wrap: true,
@@ -992,22 +1032,14 @@ export function buildParentWelcomeFlex(): { altText: string; contents: object } 
           },
           {
             type: "text",
-            text: "• 免費診斷課程，了解孩子學習狀況",
+            text: bullet1,
             color: "#555555",
             size: "xs",
             wrap: true,
           },
           {
             type: "text",
-            text: "• 彈性預約，選擇最適合的上課時段",
-            color: "#555555",
-            size: "xs",
-            wrap: true,
-            margin: "xs",
-          },
-          {
-            type: "text",
-            text: "• 即時堂數管理，掌握剩餘課程",
+            text: bullet2,
             color: "#555555",
             size: "xs",
             wrap: true,
@@ -1015,7 +1047,15 @@ export function buildParentWelcomeFlex(): { altText: string; contents: object } 
           },
           {
             type: "text",
-            text: "• 課後聯絡簿，掌握孩子學習進度",
+            text: bullet3,
+            color: "#555555",
+            size: "xs",
+            wrap: true,
+            margin: "xs",
+          },
+          {
+            type: "text",
+            text: bullet4,
             color: "#555555",
             size: "xs",
             wrap: true,
@@ -1028,7 +1068,7 @@ export function buildParentWelcomeFlex(): { altText: string; contents: object } 
           },
           {
             type: "text",
-            text: "💬 有任何問題，歡迎直接在這裡留言，我們會盡快回覆您！",
+            text: footerNote,
             color: "#888888",
             size: "xs",
             wrap: true,
@@ -1049,8 +1089,8 @@ export function buildParentWelcomeFlex(): { altText: string; contents: object } 
             height: "sm",
             action: {
               type: "uri",
-              label: "立即預約免費診斷 →",
-              uri: `${BASE}/`,
+              label: ctaLabel,
+              uri: ctaUrl,
             },
           },
         ],

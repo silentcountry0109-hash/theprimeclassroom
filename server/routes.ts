@@ -861,10 +861,46 @@ export async function registerRoutes(
           // - 未綁定（全新訪客）→ 引導註冊訊息
           const existingUser = await storage.getUserByLineUserId(lineUserId).catch(() => undefined);
           if (existingUser?.role === "parent") {
-            const welcome = buildParentWelcomeFlex();
+            const parentKeys = [
+              "line.parent_welcome.altText", "line.parent_welcome.headerTitle",
+              "line.parent_welcome.bodyIntro", "line.parent_welcome.bullet1",
+              "line.parent_welcome.bullet2", "line.parent_welcome.bullet3",
+              "line.parent_welcome.bullet4", "line.parent_welcome.footerNote",
+              "line.parent_welcome.ctaLabel", "line.parent_welcome.ctaUrl",
+            ];
+            const sc = await storage.getSiteContentByKeys(parentKeys).catch(() => ({} as Record<string, string>));
+            const rawCtaUrl = sc["line.parent_welcome.ctaUrl"];
+            const safeCtaUrl = rawCtaUrl && /^https?:\/\//i.test(rawCtaUrl) ? rawCtaUrl : undefined;
+            const welcome = buildParentWelcomeFlex({
+              altText: sc["line.parent_welcome.altText"],
+              headerTitle: sc["line.parent_welcome.headerTitle"],
+              bodyIntro: sc["line.parent_welcome.bodyIntro"],
+              bullet1: sc["line.parent_welcome.bullet1"],
+              bullet2: sc["line.parent_welcome.bullet2"],
+              bullet3: sc["line.parent_welcome.bullet3"],
+              bullet4: sc["line.parent_welcome.bullet4"],
+              footerNote: sc["line.parent_welcome.footerNote"],
+              ctaLabel: sc["line.parent_welcome.ctaLabel"],
+              ctaUrl: safeCtaUrl,
+            });
             sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
           } else if (existingUser) {
-            const welcome = buildWelcomeBindingFlex();
+            const coachKeys = [
+              "line.coach_welcome.altText", "line.coach_welcome.headerTitle",
+              "line.coach_welcome.bodySubtitle", "line.coach_welcome.step1",
+              "line.coach_welcome.step2", "line.coach_welcome.step3",
+              "line.coach_welcome.footerHint",
+            ];
+            const sc = await storage.getSiteContentByKeys(coachKeys).catch(() => ({} as Record<string, string>));
+            const welcome = buildWelcomeBindingFlex({
+              altText: sc["line.coach_welcome.altText"],
+              headerTitle: sc["line.coach_welcome.headerTitle"],
+              bodySubtitle: sc["line.coach_welcome.bodySubtitle"],
+              step1: sc["line.coach_welcome.step1"],
+              step2: sc["line.coach_welcome.step2"],
+              step3: sc["line.coach_welcome.step3"],
+              footerHint: sc["line.coach_welcome.footerHint"],
+            });
             sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
           } else {
             const welcome = buildNewVisitorWelcomeFlex();
