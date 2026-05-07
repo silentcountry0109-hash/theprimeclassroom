@@ -21,7 +21,7 @@ interface RoleData {
   role: string;
   subtitle: string;
   color: string;
-  icon: string;
+  icon?: string;
   features: { category: string; items: string[] }[];
 }
 
@@ -546,7 +546,6 @@ async function generatePdf() {
     y = drawRoleCard(doc, role, y);
   }
 
-  const pageCount = doc.bufferedPageRange().count + 1;
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(i);
