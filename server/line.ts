@@ -783,6 +783,144 @@ export function buildWelcomeBindingFlex(): { altText: string; contents: object }
   };
 }
 
+export function buildNewVisitorWelcomeFlex(): { altText: string; contents: object } {
+  return {
+    altText: "歡迎加入質數教室！立即免費註冊，預約診斷課程",
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#81D8D0",
+        paddingAll: "14px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              {
+                type: "text",
+                text: "🌟  歡迎加入質數教室！",
+                color: "#FFFFFF",
+                size: "sm",
+                weight: "bold",
+                flex: 1,
+              },
+            ],
+          },
+          {
+            type: "text",
+            text: "The Prime 質數教室",
+            color: "#FFFFFFBB",
+            size: "xxs",
+            margin: "xs",
+          },
+        ],
+      },
+      hero: {
+        type: "image",
+        url: `${BASE}/ip-character.png`,
+        size: "full",
+        aspectMode: "fit",
+        aspectRatio: "3:2",
+        backgroundColor: "#E8FAF9",
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        paddingAll: "14px",
+        contents: [
+          {
+            type: "text",
+            text: "感謝您關注質數教室！\n我們專注於小學數學補教，讓孩子愛上學習 🧮",
+            color: "#2C2C2C",
+            size: "sm",
+            wrap: true,
+          },
+          {
+            type: "separator",
+            margin: "sm",
+            color: "#F0F0F0",
+          },
+          {
+            type: "text",
+            text: "✨ 加入後您可以",
+            color: "#4FBDB4",
+            size: "sm",
+            weight: "bold",
+            margin: "sm",
+          },
+          {
+            type: "text",
+            text: "• 預約免費診斷課程，了解孩子學習狀況",
+            color: "#555555",
+            size: "xs",
+            wrap: true,
+          },
+          {
+            type: "text",
+            text: "• 彈性選擇適合的上課時段",
+            color: "#555555",
+            size: "xs",
+            wrap: true,
+            margin: "xs",
+          },
+          {
+            type: "text",
+            text: "• 即時掌握孩子的學習進度與聯絡簿",
+            color: "#555555",
+            size: "xs",
+            wrap: true,
+            margin: "xs",
+          },
+          {
+            type: "separator",
+            margin: "sm",
+            color: "#F0F0F0",
+          },
+          {
+            type: "text",
+            text: "點擊下方按鈕免費註冊，即可開始預約課程！",
+            color: "#888888",
+            size: "xs",
+            wrap: true,
+            margin: "sm",
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        spacing: "sm",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#81D8D0",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "免費註冊，預約診斷課程 →",
+              uri: `${BASE}/`,
+            },
+          },
+          {
+            type: "text",
+            text: "有任何問題，歡迎直接在這裡留言！",
+            color: "#AAAAAA",
+            size: "xxs",
+            align: "center",
+            margin: "sm",
+          },
+        ],
+      },
+    },
+  };
+}
+
 export function buildParentWelcomeFlex(): { altText: string; contents: object } {
   return {
     altText: "歡迎加入質數教室 LINE！立即預約免費診斷課程",

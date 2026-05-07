@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, getLineToken } from "./line";
+import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -855,13 +855,19 @@ export async function registerRoutes(
           console.error("[LINE OA Webhook] 更新 lineOaFollowed 失敗:", e)
         );
         if (replyToken) {
-          // 依使用者 role 傳送對應歡迎訊息
+          // 依使用者狀態傳送對應歡迎訊息
+          // - 已綁定 parent → 家長歡迎訊息
+          // - 已綁定 coach/franchise_admin/admin → 帳號綁定說明
+          // - 未綁定（全新訪客）→ 引導註冊訊息
           const existingUser = await storage.getUserByLineUserId(lineUserId).catch(() => undefined);
           if (existingUser?.role === "parent") {
             const welcome = buildParentWelcomeFlex();
             sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
-          } else {
+          } else if (existingUser) {
             const welcome = buildWelcomeBindingFlex();
+            sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
+          } else {
+            const welcome = buildNewVisitorWelcomeFlex();
             sendLineReplyFlex(replyToken, welcome.altText, welcome.contents).catch(() => {});
           }
         }
