@@ -1145,14 +1145,14 @@ function CreditsTab() {
           )}
 
           <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
-              <CreditCard className="w-4 h-4 text-tiffany" />
-              選擇堂數方案
-            </h3>
+            <div className="text-center mb-6">
+              <h3 className="text-lg font-bold text-foreground mb-1">選擇最適合的堂數方案</h3>
+              <p className="text-sm text-muted-foreground">所有方案均可跨分校使用，堂數永不過期（依方案設定）</p>
+            </div>
             {packagesLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-40 rounded-xl" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-80 rounded-2xl" />
                 ))}
               </div>
             ) : packages.length === 0 ? (
@@ -1161,82 +1161,204 @@ function CreditsTab() {
                 <p className="text-sm text-muted-foreground">目前沒有可購買的方案</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {packages.map(pkg => {
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {packages.map((pkg, idx) => {
                   const promo = getPromotionForPackage(pkg.id);
                   const discountedPrice = getDiscountedPrice(pkg);
                   const isSelected = selectedPackageId === pkg.id;
-                  const perClassPrice = Math.round(discountedPrice / pkg.credits);
+                  const bonus = pkg.bonusCredits || 0;
+                  const totalCredits = pkg.credits + bonus;
+                  const perClassPrice = Math.round(discountedPrice / totalCredits);
+                  const isPopular = idx === 1;
+
+                  const packageIcons = [CreditCard, Gift, TrendingUp];
+                  const PackageIcon = packageIcons[idx % packageIcons.length];
+
+                  const featuresList = [
+                    "跨分校自由預約",
+                    "個人化學習診斷",
+                    "電子聯絡簿記錄",
+                    bonus > 0 ? `加贈 ${bonus} 堂（共 ${totalCredits} 堂）` : "堂數靈活運用",
+                  ];
 
                   return (
-                    <button
+                    <div
                       key={pkg.id}
-                      onClick={() => {
-                        setSelectedPackageId(isSelected ? null : pkg.id);
-                        setCouponResult(null);
-                      }}
-                      className={`text-left rounded-xl border p-4 transition-all ${
+                      className={`relative flex flex-col rounded-2xl border-2 transition-all ${
                         isSelected
-                          ? "border-tiffany bg-tiffany/5 shadow-sm"
-                          : "border-gray-100 bg-white hover:border-tiffany/30 hover:shadow-sm"
-                      }`}
+                          ? "border-tiffany shadow-lg shadow-tiffany/20"
+                          : isPopular
+                          ? "border-tiffany/60 shadow-md"
+                          : "border-gray-200 hover:border-tiffany/40 hover:shadow-md"
+                      } ${isPopular ? "bg-gradient-to-b from-tiffany/5 to-white" : "bg-white"}`}
                       data-testid={`card-package-${pkg.id}`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground" data-testid={`text-package-name-${pkg.id}`}>{pkg.name}</p>
-                          {pkg.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5">{pkg.description}</p>
-                          )}
-                        </div>
-                        {isSelected && <CheckCircle2 className="w-5 h-5 text-tiffany flex-shrink-0" />}
-                      </div>
-                      <div className="flex items-end justify-between gap-2">
-                        <div>
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-2xl font-bold text-foreground" data-testid={`text-package-credits-${pkg.id}`}>
-                              {pkg.credits}
-                            </span>
-                            <span className="text-sm text-muted-foreground">堂</span>
-                          </div>
-                          {pkg.expiryDays && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              有效期 {pkg.expiryDays} 天
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          {promo ? (
-                            <>
-                              <span className="text-xs text-muted-foreground line-through">{formatPrice(pkg.price)}</span>
-                              <p className="text-lg font-bold text-coral" data-testid={`text-package-price-${pkg.id}`}>
-                                {formatPrice(discountedPrice)}
-                              </p>
-                            </>
-                          ) : (
-                            <p className="text-lg font-bold text-foreground" data-testid={`text-package-price-${pkg.id}`}>
-                              {formatPrice(pkg.price)}
-                            </p>
-                          )}
-                          <p className="text-[10px] text-muted-foreground">
-                            每堂 {formatPrice(perClassPrice)}
-                          </p>
-                        </div>
-                      </div>
-                      {promo && (
-                        <div className="mt-2 pt-2 border-t border-gray-100">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-coral bg-coral/10 px-2 py-0.5 rounded-full" data-testid={`badge-promo-${pkg.id}`}>
-                            <Tag className="w-2.5 h-2.5" />
-                            {promo.name}
+                      {isPopular && (
+                        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                          <span className="bg-tiffany text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-sm whitespace-nowrap">
+                            最受歡迎
                           </span>
                         </div>
                       )}
-                    </button>
+
+                      <div className="p-5 flex-1 flex flex-col">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isPopular ? "bg-tiffany/15 text-tiffany" : "bg-gray-100 text-gray-500"}`}>
+                            <PackageIcon className="w-4.5 h-4.5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-foreground" data-testid={`text-package-name-${pkg.id}`}>{pkg.name}</p>
+                            {pkg.description && (
+                              <p className="text-[11px] text-muted-foreground leading-tight">{pkg.description}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {bonus > 0 ? (
+                          <div className="mb-3 bg-coral/8 border border-coral/20 rounded-xl px-3 py-2 text-center">
+                            <p className="text-sm font-bold text-coral" data-testid={`text-package-bonus-${pkg.id}`}>
+                              買 {pkg.credits} 堂送 {bonus} 堂
+                            </p>
+                            <p className="text-[11px] text-coral/70 mt-0.5">實際取得 {totalCredits} 堂</p>
+                          </div>
+                        ) : (
+                          <div className="mb-3">
+                            <div className="flex items-baseline gap-1 justify-center">
+                              <span className="text-3xl font-bold text-foreground" data-testid={`text-package-credits-${pkg.id}`}>{pkg.credits}</span>
+                              <span className="text-base text-muted-foreground">堂</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="text-center mb-4">
+                          {promo ? (
+                            <>
+                              <span className="text-xs text-muted-foreground line-through mr-1">{formatPrice(pkg.price)}</span>
+                              <span className="text-2xl font-bold text-coral" data-testid={`text-package-price-${pkg.id}`}>{formatPrice(discountedPrice)}</span>
+                            </>
+                          ) : (
+                            <span className="text-2xl font-bold text-foreground" data-testid={`text-package-price-${pkg.id}`}>{formatPrice(pkg.price)}</span>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            平均每堂 <span className="font-semibold text-foreground">{formatPrice(perClassPrice)}</span>
+                          </p>
+                          {pkg.expiryDays && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">有效期 {pkg.expiryDays} 天</p>
+                          )}
+                        </div>
+
+                        <ul className="space-y-1.5 mb-5 flex-1">
+                          {featuresList.map((feat, i) => (
+                            <li key={i} className="flex items-center gap-2 text-xs text-foreground">
+                              <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${isPopular ? "text-tiffany" : "text-gray-400"}`} />
+                              <span>{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {promo && (
+                          <div className="mb-3">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-coral bg-coral/10 px-2 py-0.5 rounded-full" data-testid={`badge-promo-${pkg.id}`}>
+                              <Tag className="w-2.5 h-2.5" />
+                              {promo.name}
+                            </span>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            setSelectedPackageId(isSelected ? null : pkg.id);
+                            setCouponResult(null);
+                          }}
+                          className={`w-full py-2.5 rounded-full text-sm font-semibold transition-all ${
+                            isSelected
+                              ? "bg-tiffany text-white shadow-sm"
+                              : isPopular
+                              ? "bg-tiffany text-white hover:bg-tiffany/90"
+                              : "bg-gray-100 text-foreground hover:bg-gray-200"
+                          }`}
+                          data-testid={`button-select-package-${pkg.id}`}
+                        >
+                          {isSelected ? "已選擇 ✓" : "選擇此方案"}
+                        </button>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
             )}
           </div>
+
+          {packages.length > 0 && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h3 className="text-sm font-bold text-foreground">費用比較</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">與其他課輔方式比較，找出最划算選擇</p>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {[
+                    { label: "數學家教（到府）", monthlyFee: "8,000", perClass: "1,600", highlight: false },
+                    { label: "線上補習班（月費制）", monthlyFee: "3,500", perClass: "700", highlight: false },
+                    { label: "手搖飲（每月）", monthlyFee: "2,400", perClass: "—", highlight: false, note: "非學習投資" },
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between px-5 py-3">
+                      <div>
+                        <p className="text-xs font-medium text-foreground">{item.label}</p>
+                        {item.note && <p className="text-[10px] text-muted-foreground">{item.note}</p>}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-semibold text-foreground">每月約 NT${item.monthlyFee}</p>
+                        {item.perClass !== "—" && <p className="text-[10px] text-muted-foreground">每堂約 ${item.perClass}</p>}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between px-5 py-3 bg-tiffany/5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-tiffany flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-3 h-3 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-tiffany">質數教室</p>
+                        <p className="text-[10px] text-tiffany/70">專業數學診斷 + 個人化陪伴</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-white bg-tiffany px-2 py-0.5 rounded-full">最划算</span>
+                      <p className="text-[10px] text-tiffany mt-0.5">
+                        每堂低至 {packages.length > 0 ? formatPrice(Math.min(...packages.map(p => {
+                          const total = p.credits + (p.bonusCredits || 0);
+                          return Math.round(p.price / total);
+                        }))) : "$—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <h3 className="text-sm font-bold text-foreground mb-4 text-center">所有方案都包含</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { icon: Sparkles, title: "個人化診斷", desc: "依程度客製學習路徑" },
+                    { icon: TrendingUp, title: "進步追蹤", desc: "測驗分數與進步曲線" },
+                    { icon: BookOpen, title: "學習歷程記錄", desc: "每堂聯絡簿詳細記錄" },
+                    { icon: GraduationCap, title: "專業老師陪伴", desc: "認證師資一對一指導" },
+                  ].map((feat, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5 p-3 bg-gray-50 rounded-xl">
+                      <div className="w-8 h-8 rounded-lg bg-tiffany/10 flex items-center justify-center flex-shrink-0">
+                        <feat.icon className="w-4 h-4 text-tiffany" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">{feat.title}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{feat.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {selectedPackageId && selectedPackage && (
             <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
@@ -1271,7 +1393,9 @@ function CreditsTab() {
               <div className="border-t border-gray-100 pt-4 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">方案</span>
-                  <span className="text-foreground font-medium" data-testid="text-summary-package">{selectedPackage.name} ({selectedPackage.credits} 堂)</span>
+                  <span className="text-foreground font-medium" data-testid="text-summary-package">
+                    {selectedPackage.name} {(selectedPackage.bonusCredits || 0) > 0 ? `（買 ${selectedPackage.credits} 堂送 ${selectedPackage.bonusCredits} 堂，共 ${selectedPackage.credits + (selectedPackage.bonusCredits || 0)} 堂）` : `（${selectedPackage.credits} 堂）`}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">原價</span>

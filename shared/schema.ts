@@ -293,6 +293,7 @@ export const creditPackages = pgTable("credit_packages", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   credits: integer("credits").notNull(),
+  bonusCredits: integer("bonus_credits").default(0).notNull(),
   price: integer("price").notNull(),
   expiryDays: integer("expiry_days"),
   description: text("description"),

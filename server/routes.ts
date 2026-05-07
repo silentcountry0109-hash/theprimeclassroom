@@ -3598,9 +3598,9 @@ export async function registerRoutes(
 
   app.post("/api/admin/credit-packages", isAdmin, async (req: any, res) => {
     try {
-      const { name, credits, price, expiryDays, description, isActive, sortOrder } = req.body;
+      const { name, credits, bonusCredits, price, expiryDays, description, isActive, sortOrder } = req.body;
       if (!name || !credits || !price) return res.status(400).json({ message: "請填寫方案名稱、堂數和定價" });
-      const pkg = await storage.createCreditPackage({ name, credits, price, expiryDays: expiryDays || null, description: description || null, isActive: isActive !== false, sortOrder: sortOrder || 0 });
+      const pkg = await storage.createCreditPackage({ name, credits, bonusCredits: bonusCredits || 0, price, expiryDays: expiryDays || null, description: description || null, isActive: isActive !== false, sortOrder: sortOrder || 0 });
       res.json(pkg);
     } catch (error) {
       res.status(500).json({ message: "建立堂數方案失敗" });
@@ -3706,7 +3706,7 @@ export async function registerRoutes(
         const packages = await storage.getCreditPackages();
         const pkg = packages.find(p => p.id === packageId);
         if (!pkg) return res.status(400).json({ message: "方案不存在" });
-        creditAmount = pkg.credits;
+        creditAmount = pkg.credits + (pkg.bonusCredits || 0);
         finalAmount = pkg.price;
         if (pkg.expiryDays) {
           expiresAt = new Date(Date.now() + pkg.expiryDays * 24 * 60 * 60 * 1000);
@@ -4326,7 +4326,7 @@ export async function registerRoutes(
       const purchase = await storage.createCreditPurchase({
         parentId,
         packageId: pkg.id,
-        credits: pkg.credits,
+        credits: pkg.credits + (pkg.bonusCredits || 0),
         originalAmount,
         discountAmount,
         finalAmount,

@@ -2985,21 +2985,21 @@ function CreditPackagesSection() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<CreditPackage | null>(null);
-  const [form, setForm] = useState({ name: "", credits: 0, price: 0, expiryDays: null as number | null, description: "", isActive: true, sortOrder: 0 });
+  const [form, setForm] = useState({ name: "", credits: 0, bonusCredits: 0, price: 0, expiryDays: null as number | null, description: "", isActive: true, sortOrder: 0 });
 
   const { data: packages = [], isLoading } = useQuery<CreditPackage[]>({
     queryKey: ["/api/admin/credit-packages"],
   });
 
   const resetForm = () => {
-    setForm({ name: "", credits: 0, price: 0, expiryDays: null, description: "", isActive: true, sortOrder: 0 });
+    setForm({ name: "", credits: 0, bonusCredits: 0, price: 0, expiryDays: null, description: "", isActive: true, sortOrder: 0 });
     setEditing(null);
   };
 
   const openAdd = () => { resetForm(); setShowDialog(true); };
   const openEdit = (pkg: CreditPackage) => {
     setEditing(pkg);
-    setForm({ name: pkg.name, credits: pkg.credits, price: pkg.price, expiryDays: pkg.expiryDays, description: pkg.description || "", isActive: pkg.isActive, sortOrder: pkg.sortOrder });
+    setForm({ name: pkg.name, credits: pkg.credits, bonusCredits: pkg.bonusCredits || 0, price: pkg.price, expiryDays: pkg.expiryDays, description: pkg.description || "", isActive: pkg.isActive, sortOrder: pkg.sortOrder });
     setShowDialog(true);
   };
 
@@ -3048,9 +3048,9 @@ function CreditPackagesSection() {
                     {!pkg.isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground">停用</span>}
                   </div>
                   <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
-                    <span data-testid={`text-package-credits-${pkg.id}`}>{pkg.credits} 堂</span>
+                    <span data-testid={`text-package-credits-${pkg.id}`}>{pkg.credits} 堂{pkg.bonusCredits > 0 ? ` + 贈 ${pkg.bonusCredits} 堂` : ""}</span>
                     <span data-testid={`text-package-price-${pkg.id}`}>NT$ {pkg.price.toLocaleString()}</span>
-                    <span>每堂 NT$ {Math.round(pkg.price / pkg.credits)}</span>
+                    <span>每堂 NT$ {Math.round(pkg.price / (pkg.credits + (pkg.bonusCredits || 0)))}</span>
                     <span>{pkg.expiryDays ? `${pkg.expiryDays} 天有效` : "永不過期"}</span>
                   </div>
                   {pkg.description && <p className="text-xs text-muted-foreground mt-1">{pkg.description}</p>}
@@ -3080,9 +3080,13 @@ function CreditPackagesSection() {
                 <Input type="number" min="1" value={form.credits || ""} onChange={(e) => setForm({ ...form, credits: parseInt(e.target.value) || 0 })} data-testid="input-package-credits" />
               </div>
               <div>
-                <Label>定價 (TWD) *</Label>
-                <Input type="number" min="0" value={form.price || ""} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} data-testid="input-package-price" />
+                <Label>贈送堂數（買X送Y）</Label>
+                <Input type="number" min="0" value={form.bonusCredits || ""} onChange={(e) => setForm({ ...form, bonusCredits: parseInt(e.target.value) || 0 })} placeholder="0" data-testid="input-package-bonus-credits" />
               </div>
+            </div>
+            <div>
+              <Label>定價 (TWD) *</Label>
+              <Input type="number" min="0" value={form.price || ""} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} data-testid="input-package-price" />
             </div>
             <div>
               <Label>有效天數（空白=永不過期）</Label>
