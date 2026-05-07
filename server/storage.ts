@@ -1313,7 +1313,11 @@ export class DatabaseStorage implements IStorage {
       }
     }
     try {
-      await db.update(users).set({ lineUserId, updatedAt: new Date() }).where(eq(users.id, userId));
+      await db.update(users).set({
+        lineUserId,
+        ...(lineUserId === null ? { lineRegistrationComplete: false } : {}),
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
     } catch (err: unknown) {
       // 保留 race condition 保護：即使 schema 層已無全域 unique，若未來 DB 仍有同 role 複合 unique，確保不會靜默失敗
       if (
