@@ -30,3 +30,9 @@ id = "9BgR_27MHTViXpth5Ce8q"
 uri = "file://teacher-growth-ladder.pdf"
 type = "pdf"
 title = "教師成長階梯招募文件"
+
+[[outputs]]
+id = "YyqAfpRfQQFdNsos8a36C"
+uri = "file://.local/tasks/cis-ui-design-guide.md"
+type = "text"
+title = "質數教室 CIS & UI 設計規範"
