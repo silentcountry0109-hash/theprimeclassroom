@@ -411,12 +411,63 @@ async function backfillLineFreeTrial(): Promise<void> {
   }
 }
 
+/**
+ * 一次性清理：刪除 role='parent' 且 lineUserId IS NULL 的純帳密家長帳號，
+ * 並同步清除其 session 記錄。
+ * 冪等 — 每次啟動時執行，若無符合條件的帳號則直接跳過。
+ * 若帳號有關聯預約或孩童資料（外鍵約束），則跳過該帳號並記錄 warning。
+ */
+async function cleanupCredentialOnlyParents(): Promise<void> {
+  try {
+    const targets = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.role, "parent"),
+          sql`${users.lineUserId} IS NULL`
+        )
+      );
+    if (targets.length === 0) {
+      console.log("[Cleanup] 無純帳密家長帳號，跳過清理");
+      return;
+    }
+    console.log(`[Cleanup] 發現 ${targets.length} 個純帳密家長帳號，開始逐一清除…`);
+    let deleted = 0;
+    let skipped = 0;
+    for (const { id } of targets) {
+      try {
+        await db.transaction(async (tx) => {
+          await tx.execute(
+            sql`DELETE FROM sessions WHERE sess->>'credentialUserId' = ${id}`
+          );
+          await tx.delete(users).where(
+            and(eq(users.id, id), eq(users.role, "parent"), sql`${users.lineUserId} IS NULL`)
+          );
+        });
+        deleted++;
+      } catch (err: any) {
+        if (err?.code === "23503") {
+          console.warn(`[Cleanup] 跳過帳號 ${id}：仍有關聯的預約或孩童資料，需手動清理`);
+          skipped++;
+        } else {
+          throw err;
+        }
+      }
+    }
+    console.log(`[Cleanup] 完成：已清除 ${deleted} 個帳號，跳過 ${skipped} 個（有關聯資料）`);
+  } catch (err) {
+    console.error("[Cleanup] 清除純帳密家長帳號時發生錯誤：", err);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   await setupAuth(app);
   backfillLineFreeTrial().catch((e) => console.error("[Backfill] 啟動補丁失敗：", e));
+  cleanupCredentialOnlyParents().catch((e) => console.error("[Cleanup] 啟動清理失敗：", e));
   registerAuthRoutes(app);
 
   // ── 啟動時確認 LINE Messaging API 金鑰是否設定 ──────────────────────────
@@ -472,14 +523,20 @@ export async function registerRoutes(
         return res.status(400).json({ message: "請輸入帳號和密碼" });
       }
       const [user] = await db.select().from(users).where(eq(users.username, username));
-      if (!user || !user.passwordHash) {
+      if (!user) {
+        return res.status(401).json({ message: "帳號或密碼錯誤" });
+      }
+      if (user.role === "parent") {
+        return res.status(410).json({ message: "家長帳號已全面改用 LINE 登入，請前往登入頁使用 LINE 帳號登入" });
+      }
+      if (!user.passwordHash) {
         return res.status(401).json({ message: "帳號或密碼錯誤" });
       }
       const valid = await bcrypt.compare(password, user.passwordHash);
       if (!valid) {
         return res.status(401).json({ message: "帳號或密碼錯誤" });
       }
-      if (user.role !== "admin" && user.role !== "franchise_admin" && user.role !== "parent" && user.role !== "coach") {
+      if (user.role !== "admin" && user.role !== "franchise_admin" && user.role !== "coach") {
         return res.status(403).json({ message: "帳號或密碼錯誤" });
       }
       if (user.role === "coach") {
@@ -563,86 +620,8 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/parent-register", async (req: any, res) => {
-    try {
-      const { username, password, firstName, email, phone, address, referralSource, otp } = req.body;
-      if (!username || !password || !firstName || !phone || !email) {
-        return res.status(400).json({ message: "請填寫所有必填欄位" });
-      }
-      if (!/^09\d{8}$/.test(phone)) {
-        return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
-      }
-      if (!otp) {
-        return res.status(400).json({ message: "請先完成手機驗證" });
-      }
-      let otpApproved = false;
-      try {
-        otpApproved = await checkTwilioOtp(phone, otp);
-      } catch (otpErr: unknown) {
-        const msg = otpErr instanceof Error ? otpErr.message : "驗證碼確認失敗，請稍後再試";
-        return res.status(500).json({ message: msg });
-      }
-      if (!otpApproved) {
-        return res.status(400).json({ message: "驗證碼不正確或已過期，請重新發送" });
-      }
-      if (password.length < 6) {
-        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
-      }
-      if (username.length < 3) {
-        return res.status(400).json({ message: "帳號至少需要 3 個字元" });
-      }
-      const [existing] = await db.select().from(users).where(eq(users.username, username));
-      if (existing) {
-        return res.status(400).json({ message: "此帳號已被使用" });
-      }
-      const [existingEmail] = await db.select().from(users).where(eq(users.email, email));
-      if (existingEmail) {
-        return res.status(400).json({ message: "此 Email 已被使用，請直接登入或使用其他 Email" });
-      }
-      const hash = await bcrypt.hash(password, 10);
-      const [newUser] = await db.insert(users).values({
-        id: `parent-${username}-${Date.now()}`,
-        username,
-        passwordHash: hash,
-        firstName,
-        email: email || null,
-        phone: phone || null,
-        address: address || null,
-        referralSource: referralSource && referralSource.length > 0 ? referralSource : null,
-        role: "parent",
-      }).returning();
-      const [freePurchase] = await db.insert(creditPurchases).values({
-        parentId: newUser.id,
-        credits: 2,
-        originalAmount: 0,
-        discountAmount: 0,
-        finalAmount: 0,
-        paymentMethod: "free_trial",
-        paymentStatus: "completed",
-      }).returning();
-      await db.insert(creditBalances).values({
-        parentId: newUser.id,
-        purchaseId: freePurchase.id,
-        originalCredits: 2,
-        remainingCredits: 2,
-        expiresAt: null,
-      });
-      req.session.credentialUserId = newUser.id;
-      req.session.save(() => {
-        const { passwordHash: _, ...safeUser } = newUser;
-        res.json({ ...safeUser, isNewUser: true });
-      });
-    } catch (error: unknown) {
-      if (isPgUniqueViolation(error)) {
-        if (error.constraint?.includes("email")) {
-          return res.status(400).json({ message: "此 Email 已被使用，請直接登入或使用其他 Email" });
-        }
-        if (error.constraint?.includes("username")) {
-          return res.status(400).json({ message: "此帳號已被使用" });
-        }
-      }
-      res.status(500).json({ message: "註冊失敗，請稍後再試" });
-    }
+  app.post("/api/parent-register", (_req, res) => {
+    return res.status(410).json({ message: "帳號密碼註冊已停用，家長請使用 LINE 帳號登入 / 註冊" });
   });
 
   // ── LINE Login OAuth ──────────────────────────────────────────────────────────
