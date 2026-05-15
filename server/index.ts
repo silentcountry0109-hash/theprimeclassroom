@@ -206,6 +206,19 @@ app.use((req, res, next) => {
 
       log(`[CoachDailySummary] 查詢明日（${tomorrowStr}）課程…`);
 
+      // 清除 90 天前的舊推播紀錄，避免資料庫無限增長（每次觸發必執行，不受有無課程影響）
+      try {
+        const RETENTION_DAYS = 90;
+        const cutoffMs = Date.now() + 8 * 60 * 60 * 1000 - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+        const cutoffDate = new Date(cutoffMs).toISOString().split("T")[0];
+        const deleted = await storageInst.deleteOldCoachReminderLogs(cutoffDate);
+        if (deleted > 0) {
+          log(`[CoachDailySummary] 已清除 ${deleted} 筆 ${cutoffDate} 之前的舊推播紀錄`);
+        }
+      } catch (e) {
+        log(`[CoachDailySummary] 清除舊推播紀錄失敗: ${e}`);
+      }
+
       // 查詢隔天所有有老師的時段
       const rows = await db
         .select({

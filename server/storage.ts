@@ -41,7 +41,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
-import { eq, and, ne, sql, desc, inArray, gte, lte, asc, gt } from "drizzle-orm";
+import { eq, and, ne, sql, desc, inArray, gte, lte, asc, gt, lt } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { sendLineMessage } from "./line";
@@ -300,6 +300,7 @@ export interface IStorage {
 
   hasCoachReminderLog(coachId: number, date: string, type: string): Promise<boolean>;
   createCoachReminderLog(coachId: number, date: string, type: string): Promise<void>;
+  deleteOldCoachReminderLogs(beforeDate: string): Promise<number>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -3185,6 +3186,13 @@ export class DatabaseStorage implements IStorage {
       .insert(coachReminderLogs)
       .values({ coachId, date, type })
       .onConflictDoNothing();
+  }
+
+  async deleteOldCoachReminderLogs(beforeDate: string): Promise<number> {
+    const result = await db
+      .delete(coachReminderLogs)
+      .where(lt(coachReminderLogs.date, beforeDate));
+    return result.rowCount ?? 0;
   }
 
 }
