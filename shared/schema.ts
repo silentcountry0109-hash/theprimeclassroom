@@ -481,3 +481,15 @@ export type InsertCurriculumFile = z.infer<typeof insertCurriculumFileSchema>;
 export type CurriculumMidtermExam = typeof curriculumMidtermExams.$inferSelect;
 export type InsertCurriculumMidtermExam = z.infer<typeof insertCurriculumMidtermExamSchema>;
 
+export const coachReminderLogs = pgTable("coach_reminder_logs", {
+  id: serial("id").primaryKey(),
+  coachId: integer("coach_id").notNull(),
+  date: text("date").notNull(),
+  type: text("type").notNull().default("daily_summary"),
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (t) => ({
+  uniqueCoachDateType: uniqueIndex("coach_reminder_logs_coach_id_date_type_idx").on(t.coachId, t.date, t.type),
+}));
+
+export type CoachReminderLog = typeof coachReminderLogs.$inferSelect;
+

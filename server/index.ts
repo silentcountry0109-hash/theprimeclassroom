@@ -190,8 +190,6 @@ app.use((req, res, next) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   // ─── 每晚 20:00 老師課程摘要推播 ─────────────────────────────────────────
-  const coachReminderSentKeys = new Set<string>();
-
   async function runCoachDailySummary() {
     try {
       const { db } = await import("./db");
@@ -246,8 +244,9 @@ app.use((req, res, next) => {
       const tomorrowLabel = `${tMonth}/${tDay}（${weekday}）`;
 
       for (const [coachId, coachSlots] of byCoach.entries()) {
-        const key = `${coachId}:${tomorrowStr}`;
-        if (coachReminderSentKeys.has(key)) continue;
+        // 查詢 DB 確認是否已發送過（重啟後仍有效）
+        const alreadySent = await storageInst.hasCoachReminderLog(coachId, tomorrowStr, "daily_summary");
+        if (alreadySent) continue;
 
         const firstRow = coachSlots[0];
         if (!firstRow.coachUserId) continue;
@@ -275,8 +274,8 @@ app.use((req, res, next) => {
           if (coachUser?.lineUserId) {
             await sendLineMessage(coachUser.lineUserId, lineMsg);
           }
-          // 成功後才標記已發送，確保失敗時可重試
-          coachReminderSentKeys.add(key);
+          // 成功後才寫入 DB 紀錄，確保失敗時可重試；伺服器重啟後同樣有效
+          await storageInst.createCoachReminderLog(coachId, tomorrowStr, "daily_summary");
           log(`[CoachDailySummary] 已通知老師 coachId=${coachId}`);
         } catch (e) {
           log(`[CoachDailySummary] 老師 coachId=${coachId} 通知失敗: ${e}`);
@@ -303,13 +302,6 @@ app.use((req, res, next) => {
     const minutesUntil = Math.round(delayMs / 60000);
     log(`[CoachDailySummary] 下次排程在 ${minutesUntil} 分鐘後（台灣時間 20:00）`);
     setTimeout(async () => {
-      // 每次觸發時清理 7 天前的舊鍵值，防止 Set 無限增長
-      const cutoffTaiwanMs = Date.now() + taiwanOffsetMs - 7 * msInDay;
-      const cutoffStr = new Date(cutoffTaiwanMs).toISOString().split("T")[0];
-      for (const key of coachReminderSentKeys) {
-        const datePart = key.split(":")[1];
-        if (datePart && datePart < cutoffStr) coachReminderSentKeys.delete(key);
-      }
       await runCoachDailySummary();
       scheduleCoachDailySummary();
     }, delayMs);

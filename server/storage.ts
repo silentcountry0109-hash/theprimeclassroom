@@ -5,6 +5,7 @@ import {
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
   textbooks, textbookQuizzes, textbookFiles,
   curriculumUnits, curriculumFiles, curriculumMidtermExams,
+  coachReminderLogs,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -296,6 +297,9 @@ export interface IStorage {
   getCurriculumMidtermExam(id: number): Promise<CurriculumMidtermExam | undefined>;
   createCurriculumMidtermExam(data: InsertCurriculumMidtermExam): Promise<CurriculumMidtermExam>;
   deleteCurriculumMidtermExam(id: number): Promise<void>;
+
+  hasCoachReminderLog(coachId: number, date: string, type: string): Promise<boolean>;
+  createCoachReminderLog(coachId: number, date: string, type: string): Promise<void>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -3159,6 +3163,28 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCurriculumMidtermExam(id: number): Promise<void> {
     await db.delete(curriculumMidtermExams).where(eq(curriculumMidtermExams.id, id));
+  }
+
+  async hasCoachReminderLog(coachId: number, date: string, type: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: coachReminderLogs.id })
+      .from(coachReminderLogs)
+      .where(
+        and(
+          eq(coachReminderLogs.coachId, coachId),
+          eq(coachReminderLogs.date, date),
+          eq(coachReminderLogs.type, type),
+        )
+      )
+      .limit(1);
+    return !!row;
+  }
+
+  async createCoachReminderLog(coachId: number, date: string, type: string): Promise<void> {
+    await db
+      .insert(coachReminderLogs)
+      .values({ coachId, date, type })
+      .onConflictDoNothing();
   }
 
 }
