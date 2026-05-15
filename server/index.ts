@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { sendLineMessage } from "./line";
+import { sendLineMessage, sendLineFlexMessage, buildCoachDailySummaryFlex } from "./line";
 
 const app = express();
 const httpServer = createServer(app);
@@ -252,13 +252,8 @@ app.use((req, res, next) => {
         if (!firstRow.coachUserId) continue;
 
         const totalStudents = coachSlots.reduce((sum, s) => sum + (s.bookedSeats || 0), 0);
-        const slotLines = [...coachSlots]
-          .sort((a, b) => a.startTime.localeCompare(b.startTime))
-          .map(s => `・${s.startTime}–${s.endTime}（${s.bookedSeats} 位學生）`)
-          .join("\n");
 
         const notifMsg = `明日（${tomorrowLabel}）有 ${coachSlots.length} 堂課，共 ${totalStudents} 位學生`;
-        const lineMsg = `【質數教室】📅 明日課程摘要\n日期：${tomorrowLabel}\n課程：${coachSlots.length} 堂，共 ${totalStudents} 位學生\n\n${slotLines}\n\n請做好準備，祝教學順利！`;
 
         try {
           await storageInst.createNotification({
@@ -272,7 +267,11 @@ app.use((req, res, next) => {
             .from(usersTable)
             .where(eq(usersTable.id, firstRow.coachUserId));
           if (coachUser?.lineUserId) {
-            await sendLineMessage(coachUser.lineUserId, lineMsg);
+            const flex = buildCoachDailySummaryFlex({
+              date: tomorrowLabel,
+              slots: coachSlots.map(s => ({ startTime: s.startTime, endTime: s.endTime, bookedSeats: s.bookedSeats || 0 })),
+            });
+            await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
           }
           // 成功後才寫入 DB 紀錄，確保失敗時可重試；伺服器重啟後同樣有效
           await storageInst.createCoachReminderLog(coachId, tomorrowStr, "daily_summary");

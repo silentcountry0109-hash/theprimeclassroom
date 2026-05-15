@@ -1099,6 +1099,249 @@ export function buildParentWelcomeFlex(cfg: ParentWelcomeConfig = {}): { altText
   };
 }
 
+export function buildCoachNewBookingFlex(params: {
+  childName: string;
+  date: string;
+  time: string;
+  location: string;
+  dashboardUrl?: string;
+}): { altText: string; contents: object } {
+  const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  return {
+    altText: `📚 新課程預約：${params.childName} ${params.date} ${params.time}`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#4FBDB4",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "📚  新課程預約", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "The Prime 質數教室", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("學生", params.childName, "#4FBDB4"),
+          separator(),
+          infoRow("📅 日期", params.date),
+          infoRow("🕙 時間", params.time),
+          infoRow("📍 地點", params.location),
+          separator(),
+          {
+            type: "text",
+            text: "🙌 請提前準備好課程，期待這次的授課！",
+            color: "#888888",
+            size: "xs",
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#4FBDB4",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "前往行事曆 →",
+              uri: params.dashboardUrl ?? `${appBase}/coach-dashboard`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildCoachCancelFlex(params: {
+  childName: string;
+  date: string;
+  time: string;
+  location: string;
+  dashboardUrl?: string;
+}): { altText: string; contents: object } {
+  const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  return {
+    altText: `❌ 學生取消預約：${params.childName} ${params.date} ${params.time}`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#D32F2F",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "❌  學生取消預約", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "The Prime 質數教室", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("學生", params.childName, "#D32F2F"),
+          separator(),
+          infoRow("📅 日期", params.date, "#BBBBBB", true),
+          infoRow("🕙 時間", params.time, "#BBBBBB", true),
+          infoRow("📍 地點", params.location),
+          separator(),
+          {
+            type: "text",
+            text: "⚠️ 該時段已釋出，可接受新預約。",
+            color: "#888888",
+            size: "xs",
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#D32F2F",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "前往行事曆 →",
+              uri: params.dashboardUrl ?? `${appBase}/coach-dashboard`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildCoachDailySummaryFlex(params: {
+  date: string;
+  slots: Array<{ startTime: string; endTime: string; bookedSeats: number }>;
+  dashboardUrl?: string;
+}): { altText: string; contents: object } {
+  const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  const totalStudents = params.slots.reduce((sum, s) => sum + (s.bookedSeats || 0), 0);
+  const slotRows = [...params.slots]
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+    .map((s) => ({
+      type: "box",
+      layout: "horizontal",
+      spacing: "sm",
+      margin: "xs",
+      contents: [
+        { type: "text", text: `${s.startTime}–${s.endTime}`, color: "#2C2C2C", size: "xs", flex: 2 },
+        { type: "text", text: `${s.bookedSeats} 位學生`, color: "#4FBDB4", size: "xs", flex: 1, align: "end" as const },
+      ],
+    }));
+
+  return {
+    altText: `📅 明日課程摘要：${params.date}，共 ${params.slots.length} 堂 ${totalStudents} 位學生`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#5C6BC0",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "📅  明日課程摘要", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: params.date, color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: `共 ${params.slots.length} 堂課`, color: "#5C6BC0", size: "sm", weight: "bold", flex: 1 },
+              { type: "text", text: `${totalStudents} 位學生`, color: "#E65100", size: "sm", weight: "bold", flex: 0 },
+            ],
+          },
+          separator(),
+          {
+            type: "box",
+            layout: "horizontal",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "時段", color: "#AAAAAA", size: "xs", flex: 2 },
+              { type: "text", text: "學生人數", color: "#AAAAAA", size: "xs", flex: 1, align: "end" as const },
+            ],
+          },
+          ...slotRows,
+          separator(),
+          {
+            type: "text",
+            text: "🎓 請做好準備，祝教學順利！",
+            color: "#888888",
+            size: "xs",
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#5C6BC0",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "前往行事曆 →",
+              uri: params.dashboardUrl ?? `${appBase}/coach-dashboard`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
 export function buildCourseCancelFlex(params: {
   childName: string;
   date: string;

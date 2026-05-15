@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken } from "./line";
+import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken, buildCoachNewBookingFlex, buildCoachCancelFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -1315,9 +1315,11 @@ export async function registerRoutes(
           const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, slot.coachId));
           if (coachRec?.userId) {
             const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
-            const msg = `【質數教室】新課程預約\n新學生 ${childName} 將在 ${slotDateStr} ${slotTime} 出席您的課程。`;
             await storage.createNotification({ userId: coachRec.userId, type: "new_booking", title: "新課程預約", message: `新學生 ${childName} 將在 ${slotDateStr} ${slotTime} 出席您的課程。` });
-            if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, msg);
+            if (coachUser?.lineUserId) {
+              const flex = buildCoachNewBookingFlex({ childName, date: slotDateStr, time: slotTime, location: franchiseName });
+              await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
+            }
           }
         }
       } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
@@ -1429,7 +1431,9 @@ export async function registerRoutes(
           });
           const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
           if (coachUser?.lineUserId) {
-            await sendLineMessage(coachUser.lineUserId, `【質數教室】新課程預約\n${notifMsg}`);
+            const franchiseRec = await storage.getFranchise(s.franchiseId);
+            const flex = buildCoachNewBookingFlex({ childName, date: s.date, time: slotTime, location: franchiseRec?.name || "教室" });
+            await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
           }
         }
       } catch (e) { console.error("[LINE] 老師連排通知失敗:", e); }
@@ -1528,7 +1532,8 @@ export async function registerRoutes(
           if (coachRec?.userId) {
             const childName = target.childName || "學生";
             const slotEndTime = target.slotEndTime || "";
-            const notifMsg = `${childName} 已取消 ${slotDate} ${slotStartTime}–${slotEndTime} 的課程預約。`;
+            const slotTime = `${slotStartTime}–${slotEndTime}`;
+            const notifMsg = `${childName} 已取消 ${slotDate} ${slotTime} 的課程預約。`;
             await storage.createNotification({
               userId: coachRec.userId,
               type: "booking_cancelled",
@@ -1537,7 +1542,9 @@ export async function registerRoutes(
             });
             const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
             if (coachUser?.lineUserId) {
-              await sendLineMessage(coachUser.lineUserId, `【質數教室】❌ 學生取消預約\n${notifMsg}`);
+              const franchiseRec = await storage.getFranchise(cancelledSlot.franchiseId);
+              const flex = buildCoachCancelFlex({ childName, date: slotDate, time: slotTime, location: franchiseRec?.name || "教室" });
+              await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
             }
           }
         }
