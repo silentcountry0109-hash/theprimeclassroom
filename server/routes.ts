@@ -1409,6 +1409,31 @@ export async function registerRoutes(
         }
       } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
 
+      // 通知：各時段老師（連排預約成立）
+      try {
+        const successSlotIds = results.filter(r => r.success).map(r => r.slotId);
+        const child = kids.find((k: any) => k.id === childId);
+        const childName = child?.name || "新學生";
+        for (const sid of successSlotIds) {
+          const s = await storage.getSlot(sid);
+          if (!s?.coachId) continue;
+          const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, s.coachId));
+          if (!coachRec?.userId) continue;
+          const slotTime = `${s.startTime}–${s.endTime}`;
+          const notifMsg = `新學生 ${childName} 將在 ${s.date} ${slotTime} 出席您的課程。`;
+          await storage.createNotification({
+            userId: coachRec.userId,
+            type: "new_booking",
+            title: "新課程預約",
+            message: notifMsg,
+          });
+          const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
+          if (coachUser?.lineUserId) {
+            await sendLineMessage(coachUser.lineUserId, `【質數教室】新課程預約\n${notifMsg}`);
+          }
+        }
+      } catch (e) { console.error("[LINE] 老師連排通知失敗:", e); }
+
       res.json({ results });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "預約失敗，請稍後再試" });
@@ -1494,6 +1519,29 @@ export async function registerRoutes(
           await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
         }
       } catch (e) { console.error("[LINE] 通知發送失敗:", e); }
+
+      // 通知：老師（學生取消預約）
+      try {
+        const cancelledSlot = await storage.getSlot(target.slotId);
+        if (cancelledSlot?.coachId) {
+          const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, cancelledSlot.coachId));
+          if (coachRec?.userId) {
+            const childName = target.childName || "學生";
+            const slotEndTime = target.slotEndTime || "";
+            const notifMsg = `${childName} 已取消 ${slotDate} ${slotStartTime}–${slotEndTime} 的課程預約。`;
+            await storage.createNotification({
+              userId: coachRec.userId,
+              type: "booking_cancelled",
+              title: "學生取消預約",
+              message: notifMsg,
+            });
+            const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
+            if (coachUser?.lineUserId) {
+              await sendLineMessage(coachUser.lineUserId, `【質數教室】❌ 學生取消預約\n${notifMsg}`);
+            }
+          }
+        }
+      } catch (e) { console.error("[LINE] 老師取消通知失敗:", e); }
 
       res.json({ success: true });
     } catch (error: any) {

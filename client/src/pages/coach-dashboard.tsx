@@ -234,6 +234,14 @@ export default function CoachDashboard() {
                                 <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                                   <Users className="w-3.5 h-3.5 text-blue-600" />
                                 </div>
+                              ) : n.type === "booking_cancelled" ? (
+                                <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <UserX className="w-3.5 h-3.5 text-orange-500" />
+                                </div>
+                              ) : n.type === "pre_class_reminder" ? (
+                                <div className="w-6 h-6 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <Calendar className="w-3.5 h-3.5 text-tiffany" />
+                                </div>
                               ) : (
                                 <div className="w-6 h-6 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                                   <Bell className="w-3.5 h-3.5 text-tiffany" />

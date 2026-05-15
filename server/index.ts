@@ -189,6 +189,127 @@ app.use((req, res, next) => {
   setInterval(runPreClassReminder, 60 * 60 * 1000);
   // ─────────────────────────────────────────────────────────────────────────
 
+  // ─── 每晚 20:00 老師課程摘要推播 ─────────────────────────────────────────
+  const coachReminderSentKeys = new Set<string>();
+
+  async function runCoachDailySummary() {
+    try {
+      const { db } = await import("./db");
+      const { timeSlots: timeSlotsTable, coaches: coachesTable, users: usersTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const { storage: storageInst } = await import("./storage");
+
+      // 取得台灣「明天」日期字串（依據 UTC+8 固定偏移計算，不依賴 server 時區）
+      const taiwanOffsetMs = 8 * 60 * 60 * 1000;
+      const nowTaiwanMs = Date.now() + taiwanOffsetMs;
+      const msInDay = 24 * 60 * 60 * 1000;
+      const tomorrowTaiwanMs = nowTaiwanMs + msInDay;
+      const tomorrowStr = new Date(tomorrowTaiwanMs).toISOString().split("T")[0];
+
+      log(`[CoachDailySummary] 查詢明日（${tomorrowStr}）課程…`);
+
+      // 查詢隔天所有有老師的時段
+      const rows = await db
+        .select({
+          coachId: coachesTable.id,
+          coachUserId: coachesTable.userId,
+          slotId: timeSlotsTable.id,
+          startTime: timeSlotsTable.startTime,
+          endTime: timeSlotsTable.endTime,
+          bookedSeats: timeSlotsTable.bookedSeats,
+        })
+        .from(timeSlotsTable)
+        .innerJoin(coachesTable, eq(timeSlotsTable.coachId, coachesTable.id))
+        .where(
+          and(
+            eq(timeSlotsTable.date, tomorrowStr),
+            eq(timeSlotsTable.isActive, true),
+          )
+        );
+
+      if (rows.length === 0) {
+        log(`[CoachDailySummary] 明日無課程，跳過`);
+        return;
+      }
+
+      // 以老師分組
+      const byCoach = new Map<number, typeof rows>();
+      for (const row of rows) {
+        if (!byCoach.has(row.coachId)) byCoach.set(row.coachId, []);
+        byCoach.get(row.coachId)!.push(row);
+      }
+
+      // 計算明天星期幾（台灣時間）
+      const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
+      const [, tMonth, tDay] = tomorrowStr.split("-").map(Number);
+      const weekday = weekdayLabels[new Date(`${tomorrowStr}T00:00:00+08:00`).getDay()];
+      const tomorrowLabel = `${tMonth}/${tDay}（${weekday}）`;
+
+      for (const [coachId, coachSlots] of byCoach.entries()) {
+        const key = `${coachId}:${tomorrowStr}`;
+        if (coachReminderSentKeys.has(key)) continue;
+        coachReminderSentKeys.add(key);
+
+        const firstRow = coachSlots[0];
+        if (!firstRow.coachUserId) continue;
+
+        const totalStudents = coachSlots.reduce((sum, s) => sum + (s.bookedSeats || 0), 0);
+        const slotLines = [...coachSlots]
+          .sort((a, b) => a.startTime.localeCompare(b.startTime))
+          .map(s => `・${s.startTime}–${s.endTime}（${s.bookedSeats} 位學生）`)
+          .join("\n");
+
+        const notifMsg = `明日（${tomorrowLabel}）有 ${coachSlots.length} 堂課，共 ${totalStudents} 位學生`;
+        const lineMsg = `【質數教室】📅 明日課程摘要\n日期：${tomorrowLabel}\n課程：${coachSlots.length} 堂，共 ${totalStudents} 位學生\n\n${slotLines}\n\n請做好準備，祝教學順利！`;
+
+        try {
+          await storageInst.createNotification({
+            userId: firstRow.coachUserId,
+            type: "pre_class_reminder",
+            title: "明日課程摘要",
+            message: notifMsg,
+          });
+          const [coachUser] = await db
+            .select({ lineUserId: usersTable.lineUserId })
+            .from(usersTable)
+            .where(eq(usersTable.id, firstRow.coachUserId));
+          if (coachUser?.lineUserId) {
+            await sendLineMessage(coachUser.lineUserId, lineMsg);
+          }
+          log(`[CoachDailySummary] 已通知老師 coachId=${coachId}`);
+        } catch (e) {
+          log(`[CoachDailySummary] 老師 coachId=${coachId} 通知失敗: ${e}`);
+        }
+      }
+    } catch (e) {
+      log(`[CoachDailySummary] 執行失敗: ${e}`);
+    }
+  }
+
+  function scheduleCoachDailySummary() {
+    // 使用 UTC+8 固定偏移計算距離下次台灣 20:00 的毫秒數（不依賴 server 時區）
+    const taiwanOffsetMs = 8 * 60 * 60 * 1000;
+    const nowUtcMs = Date.now();
+    const nowTaiwanMs = nowUtcMs + taiwanOffsetMs;
+    const msInDay = 24 * 60 * 60 * 1000;
+    const todayTaiwanStartMs = nowTaiwanMs - (nowTaiwanMs % msInDay);
+    const target20hTaiwanMs = todayTaiwanStartMs + 20 * 60 * 60 * 1000;
+    let targetTaiwanMs = target20hTaiwanMs;
+    if (nowTaiwanMs >= target20hTaiwanMs) {
+      targetTaiwanMs = target20hTaiwanMs + msInDay; // 已過 20:00，排到明天
+    }
+    const delayMs = targetTaiwanMs - nowTaiwanMs; // 與 nowUtcMs + offset 的差，等於與 nowUtcMs 的差
+    const minutesUntil = Math.round(delayMs / 60000);
+    log(`[CoachDailySummary] 下次排程在 ${minutesUntil} 分鐘後（台灣時間 20:00）`);
+    setTimeout(async () => {
+      await runCoachDailySummary();
+      scheduleCoachDailySummary();
+    }, delayMs);
+  }
+
+  scheduleCoachDailySummary();
+  // ─────────────────────────────────────────────────────────────────────────
+
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
