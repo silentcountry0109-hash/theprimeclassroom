@@ -235,8 +235,8 @@ export default function CoachDashboard() {
                                   <Users className="w-3.5 h-3.5 text-blue-600" />
                                 </div>
                               ) : n.type === "booking_cancelled" ? (
-                                <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                  <UserX className="w-3.5 h-3.5 text-orange-500" />
+                                <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
                                 </div>
                               ) : n.type === "pre_class_reminder" ? (
                                 <div className="w-6 h-6 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0 mt-0.5">

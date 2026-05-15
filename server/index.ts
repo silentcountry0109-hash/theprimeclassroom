@@ -298,10 +298,17 @@ app.use((req, res, next) => {
     if (nowTaiwanMs >= target20hTaiwanMs) {
       targetTaiwanMs = target20hTaiwanMs + msInDay; // 已過 20:00，排到明天
     }
-    const delayMs = targetTaiwanMs - nowTaiwanMs; // 與 nowUtcMs + offset 的差，等於與 nowUtcMs 的差
+    const delayMs = targetTaiwanMs - nowTaiwanMs;
     const minutesUntil = Math.round(delayMs / 60000);
     log(`[CoachDailySummary] 下次排程在 ${minutesUntil} 分鐘後（台灣時間 20:00）`);
     setTimeout(async () => {
+      // 每次觸發時清理 7 天前的舊鍵值，防止 Set 無限增長
+      const cutoffTaiwanMs = Date.now() + taiwanOffsetMs - 7 * msInDay;
+      const cutoffStr = new Date(cutoffTaiwanMs).toISOString().split("T")[0];
+      for (const key of coachReminderSentKeys) {
+        const datePart = key.split(":")[1];
+        if (datePart && datePart < cutoffStr) coachReminderSentKeys.delete(key);
+      }
       await runCoachDailySummary();
       scheduleCoachDailySummary();
     }, delayMs);
