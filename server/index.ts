@@ -248,7 +248,6 @@ app.use((req, res, next) => {
       for (const [coachId, coachSlots] of byCoach.entries()) {
         const key = `${coachId}:${tomorrowStr}`;
         if (coachReminderSentKeys.has(key)) continue;
-        coachReminderSentKeys.add(key);
 
         const firstRow = coachSlots[0];
         if (!firstRow.coachUserId) continue;
@@ -276,6 +275,8 @@ app.use((req, res, next) => {
           if (coachUser?.lineUserId) {
             await sendLineMessage(coachUser.lineUserId, lineMsg);
           }
+          // 成功後才標記已發送，確保失敗時可重試
+          coachReminderSentKeys.add(key);
           log(`[CoachDailySummary] 已通知老師 coachId=${coachId}`);
         } catch (e) {
           log(`[CoachDailySummary] 老師 coachId=${coachId} 通知失敗: ${e}`);
