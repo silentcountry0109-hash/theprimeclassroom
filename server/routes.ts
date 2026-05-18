@@ -192,6 +192,10 @@ function hasTwilioCredentials(): boolean {
 }
 
 async function sendTwilioOtp(phone: string): Promise<void> {
+  if (process.env.BYPASS_OTP_CODE) {
+    console.log(`[BYPASS OTP] 萬用驗證碼模式啟用，跳過 SMS 發送（phone=${phone}）`);
+    return;
+  }
   if (isDev && !hasTwilioCredentials()) {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const now = Date.now();
@@ -235,6 +239,10 @@ async function sendTwilioOtp(phone: string): Promise<void> {
 }
 
 async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
+  if (process.env.BYPASS_OTP_CODE && String(code) === process.env.BYPASS_OTP_CODE) {
+    console.log(`[BYPASS OTP] 萬用驗證碼通過（phone=${phone}）`);
+    return true;
+  }
   if (isDev && !hasTwilioCredentials()) {
     const now = Date.now();
     const record = devOtpStore.get(phone);
