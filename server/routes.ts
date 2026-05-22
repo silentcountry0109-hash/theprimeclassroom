@@ -4071,6 +4071,16 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/parent/agree-policies", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      if (req.currentUser.role !== "parent") return res.status(403).json({ message: "僅限家長使用" });
+      const updated = await storage.updateUserPoliciesAgreedAt(req.currentUser.id);
+      res.json({ policiesAgreedAt: updated.policiesAgreedAt });
+    } catch (error) {
+      res.status(500).json({ message: "記錄同意失敗" });
+    }
+  });
+
   app.post("/api/parent/validate-coupon", isCredentialOrAuth, async (req: any, res) => {
     try {
       if (req.currentUser.role !== "parent") return res.status(403).json({ message: "僅限家長使用" });

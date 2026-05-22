@@ -33,6 +33,7 @@ export const users = pgTable("users", {
   lineUserId: varchar("line_user_id"),
   lineRegistrationComplete: boolean("line_registration_complete").default(false),
   lineOaFollowed: boolean("line_oa_followed").default(false),
+  policiesAgreedAt: timestamp("policies_agreed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
