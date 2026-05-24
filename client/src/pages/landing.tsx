@@ -2178,10 +2178,29 @@ function FooterSection() {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-white/40">
-            &copy; {new Date().getFullYear()} The Prime 質數教室. All rights
-            reserved.
-          </p>
+          <div className="flex flex-col md:flex-row items-center gap-3">
+            <p className="text-xs text-white/40">
+              &copy; {new Date().getFullYear()} The Prime 質數教室. All rights
+              reserved.
+            </p>
+            <div className="flex items-center gap-3">
+              <a
+                href="/privacy"
+                className="text-xs text-white/40 hover:text-white/70 transition-colors"
+                data-testid="footer-link-privacy"
+              >
+                隱私權政策
+              </a>
+              <span className="text-white/20 text-xs">|</span>
+              <a
+                href="/refund"
+                className="text-xs text-white/40 hover:text-white/70 transition-colors"
+                data-testid="footer-link-refund"
+              >
+                退費規則
+              </a>
+            </div>
+          </div>
           <a
             href="/api/login"
             className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-tiffany transition-colors border border-white/15 rounded-full px-5 py-2 hover:border-tiffany/40"

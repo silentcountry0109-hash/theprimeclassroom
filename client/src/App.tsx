@@ -24,6 +24,8 @@ import CoachDashboard from "@/pages/coach-dashboard";
 import ParentRegisterAddFriend from "@/pages/parent-register-add-friend";
 import ParentRegisterVerifyPhone from "@/pages/parent-register-verify-phone";
 import PaymentResult from "@/pages/payment-result";
+import PrivacyPage from "@/pages/privacy";
+import RefundPage from "@/pages/refund";
 
 function LoadingScreen() {
   return (
@@ -271,6 +273,8 @@ function Router() {
       <Route path="/parent-register/add-friend" component={ParentRegisterAddFriend} />
       <Route path="/parent-register/verify-phone" component={ParentRegisterVerifyPhone} />
       <Route path="/payment-result" component={PaymentResult} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/refund" component={RefundPage} />
       <Route component={NotFound} />
     </Switch>
   );
