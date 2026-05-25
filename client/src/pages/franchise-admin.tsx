@@ -81,6 +81,8 @@ import {
   MessageSquare,
   UserCheck,
   UserX,
+  Coins,
+  Wallet,
 } from "lucide-react";
 import type { Franchise, Coach, TimeSlot, Classroom } from "@shared/schema";
 import type { User } from "@shared/models/auth";
@@ -300,6 +302,7 @@ export default function FranchiseAdminDashboard({ initialTab }: { initialTab?: s
     { id: "timeslots", label: "時段管理", icon: Clock },
     { id: "bookings", label: "預約管理", icon: CalendarCheck },
     { id: "students", label: "學生管理", icon: Users },
+    { id: "credits", label: "家長點數", icon: Coins },
   ];
 
   return (
@@ -457,6 +460,7 @@ export default function FranchiseAdminDashboard({ initialTab }: { initialTab?: s
             {activeTab === "timeslots" && <TimeSlotsTab />}
             {activeTab === "bookings" && <BookingsTab />}
             {activeTab === "students" && <StudentsTab />}
+            {activeTab === "credits" && <ParentCreditsTab />}
           </main>
         </div>
       </div>
@@ -4505,6 +4509,249 @@ function StudentDetailPanel({ childId }: { childId: number }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+interface ParentWallet {
+  parentId: string;
+  parentName: string;
+  username: string;
+  phone: string | null;
+  balance: number;
+}
+
+interface CreditPackageOption {
+  id: number;
+  name: string;
+  credits: number;
+  bonusCredits: number;
+  price: number;
+  expiryDays: number | null;
+  isActive: boolean;
+}
+
+function ParentCreditsTab() {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [showDialog, setShowDialog] = useState(false);
+  const [selectedParent, setSelectedParent] = useState<ParentWallet | null>(null);
+  const [adjustForm, setAdjustForm] = useState<{
+    packageId: number | null;
+    credits: number;
+    description: string;
+  }>({ packageId: null, credits: 0, description: "" });
+
+  const { data: wallets = [], isLoading } = useQuery<ParentWallet[]>({
+    queryKey: ["/api/franchise-admin/parent-wallets"],
+  });
+
+  const { data: packages = [] } = useQuery<CreditPackageOption[]>({
+    queryKey: ["/api/franchise-admin/credit-packages"],
+  });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return wallets;
+    return wallets.filter((w) =>
+      (w.parentName || "").toLowerCase().includes(q) ||
+      (w.username || "").toLowerCase().includes(q) ||
+      (w.phone || "").toLowerCase().includes(q)
+    );
+  }, [wallets, search]);
+
+  const openAdjust = (wallet: ParentWallet) => {
+    setSelectedParent(wallet);
+    setAdjustForm({ packageId: null, credits: 0, description: "" });
+    setShowDialog(true);
+  };
+
+  const adjustMutation = useMutation({
+    mutationFn: async (data: { parentId: string; packageId: number | null; credits: number; description: string }) => {
+      const res = await apiRequest("POST", "/api/franchise-admin/adjust-credits", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "加點成功", description: `新餘額：${data.newBalance} 堂` });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/parent-wallets"] });
+      setShowDialog(false);
+      setSelectedParent(null);
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "加點失敗", variant: "destructive" });
+    },
+  });
+
+  const selectedPkg = packages.find((p) => p.id === adjustForm.packageId);
+  const submitDisabled =
+    !selectedParent ||
+    (!adjustForm.packageId && (!adjustForm.credits || adjustForm.credits <= 0)) ||
+    adjustMutation.isPending;
+
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-foreground" data-testid="text-credits-title">家長點數</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          可手動加點的家長為本分校相關（孩子曾在此分校預約，或已加入本分校學生名單）
+        </p>
+      </div>
+
+      <div className="mb-3 relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜尋家長姓名／帳號／電話"
+          className="pl-9"
+          data-testid="input-search-parent-wallets"
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 rounded-md" />)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-md border border-gray-100">
+          <Wallet className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground" data-testid="text-no-parent-wallets">
+            {wallets.length === 0 ? "本分校目前尚無相關家長" : "查無符合搜尋的家長"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((wallet) => (
+            <div
+              key={wallet.parentId}
+              className="bg-white rounded-md border border-gray-100 p-4 flex items-center gap-4"
+              data-testid={`wallet-card-${wallet.parentId}`}
+            >
+              <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-tiffany" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground" data-testid={`text-wallet-name-${wallet.parentId}`}>
+                  {wallet.parentName || wallet.username}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {wallet.phone ? wallet.phone : `@${wallet.username}`}
+                </p>
+              </div>
+              <div className="text-right mr-3">
+                <p className="text-lg font-bold text-foreground" data-testid={`text-wallet-balance-${wallet.parentId}`}>
+                  {wallet.balance}
+                </p>
+                <p className="text-[10px] text-muted-foreground">剩餘堂數</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openAdjust(wallet)}
+                data-testid={`button-adjust-credits-${wallet.parentId}`}
+              >
+                <Plus className="w-4 h-4 mr-1" />加點
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showDialog} onOpenChange={(open) => { if (!open) setSelectedParent(null); setShowDialog(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>手動加點 — {selectedParent?.parentName || selectedParent?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>選擇方案（或自訂堂數）</Label>
+              <Select
+                value={adjustForm.packageId?.toString() || "custom"}
+                onValueChange={(v) => {
+                  if (v === "custom") {
+                    setAdjustForm({ ...adjustForm, packageId: null, credits: 0 });
+                  } else {
+                    const pkg = packages.find((p) => p.id === parseInt(v));
+                    setAdjustForm({
+                      ...adjustForm,
+                      packageId: parseInt(v),
+                      credits: (pkg?.credits || 0) + (pkg?.bonusCredits || 0),
+                    });
+                  }
+                }}
+              >
+                <SelectTrigger data-testid="select-adjust-package"><SelectValue placeholder="選擇方案" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">自訂堂數</SelectItem>
+                  {packages.filter((p) => p.isActive).map((pkg) => (
+                    <SelectItem key={pkg.id} value={pkg.id.toString()}>
+                      {pkg.name}（{pkg.credits + (pkg.bonusCredits || 0)} 堂 / NT$ {pkg.price.toLocaleString()}）
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!adjustForm.packageId && (
+              <>
+                <div>
+                  <Label>自訂堂數 *</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={adjustForm.credits || ""}
+                    onChange={(e) => setAdjustForm({ ...adjustForm, credits: parseInt(e.target.value) || 0 })}
+                    data-testid="input-adjust-credits"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  自訂堂數無效期限制（不會自動過期）。若需設定期限，請改選有效期方案。
+                </p>
+              </>
+            )}
+
+            {selectedPkg && (
+              <div className="bg-amber-warm/30 rounded-md p-3 text-xs text-muted-foreground space-y-0.5">
+                <p>方案：{selectedPkg.name}</p>
+                <p>實得堂數：{selectedPkg.credits + (selectedPkg.bonusCredits || 0)} 堂</p>
+                <p>定價：NT$ {selectedPkg.price.toLocaleString()}</p>
+                {selectedPkg.expiryDays
+                  ? <p>有效天數：{selectedPkg.expiryDays} 天（自今日起算）</p>
+                  : <p>有效天數：永久</p>}
+              </div>
+            )}
+
+            <div>
+              <Label>備註</Label>
+              <Input
+                value={adjustForm.description}
+                onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })}
+                placeholder="例：補償、活動贈點、現金收款等"
+                data-testid="input-adjust-description"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                系統會自動附上分校名稱與您的姓名於交易紀錄中
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSelectedParent(null); setShowDialog(false); }}>取消</Button>
+            <Button
+              onClick={() => {
+                if (!selectedParent) return;
+                adjustMutation.mutate({
+                  parentId: selectedParent.parentId,
+                  packageId: adjustForm.packageId,
+                  credits: adjustForm.packageId ? 0 : adjustForm.credits,
+                  description: adjustForm.description,
+                });
+              }}
+              disabled={submitDisabled}
+              data-testid="button-submit-adjust"
+            >
+              {adjustMutation.isPending ? "處理中..." : "確認加點"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

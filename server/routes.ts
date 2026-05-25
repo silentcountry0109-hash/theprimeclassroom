@@ -10,7 +10,7 @@ import crypto from "crypto";
 import twilio from "twilio";
 import { users } from "@shared/models/auth";
 import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
-import { eq, and, or, isNotNull, sql } from "drizzle-orm";
+import { eq, and, or, isNotNull, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
 import path from "path";
@@ -2712,6 +2712,108 @@ export async function registerRoutes(
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch student contact books" });
+    }
+  });
+
+  app.get("/api/franchise-admin/credit-packages", isFranchiseAdmin, async (_req: any, res) => {
+    try {
+      const packages = await storage.getCreditPackages();
+      res.json(packages);
+    } catch (error) {
+      res.status(500).json({ message: "取得方案失敗" });
+    }
+  });
+
+  app.get("/api/franchise-admin/parent-wallets", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const students = await storage.getFranchiseStudents(req.franchiseId);
+      const parentIds = Array.from(new Set(students.map((s: any) => s.parentId).filter(Boolean)));
+      if (parentIds.length === 0) return res.json([]);
+      const parentRows = await db
+        .select({ id: users.id, username: users.username, firstName: users.firstName, lastName: users.lastName, phone: users.phone })
+        .from(users)
+        .where(inArray(users.id, parentIds as string[]));
+      const wallets = await Promise.all(parentRows.map(async (p) => {
+        const balance = await storage.getParentBalance(p.id);
+        return {
+          parentId: p.id,
+          parentName: [p.lastName, p.firstName].filter(Boolean).join("") || p.firstName || p.username,
+          username: p.username,
+          phone: p.phone,
+          balance,
+        };
+      }));
+      wallets.sort((a, b) => (a.parentName || "").localeCompare(b.parentName || "", "zh-TW"));
+      res.json(wallets);
+    } catch (error) {
+      res.status(500).json({ message: "取得家長錢包列表失敗" });
+    }
+  });
+
+  app.post("/api/franchise-admin/adjust-credits", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const { parentId, packageId, credits, description } = req.body;
+      if (!parentId) return res.status(400).json({ message: "請選擇家長" });
+
+      const students = await storage.getFranchiseStudents(req.franchiseId);
+      const relatedParentIds = new Set(students.map((s: any) => s.parentId).filter(Boolean));
+      if (!relatedParentIds.has(parentId)) {
+        return res.status(403).json({ message: "此家長與您管理的分校無關聯，無法加點" });
+      }
+
+      const franchise = await storage.getFranchise(req.franchiseId);
+      const franchiseName = franchise?.name || `分校 #${req.franchiseId}`;
+      const adminName = [req.currentUser.lastName, req.currentUser.firstName].filter(Boolean).join("") || req.currentUser.username || "分校主任";
+
+      let creditAmount = credits;
+      let expiresAt: Date | null = null;
+      let finalAmount = 0;
+      let pkgId = packageId || null;
+
+      if (packageId) {
+        const packages = await storage.getCreditPackages();
+        const pkg = packages.find(p => p.id === packageId);
+        if (!pkg) return res.status(400).json({ message: "方案不存在" });
+        creditAmount = pkg.credits + (pkg.bonusCredits || 0);
+        finalAmount = pkg.price;
+        if (pkg.expiryDays) {
+          expiresAt = new Date(Date.now() + pkg.expiryDays * 24 * 60 * 60 * 1000);
+        }
+      }
+
+      if (!creditAmount || creditAmount <= 0) return res.status(400).json({ message: "堂數必須大於 0" });
+
+      const baseDesc = description?.trim() || "分校主任手動加點";
+      const fullDesc = `${baseDesc}｜${franchiseName} · ${adminName}`;
+
+      const purchase = await storage.createCreditPurchase({
+        parentId,
+        packageId: pkgId,
+        credits: creditAmount,
+        originalAmount: finalAmount,
+        discountAmount: 0,
+        finalAmount,
+        paymentMethod: "manual",
+        paymentStatus: "paid",
+        expiresAt,
+      });
+
+      const balance = await storage.addCredits(parentId, purchase.id, creditAmount, expiresAt);
+
+      await storage.createCreditTransaction({
+        parentId,
+        type: "franchise_admin_adjust",
+        credits: creditAmount,
+        balanceId: balance.id,
+        purchaseId: purchase.id,
+        description: fullDesc,
+      });
+
+      const newBalance = await storage.getParentBalance(parentId);
+      res.json({ success: true, purchase, newBalance });
+    } catch (error: any) {
+      console.error("[franchise-admin/adjust-credits] error:", error);
+      res.status(500).json({ message: error.message || "加點失敗" });
     }
   });
 
