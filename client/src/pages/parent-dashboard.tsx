@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getDefaultClassroomImage } from "@/lib/default-images";
+import MarkdownContent from "@/components/markdown-content";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -1466,8 +1467,8 @@ function CreditsTab() {
                   </span>
                 </label>
                 {showRefundPolicy && (
-                  <div className="text-xs text-muted-foreground leading-relaxed bg-gray-50 border border-gray-100 rounded-md px-3 py-2 whitespace-pre-wrap max-h-40 overflow-y-auto" data-testid="text-refund-policy-content">
-                    {refundPolicyText}
+                  <div className="bg-gray-50 border border-gray-100 rounded-md px-3 py-2 max-h-60 overflow-y-auto overflow-x-auto" data-testid="text-refund-policy-content">
+                    <MarkdownContent source={refundPolicyText} className="prose-xs" />
                   </div>
                 )}
               </div>

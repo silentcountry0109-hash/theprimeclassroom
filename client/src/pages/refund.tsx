@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, ReceiptText } from "lucide-react";
 import Navbar from "@/components/navbar";
+import MarkdownContent from "@/components/markdown-content";
 
 export default function RefundPage() {
   const { data: siteContent, isLoading } = useQuery<Record<string, string>>({
@@ -12,6 +13,19 @@ export default function RefundPage() {
     siteContent?.["refund_policy"] ||
     "（尚未設定退費規則，請由總部後台編輯）";
   const updatedAt = siteContent?.["policies_updated_at"];
+  const updatedAtLabel = updatedAt
+    ? (() => {
+        try {
+          return new Date(updatedAt).toLocaleDateString("zh-TW", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          });
+        } catch {
+          return updatedAt;
+        }
+      })()
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -38,9 +52,9 @@ export default function RefundPage() {
           </h1>
         </div>
 
-        {updatedAt && (
+        {updatedAtLabel && (
           <p className="text-xs text-muted-foreground mb-8" data-testid="text-updated-at">
-            最後更新：{updatedAt}
+            最後更新：{updatedAtLabel}
           </p>
         )}
 
@@ -55,11 +69,8 @@ export default function RefundPage() {
             ))}
           </div>
         ) : (
-          <div
-            className="prose prose-sm max-w-none text-foreground/80 leading-relaxed whitespace-pre-wrap"
-            data-testid="content-refund-policy"
-          >
-            {refundPolicy}
+          <div className="rounded-2xl border border-tiffany/20 bg-washi/60 p-5 md:p-8 shadow-sm overflow-x-auto">
+            <MarkdownContent source={refundPolicy} testId="content-refund-policy" />
           </div>
         )}
       </main>

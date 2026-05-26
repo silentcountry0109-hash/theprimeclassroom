@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { DEFAULT_PRIVACY_POLICY, DEFAULT_REFUND_POLICY } from "@shared/default-policies";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -3785,8 +3786,8 @@ const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
     id: "legal-policies",
     label: "法律政策",
     fields: [
-      { key: "privacy_policy", label: "隱私權政策（純文字或 Markdown）", multiline: true },
-      { key: "refund_policy", label: "退費規則（純文字或 Markdown）", multiline: true },
+      { key: "privacy_policy", label: "隱私權政策（支援 Markdown）", multiline: true },
+      { key: "refund_policy", label: "退費規則（支援 Markdown，可包含案例對照表）", multiline: true },
     ],
   },
 ];
@@ -3858,8 +3859,8 @@ const DEFAULT_VALUES: Record<string, string> = {
   "footer.phone": "02-1234-5678",
   "footer.email": "hello@primemath.tw",
   "footer.address": "台北市大安區",
-  "privacy_policy": "# 隱私權政策\n\n本平台（質數教室）重視您的隱私權，並致力於保護您的個人資料。\n\n## 資料蒐集\n我們蒐集您在使用本平台時所提供的個人資料，包括姓名、電話、電子信箱等，僅用於提供教育服務及相關通知。\n\n## 資料使用\n您的個人資料將用於：\n- 提供課程預約及管理服務\n- 傳送課程提醒及相關通知\n- 改善本平台之服務品質\n\n## 資料保護\n我們採用業界標準的安全措施保護您的個人資料，未經您的同意，我們不會將您的個人資料提供給第三方。\n\n## 聯絡我們\n如有任何關於隱私權的問題，請聯絡 hello@primemath.tw。",
-  "refund_policy": "# 退費規則\n\n## 堂數退費\n1. 購買後尚未使用之堂數，可於購買日起 7 日內申請全額退費。\n2. 超過 7 日後，每堂按原始購買單價退還剩餘堂數金額，並扣除行政手續費 NT$100。\n3. 透過促銷活動或優惠碼購得之加贈堂數，不適用退費。\n\n## 退費申請流程\n1. 請透過 LINE 官方帳號或 Email 提出退費申請。\n2. 我們將於 3 個工作日內完成審核。\n3. 退款將原路退回，處理時間依各銀行規定（約 7-14 個工作日）。\n\n## 注意事項\n- 已使用之堂數恕不退費。\n- 如因平台系統因素導致課程無法進行，將全額退還該堂費用。\n\n如有疑問，請聯絡 hello@primemath.tw。",
+  "privacy_policy": DEFAULT_PRIVACY_POLICY,
+  "refund_policy": DEFAULT_REFUND_POLICY,
 };
 
 function SiteEditorTab() {

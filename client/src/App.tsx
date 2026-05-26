@@ -8,6 +8,7 @@ import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import MarkdownContent from "@/components/markdown-content";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import NotFound from "@/pages/not-found";
@@ -87,10 +88,10 @@ function PolicyScrollSection({
       <div
         ref={scrollRef}
         onScroll={checkBottom}
-        className="h-40 overflow-y-scroll border border-gray-200 rounded-lg p-3 bg-gray-50 text-xs text-foreground leading-relaxed whitespace-pre-wrap"
+        className="h-40 overflow-y-scroll overflow-x-auto border border-gray-200 rounded-lg p-3 bg-gray-50"
         data-testid={`policy-scroll-${title}`}
       >
-        {content}
+        <MarkdownContent source={content} className="prose-xs" />
       </div>
       {!scrolledToBottom && (
         <p className="text-[11px] text-muted-foreground">請閱讀完畢後勾選</p>
