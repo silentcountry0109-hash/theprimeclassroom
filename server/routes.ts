@@ -191,7 +191,49 @@ function hasTwilioCredentials(): boolean {
   );
 }
 
+function resolveLineRedirectUri(req: any): string {
+  // 優先順序：APP_BASE_URL > x-forwarded-host + x-forwarded-proto > req.hostname
+  const stripped = process.env.APP_BASE_URL?.replace(/\/$/, "");
+  if (stripped) return `${stripped}/api/auth/line/callback`;
+  const fwdHost = (req.headers["x-forwarded-host"] as string)?.split(",")[0]?.trim();
+  const fwdProto = (req.headers["x-forwarded-proto"] as string)?.split(",")[0]?.trim();
+  const host = fwdHost || req.hostname;
+  const proto = fwdProto || req.protocol;
+  return `${proto}://${host}/api/auth/line/callback`;
+}
+
+function isLineRedirectUriAllowed(uri: string): boolean {
+  const allowList = process.env.LINE_ALLOWED_CALLBACKS;
+  // 未設定白名單時不做檢查（向後相容），交由 LINE 那邊把關。
+  if (!allowList || !allowList.trim()) return true;
+  const allowed = allowList.split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
+  return allowed.includes(uri.replace(/\/$/, ""));
+}
+
+function isTwilioBypassed(): boolean {
+  // 強制略過 Twilio：DISABLE_TWILIO=true 即可生效（即使 production 也行，
+  // 但需要明確設定環境變數，避免意外關閉真實驗證）。
+  return process.env.DISABLE_TWILIO === "true";
+}
+
+function bypassModeActive(): boolean {
+  // 前端要顯示「測試模式」提示的條件：強制略過模式，或 dev 環境下未設定 Twilio 憑證（會走 dev fallback）。
+  return isTwilioBypassed() || (isDev && !hasTwilioCredentials());
+}
+
 async function sendTwilioOtp(phone: string): Promise<void> {
+  // 強制略過 Twilio 模式：不論憑證是否齊全，都不打 Twilio API。
+  if (isTwilioBypassed()) {
+    if (process.env.BYPASS_OTP_CODE) {
+      console.log(`[BYPASS OTP] DISABLE_TWILIO=true，萬用驗證碼模式啟用，跳過 SMS 發送（phone=${phone}）`);
+      return;
+    }
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const now = Date.now();
+    devOtpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
+    console.log(`[BYPASS OTP] DISABLE_TWILIO=true，跳過 Twilio。OTP for ${phone}: ${otp}`);
+    return;
+  }
   if (process.env.BYPASS_OTP_CODE) {
     console.log(`[BYPASS OTP] 萬用驗證碼模式啟用，跳過 SMS 發送（phone=${phone}）`);
     return;
@@ -241,6 +283,20 @@ async function sendTwilioOtp(phone: string): Promise<void> {
 async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
   if (process.env.BYPASS_OTP_CODE && String(code) === process.env.BYPASS_OTP_CODE) {
     console.log(`[BYPASS OTP] 萬用驗證碼通過（phone=${phone}）`);
+    return true;
+  }
+  // 強制略過 Twilio 模式：以 devOtpStore 為準，不打 Twilio API。
+  if (isTwilioBypassed()) {
+    const now = Date.now();
+    const record = devOtpStore.get(phone);
+    if (!record) return false;
+    if (now > record.expiresAt) { devOtpStore.delete(phone); return false; }
+    if (record.attempts >= 3) { devOtpStore.delete(phone); return false; }
+    if (record.otp !== String(code)) {
+      devOtpStore.set(phone, { ...record, attempts: record.attempts + 1 });
+      return false;
+    }
+    devOtpStore.delete(phone);
     return true;
   }
   if (isDev && !hasTwilioCredentials()) {
@@ -488,6 +544,14 @@ export async function registerRoutes(
   cleanupCredentialOnlyParents().catch((e) => console.error("[Cleanup] 啟動清理失敗：", e));
   registerAuthRoutes(app);
 
+  // ── 啟動時提示 Twilio 略過模式 ────────────────────────────────────────────
+  if (isTwilioBypassed()) {
+    console.warn(
+      "⚠️ [Twilio] DISABLE_TWILIO=true — Twilio 已暫時停用，使用萬用／dev 驗證碼。" +
+      " 如需恢復真實簡訊驗證，請移除或設為 false 後重啟。"
+    );
+  }
+
   // ── 啟動時確認 LINE Messaging API 金鑰是否設定 ──────────────────────────
   if (!process.env.LINE_MESSAGING_CHANNEL_SECRET) {
     console.warn(
@@ -631,7 +695,7 @@ export async function registerRoutes(
       }
       await sendTwilioOtp(phone);
       recordOtpSend(phone);
-      return res.json({ message: "驗證碼已發送" });
+      return res.json({ message: "驗證碼已發送", bypassMode: bypassModeActive() });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "發送失敗，請稍後再試";
       return res.status(500).json({ message: msg });
@@ -649,9 +713,17 @@ export async function registerRoutes(
     if (!channelId) {
       return res.redirect("/parent-login?error=line_not_configured");
     }
-    const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-    const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || `${protocol}://${req.hostname}`;
-    const redirectUri = `${baseUrl}/api/auth/line/callback`;
+    const redirectUri = resolveLineRedirectUri(req);
+    console.log(`[LINE OAuth] /api/auth/line redirect_uri=${redirectUri}`);
+    if (!isLineRedirectUriAllowed(redirectUri)) {
+      console.error(
+        `[LINE OAuth] redirect_uri 不在白名單內：${redirectUri}\n` +
+        `  請在 LINE Developers Console → LINE Login → Callback URL 新增此網址，\n` +
+        `  或將 APP_BASE_URL / LINE_ALLOWED_CALLBACKS 設為正確值。\n` +
+        `  目前 LINE_ALLOWED_CALLBACKS=${process.env.LINE_ALLOWED_CALLBACKS ?? "(未設定)"}, APP_BASE_URL=${process.env.APP_BASE_URL ?? "(未設定)"}`
+      );
+      return res.redirect("/parent-login?error=line_redirect_unregistered");
+    }
     const state = Math.random().toString(36).slice(2);
     req.session.lineOAuthState = state;
     req.session.save(() => {
@@ -679,9 +751,8 @@ export async function registerRoutes(
 
       const channelId = process.env.LINE_CHANNEL_ID!;
       const channelSecret = process.env.LINE_CHANNEL_SECRET!;
-      const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-      const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || `${protocol}://${req.hostname}`;
-      const redirectUri = `${baseUrl}/api/auth/line/callback`;
+      const redirectUri = resolveLineRedirectUri(req);
+      console.log(`[LINE OAuth] /api/auth/line/callback exchanging with redirect_uri=${redirectUri}`);
 
       const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
         method: "POST",
@@ -761,7 +832,7 @@ export async function registerRoutes(
       }
       await sendTwilioOtp(phone);
       recordOtpSend(phone);
-      res.json({ message: "驗證碼已發送" });
+      res.json({ message: "驗證碼已發送", bypassMode: bypassModeActive() });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "發送失敗，請稍後再試";
       res.status(500).json({ message: msg });

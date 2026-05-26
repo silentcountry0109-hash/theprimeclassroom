@@ -52,7 +52,8 @@ export default function ParentLogin() {
                 {urlError === "line_profile" && "無法取得 LINE 個人資料，請稍後再試"}
                 {urlError === "line_server" && "LINE 登入發生錯誤，請稍後再試"}
                 {urlError === "line_id_taken" && "此 LINE 帳號已綁定其他身份（例如老師帳號），無法同時作為家長使用"}
-                {!["line_not_configured","line_denied","line_state","line_token","line_profile","line_server","line_id_taken"].includes(urlError || "") && "登入發生錯誤，請稍後再試"}
+                {urlError === "line_redirect_unregistered" && "LINE 登入設定未完成（callback 網址未登記）。請聯絡管理員至 LINE Developers Console 新增此網站的 Callback URL。"}
+                {!["line_not_configured","line_denied","line_state","line_token","line_profile","line_server","line_id_taken","line_redirect_unregistered"].includes(urlError || "") && "登入發生錯誤，請稍後再試"}
               </p>
             )}
 
