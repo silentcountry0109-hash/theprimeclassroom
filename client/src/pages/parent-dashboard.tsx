@@ -932,10 +932,27 @@ function CreditsTab() {
   const [refundPolicyAgreed, setRefundPolicyAgreed] = useState(false);
   const [showRefundPolicy, setShowRefundPolicy] = useState(false);
 
+  const { user: replitUser } = useAuth();
+  const { user: credUser } = useCredentialAuth();
+  const currentUser = (credUser || replitUser) as any;
+
   const { data: siteContent } = useQuery<Record<string, string>>({
     queryKey: ["/api/site-content"],
   });
   const refundPolicyText = siteContent?.["refund_policy"] || "退費規則載入中…";
+
+  const alreadyAgreedPolicies = (() => {
+    const agreedAt = currentUser?.policiesAgreedAt;
+    if (!agreedAt) return false;
+    const policiesUpdatedAt = siteContent?.["policies_updated_at"];
+    if (!policiesUpdatedAt) return false;
+    const agreedTime = new Date(agreedAt).getTime();
+    const updatedTime = new Date(policiesUpdatedAt).getTime();
+    if (!Number.isFinite(agreedTime) || !Number.isFinite(updatedTime)) return false;
+    return agreedTime >= updatedTime;
+  })();
+
+  const canPurchase = alreadyAgreedPolicies || refundPolicyAgreed;
 
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
@@ -1446,16 +1463,10 @@ function CreditsTab() {
                 </p>
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-                <label className="flex items-start gap-2.5 cursor-pointer" data-testid="label-refund-policy-agree">
-                  <Checkbox
-                    checked={refundPolicyAgreed}
-                    onCheckedChange={(v) => setRefundPolicyAgreed(!!v)}
-                    data-testid="checkbox-refund-policy"
-                    className="mt-0.5"
-                  />
-                  <span className="text-xs text-foreground leading-relaxed">
-                    我已閱讀並同意{" "}
+              {alreadyAgreedPolicies ? (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed" data-testid="text-refund-policy-notice">
+                    購買即表示同意{" "}
                     <button
                       type="button"
                       onClick={() => setShowRefundPolicy((v) => !v)}
@@ -1464,18 +1475,45 @@ function CreditsTab() {
                     >
                       退費規則
                     </button>
-                  </span>
-                </label>
-                {showRefundPolicy && (
-                  <div className="bg-gray-50 border border-gray-100 rounded-md px-3 py-2 max-h-60 overflow-y-auto overflow-x-auto" data-testid="text-refund-policy-content">
-                    <MarkdownContent source={refundPolicyText} className="prose-xs" />
-                  </div>
-                )}
-              </div>
+                  </p>
+                  {showRefundPolicy && (
+                    <div className="bg-gray-50 border border-gray-100 rounded-md px-3 py-2 max-h-60 overflow-y-auto overflow-x-auto" data-testid="text-refund-policy-content">
+                      <MarkdownContent source={refundPolicyText} className="prose-xs" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  <label className="flex items-start gap-2.5 cursor-pointer" data-testid="label-refund-policy-agree">
+                    <Checkbox
+                      checked={refundPolicyAgreed}
+                      onCheckedChange={(v) => setRefundPolicyAgreed(!!v)}
+                      data-testid="checkbox-refund-policy"
+                      className="mt-0.5"
+                    />
+                    <span className="text-xs text-foreground leading-relaxed">
+                      我已閱讀並同意{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowRefundPolicy((v) => !v)}
+                        className="text-tiffany underline hover:text-tiffany/80 transition-colors"
+                        data-testid="button-toggle-refund-policy"
+                      >
+                        退費規則
+                      </button>
+                    </span>
+                  </label>
+                  {showRefundPolicy && (
+                    <div className="bg-gray-50 border border-gray-100 rounded-md px-3 py-2 max-h-60 overflow-y-auto overflow-x-auto" data-testid="text-refund-policy-content">
+                      <MarkdownContent source={refundPolicyText} className="prose-xs" />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <Button
                 className="w-full rounded-full"
-                disabled={purchaseMutation.isPending || !refundPolicyAgreed}
+                disabled={purchaseMutation.isPending || !canPurchase}
                 onClick={() => {
                   if (!selectedPackageId) return;
                   purchaseMutation.mutate({
@@ -1483,7 +1521,7 @@ function CreditsTab() {
                     couponCode: couponResult?.coupon?.code,
                   });
                 }}
-                style={{ backgroundColor: refundPolicyAgreed ? "#81D8D0" : undefined, color: refundPolicyAgreed ? "white" : undefined }}
+                style={{ backgroundColor: canPurchase ? "#81D8D0" : undefined, color: canPurchase ? "white" : undefined }}
                 data-testid="button-purchase-credits"
               >
                 {purchaseMutation.isPending ? "處理中..." : "立即購買"}
