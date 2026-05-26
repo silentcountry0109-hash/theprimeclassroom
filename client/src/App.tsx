@@ -27,6 +27,8 @@ import ParentRegisterVerifyPhone from "@/pages/parent-register-verify-phone";
 import PaymentResult from "@/pages/payment-result";
 import PrivacyPage from "@/pages/privacy";
 import RefundPage from "@/pages/refund";
+import LiffApp from "@/pages/liff-app";
+import { useLocation } from "wouter";
 
 function LoadingScreen() {
   return (
@@ -193,13 +195,20 @@ function PoliciesAgreementModal({
 }
 
 function PoliciesGate({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const isLiff = location.startsWith("/liff");
   const { user: replitUser, isLoading: replitLoading } = useAuth();
   const { user: credUser, isLoading: credLoading } = useCredentialAuth();
   const [dismissed, setDismissed] = useState(false);
 
   const { data: siteContent } = useQuery<Record<string, string>>({
     queryKey: ["/api/site-content"],
+    enabled: !isLiff,
   });
+
+  if (isLiff) {
+    return <>{children}</>;
+  }
 
   const isLoading = replitLoading || credLoading;
   const user = credUser || replitUser;
@@ -276,6 +285,8 @@ function Router() {
       <Route path="/payment-result" component={PaymentResult} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/refund" component={RefundPage} />
+      <Route path="/liff" component={LiffApp} />
+      <Route path="/liff/:tab*" component={LiffApp} />
       <Route component={NotFound} />
     </Switch>
   );

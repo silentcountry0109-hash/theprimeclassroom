@@ -791,6 +791,52 @@ export async function registerRoutes(
     }
   });
 
+  // ── LIFF: 以 LIFF Access Token 換取本系統 session ────────────────────────────
+  app.post("/api/auth/liff", async (req: any, res) => {
+    try {
+      const { accessToken } = req.body as { accessToken?: string };
+      if (!accessToken || typeof accessToken !== "string") {
+        return res.status(400).json({ message: "缺少 accessToken" });
+      }
+      const verifyRes = await fetch(`https://api.line.me/oauth2/v2.1/verify?access_token=${encodeURIComponent(accessToken)}`);
+      if (!verifyRes.ok) {
+        return res.status(401).json({ message: "LINE access token 驗證失敗" });
+      }
+      const verifyData = await verifyRes.json() as { client_id?: string; expires_in?: number };
+      if (typeof verifyData.expires_in === "number" && verifyData.expires_in <= 0) {
+        return res.status(401).json({ message: "Access token 已過期" });
+      }
+      const expectedChannel = process.env.LIFF_LOGIN_CHANNEL_ID || process.env.LINE_CHANNEL_ID;
+      if (expectedChannel && verifyData.client_id && verifyData.client_id !== expectedChannel) {
+        console.warn(`[LIFF Auth] channel mismatch: got ${verifyData.client_id} expected ${expectedChannel}`);
+        return res.status(401).json({ message: "Access token 來源頻道不符" });
+      }
+      const profileRes = await fetch("https://api.line.me/v2/profile", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!profileRes.ok) {
+        return res.status(401).json({ message: "無法取得 LINE 個人資料" });
+      }
+      const profile = await profileRes.json() as { userId: string; displayName: string; pictureUrl?: string };
+
+      const user = await authStorage.getUserByLineUserId(profile.userId, "parent");
+      if (!user) {
+        return res.json({ status: "unbound", lineProfile: profile });
+      }
+      if (user.lineRegistrationComplete === false) {
+        return res.json({ status: "incomplete", lineProfile: profile, userId: user.id });
+      }
+      req.session.credentialUserId = user.id;
+      req.session.save(() => {
+        const { passwordHash: _ph, ...safeUser } = user as any;
+        res.json({ status: "ok", user: safeUser });
+      });
+    } catch (err) {
+      console.error("[LIFF Auth] Error:", err);
+      res.status(500).json({ message: "LIFF 驗證失敗" });
+    }
+  });
+
   // ── END LINE Login OAuth ───────────────────────────────────────────────────────
 
   // ── LINE OA Webhook — Coach / Director account binding ────────────────────────
@@ -4511,6 +4557,14 @@ export async function registerRoutes(
     ? process.env.REPLIT_DOMAINS.split(",")[0]
     : "localhost:5000";
 
+  // In-memory store for ECPay launch tokens (one-time use, 15-min TTL)
+  // Keyed by token; value contains actionUrl + params for the auto-submit form.
+  const ecpayLaunchStore = new Map<string, { actionUrl: string; params: Record<string, string>; expiresAt: number }>();
+  function purgeExpiredLaunches() {
+    const now = Date.now();
+    for (const [k, v] of ecpayLaunchStore) if (v.expiresAt < now) ecpayLaunchStore.delete(k);
+  }
+
   function computeCheckMacValue(params: Record<string, string>): string {
     const p = { ...params };
     delete p.CheckMacValue;
@@ -4619,11 +4673,49 @@ export async function registerRoutes(
       };
       params.CheckMacValue = computeCheckMacValue(params);
 
-      res.json({ actionUrl: ECPAY_AIO_URL, params });
+      // 為 LIFF 等情境提供可由外部瀏覽器直接 GET 的 launch URL（伺服器回傳 auto-submit HTML）
+      purgeExpiredLaunches();
+      const launchToken = crypto.randomBytes(24).toString("hex");
+      ecpayLaunchStore.set(launchToken, {
+        actionUrl: ECPAY_AIO_URL,
+        params,
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      });
+      const launchUrl = `/api/payment/ecpay/launch/${launchToken}`;
+
+      res.json({ actionUrl: ECPAY_AIO_URL, params, launchUrl });
     } catch (error) {
       console.error("ECPay create error:", error);
       res.status(500).json({ message: "建立付款失敗" });
     }
+  });
+
+  // GET launch endpoint: 返回 auto-submit HTML 表單，供外部瀏覽器（如 LIFF openWindow external）開啟後自動 POST 到 ECPay。
+  // 不需登入（external browser 沒有 session），以 one-time token 保護。
+  app.get("/api/payment/ecpay/launch/:token", (req, res) => {
+    purgeExpiredLaunches();
+    const token = String(req.params.token || "");
+    const entry = ecpayLaunchStore.get(token);
+    if (!entry) {
+      res.status(404).type("html").send(
+        `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>連結已失效</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:40px"><h2>結帳連結已失效</h2><p>請回到質數教室重新建立訂單。</p></body></html>`
+      );
+      return;
+    }
+    ecpayLaunchStore.delete(token); // one-time
+    const escapeAttr = (s: string) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const inputs = Object.entries(entry.params)
+      .map(([k, v]) => `<input type="hidden" name="${escapeAttr(k)}" value="${escapeAttr(v)}"/>`)
+      .join("");
+    res.type("html").send(
+      `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>前往 ECPay 結帳</title></head>
+      <body style="font-family:sans-serif;text-align:center;padding:40px">
+        <p>正在前往 ECPay 安全結帳頁面…</p>
+        <form id="ecpay-form" method="post" action="${escapeAttr(entry.actionUrl)}">${inputs}</form>
+        <script>document.getElementById('ecpay-form').submit();</script>
+      </body></html>`
+    );
   });
 
   app.post("/api/payment/ecpay/notify", async (req, res) => {
