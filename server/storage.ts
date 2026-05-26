@@ -255,14 +255,15 @@ export interface IStorage {
   getEcpayPurchases(status?: string): Promise<Array<CreditPurchase & { parentName: string | null; parentUsername: string | null; packageName: string | null; ecpayInternalTradeNo: string | null }>>;
   atomicMarkPurchasePaid(ecpayTradeNo: string): Promise<CreditPurchase | null>;
   atomicMarkPaidAndAddCredits(ecpayTradeNo: string, expiresAt: Date | null, ecpayInternalTradeNo?: string): Promise<CreditPurchase | null>;
-  refundEcpayPurchase(purchaseId: number): Promise<{ purchase: CreditPurchase; creditsDeducted: number }>;
+  refundEcpayPurchase(purchaseId: number): Promise<{ purchase: CreditPurchase; creditsDeducted: number; refundAmount: number; paidCredits: number; usedCredits: number }>;
+  computeRefundPreview(purchaseId: number): Promise<{ paidCredits: number; usedCredits: number; refundableCredits: number; refundAmount: number } | null>;
 
 
   getParentBalance(parentId: string): Promise<number>;
   getCreditBalances(parentId: string): Promise<CreditBalance[]>;
   deductCredits(parentId: string, amount: number, bookingId?: number, description?: string): Promise<CreditTransaction>;
   refundCredits(parentId: string, bookingId: number, description?: string): Promise<CreditTransaction | null>;
-  addCredits(parentId: string, purchaseId: number, credits: number, expiresAt: Date | null): Promise<CreditBalance>;
+  addCredits(parentId: string, purchaseId: number, credits: number, expiresAt: Date | null, creditType?: "paid" | "bonus"): Promise<CreditBalance>;
 
   createCreditTransaction(data: InsertCreditTransaction): Promise<CreditTransaction>;
   getTransactionsByParent(parentId: string): Promise<CreditTransaction[]>;
@@ -319,6 +320,8 @@ export interface IStorage {
   }>;
 
 }
+
+export const CREDIT_REFUND_UNIT_PRICE = 750;
 
 function getTimePeriodCondition(periods: string[]): string {
   const conditions: string[] = [];
@@ -2587,26 +2590,89 @@ export class DatabaseStorage implements IStorage {
         .where(and(eq(creditPurchases.ecpayTradeNo, ecpayTradeNo), eq(creditPurchases.paymentStatus, "pending")))
         .returning();
       if (!purchase) return null;
-      const [balance] = await tx.insert(creditBalances).values({
+
+      // 解析方案以區分付費堂與贈送堂
+      let paidCredits = purchase.credits;
+      let bonusCredits = 0;
+      let bonusExpiresAt: Date | null = null;
+      if (purchase.packageId) {
+        const [pkg] = await tx.select().from(creditPackages).where(eq(creditPackages.id, purchase.packageId));
+        if (pkg) {
+          paidCredits = pkg.credits;
+          bonusCredits = pkg.bonusCredits || 0;
+          if (bonusCredits > 0) {
+            // 贈送堂效期：有指定 bonusExpiryDays 用其值；否則沿用付費堂效期（與 UI「空白=與付費堂相同」一致）
+            bonusExpiresAt = pkg.bonusExpiryDays
+              ? new Date(Date.now() + pkg.bonusExpiryDays * 86400 * 1000)
+              : expiresAt;
+          }
+        }
+      }
+
+      const [paidBalance] = await tx.insert(creditBalances).values({
         parentId: purchase.parentId,
         purchaseId: purchase.id,
-        originalCredits: purchase.credits,
-        remainingCredits: purchase.credits,
+        originalCredits: paidCredits,
+        remainingCredits: paidCredits,
+        creditType: "paid",
         expiresAt,
       }).returning();
       await tx.insert(creditTransactions).values({
         parentId: purchase.parentId,
         type: "purchase",
-        credits: purchase.credits,
-        balanceId: balance.id,
+        credits: paidCredits,
+        balanceId: paidBalance.id,
         purchaseId: purchase.id,
-        description: "線上付款購買堂數",
+        description: `線上付款購買堂數（付費 ${paidCredits} 堂）`,
       });
+
+      if (bonusCredits > 0) {
+        const [bonusBalance] = await tx.insert(creditBalances).values({
+          parentId: purchase.parentId,
+          purchaseId: purchase.id,
+          originalCredits: bonusCredits,
+          remainingCredits: bonusCredits,
+          creditType: "bonus",
+          expiresAt: bonusExpiresAt,
+        }).returning();
+        await tx.insert(creditTransactions).values({
+          parentId: purchase.parentId,
+          type: "purchase",
+          credits: bonusCredits,
+          balanceId: bonusBalance.id,
+          purchaseId: purchase.id,
+          description: `加贈 ${bonusCredits} 堂（贈送堂${bonusExpiresAt ? `，${bonusExpiresAt.toLocaleDateString("zh-TW")} 到期` : ""}）`,
+        });
+      }
+
       return purchase;
     });
   }
 
-  async refundEcpayPurchase(purchaseId: number): Promise<{ purchase: CreditPurchase; creditsDeducted: number }> {
+  async computeRefundPreview(purchaseId: number): Promise<{ paidCredits: number; usedCredits: number; refundableCredits: number; refundAmount: number } | null> {
+    const [purchase] = await db.select().from(creditPurchases).where(eq(creditPurchases.id, purchaseId));
+    if (!purchase) return null;
+    const balanceRows = await db.select().from(creditBalances).where(eq(creditBalances.purchaseId, purchaseId));
+    const paidBalance = balanceRows.find(b => b.creditType === "paid");
+    let paidCredits = paidBalance?.originalCredits ?? 0;
+    if (!paidBalance && purchase.packageId) {
+      const [pkg] = await db.select().from(creditPackages).where(eq(creditPackages.id, purchase.packageId));
+      if (pkg) paidCredits = pkg.credits;
+    }
+    // 已使用總堂數 = sum of (originalCredits - remainingCredits) across both buckets
+    let usedCredits = 0;
+    for (const bal of balanceRows) {
+      const used = Math.max(0, bal.originalCredits - bal.remainingCredits);
+      usedCredits += used;
+    }
+    const refundableCredits = Math.max(0, paidCredits - usedCredits);
+    let refundAmount = refundableCredits * CREDIT_REFUND_UNIT_PRICE;
+    // 安全上限：不超過實付金額
+    if (refundAmount > purchase.finalAmount) refundAmount = purchase.finalAmount;
+    return { paidCredits, usedCredits, refundableCredits, refundAmount };
+  }
+
+  async refundEcpayPurchase(purchaseId: number): Promise<{ purchase: CreditPurchase; creditsDeducted: number; refundAmount: number; paidCredits: number; usedCredits: number }> {
     return db.transaction(async (tx) => {
       const [purchase] = await tx.select().from(creditPurchases).where(eq(creditPurchases.id, purchaseId));
       if (!purchase) throw new Error("找不到該付款紀錄");
@@ -2621,6 +2687,21 @@ export class DatabaseStorage implements IStorage {
       const balanceRows = await tx.select().from(creditBalances)
         .where(eq(creditBalances.purchaseId, purchaseId));
 
+      const paidBalance = balanceRows.find(b => b.creditType === "paid");
+      let paidCredits = paidBalance?.originalCredits ?? 0;
+      if (!paidBalance && purchase.packageId) {
+        const [pkg] = await tx.select().from(creditPackages).where(eq(creditPackages.id, purchase.packageId));
+        if (pkg) paidCredits = pkg.credits;
+      }
+      let usedCredits = 0;
+      for (const bal of balanceRows) {
+        usedCredits += Math.max(0, bal.originalCredits - bal.remainingCredits);
+      }
+      const refundableCredits = Math.max(0, paidCredits - usedCredits);
+      let refundAmount = refundableCredits * CREDIT_REFUND_UNIT_PRICE;
+      if (refundAmount > purchase.finalAmount) refundAmount = purchase.finalAmount;
+
+      // 將該購買所有桶子的剩餘堂數歸零（避免家長拿到退款後仍可使用）
       let creditsDeducted = 0;
       for (const bal of balanceRows) {
         if (bal.remainingCredits > 0) {
@@ -2636,10 +2717,10 @@ export class DatabaseStorage implements IStorage {
         type: "payment_refund",
         credits: -creditsDeducted,
         purchaseId: purchase.id,
-        description: `線上付款退款（退還 NT$${purchase.finalAmount}，扣除 ${creditsDeducted} 堂）`,
+        description: `線上付款退款（付費 ${paidCredits} 堂、已用 ${usedCredits} 堂、退款 NT$${refundAmount}、扣回 ${creditsDeducted} 堂）`,
       });
 
-      return { purchase: updated, creditsDeducted };
+      return { purchase: updated, creditsDeducted, refundAmount, paidCredits, usedCredits };
     });
   }
 
@@ -2742,12 +2823,13 @@ export class DatabaseStorage implements IStorage {
     return tx;
   }
 
-  async addCredits(parentId: string, purchaseId: number, credits: number, expiresAt: Date | null): Promise<CreditBalance> {
+  async addCredits(parentId: string, purchaseId: number, credits: number, expiresAt: Date | null, creditType: "paid" | "bonus" = "paid"): Promise<CreditBalance> {
     const [balance] = await db.insert(creditBalances).values({
       parentId,
       purchaseId,
       originalCredits: credits,
       remainingCredits: credits,
+      creditType,
       expiresAt,
     }).returning();
     return balance;

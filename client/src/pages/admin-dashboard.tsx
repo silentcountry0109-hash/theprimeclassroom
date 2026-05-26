@@ -2792,7 +2792,7 @@ function EcpayPurchasesSection() {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "退款成功", description: `已退款，扣除 ${data.creditsDeducted} 堂` });
+      toast({ title: "退款成功", description: `已退 NT$${(data.refundAmount ?? 0).toLocaleString()}（付費 ${data.paidCredits ?? 0} 堂 − 已用 ${data.usedCredits ?? 0} 堂）` });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/ecpay-purchases"] });
       setConfirmRefundId(null);
     },
@@ -2836,6 +2836,15 @@ function EcpayPurchasesSection() {
   const refundedCount = allPurchases.filter(p => p.paymentStatus === "refunded").length;
 
   const confirmPurchase = confirmRefundId != null ? allPurchases.find(p => p.id === confirmRefundId) : null;
+  const { data: refundPreview } = useQuery<{ paidCredits: number; usedCredits: number; refundableCredits: number; refundAmount: number; unitPrice: number }>({
+    queryKey: ["/api/admin/ecpay-refund-preview", confirmRefundId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/ecpay-refund-preview/${confirmRefundId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("無法載入退款預覽");
+      return res.json();
+    },
+    enabled: confirmRefundId != null,
+  });
 
   return (
     <div>
@@ -2954,14 +2963,28 @@ function EcpayPurchasesSection() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>確認退款</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmPurchase && (
-                <span>
-                  確定要對 <strong>{confirmPurchase.parentName || confirmPurchase.parentUsername}</strong> 的訂單退款
-                  <strong> NT$ {confirmPurchase.finalAmount.toLocaleString()}</strong> 嗎？<br />
-                  退款後將自動扣除對應的剩餘堂數，此操作無法還原。
-                </span>
-              )}
+            <AlertDialogDescription asChild>
+              {confirmPurchase ? (
+                <div className="space-y-2 text-sm">
+                  <div>
+                    家長：<strong>{confirmPurchase.parentName || confirmPurchase.parentUsername}</strong><br />
+                    原始實收：<strong>NT$ {confirmPurchase.finalAmount.toLocaleString()}</strong>
+                  </div>
+                  {refundPreview ? (
+                    <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs space-y-1" data-testid="refund-preview-box">
+                      <div>付費堂數：<strong>{refundPreview.paidCredits}</strong> 堂</div>
+                      <div>已使用總堂數（付費+贈送）：<strong>{refundPreview.usedCredits}</strong> 堂</div>
+                      <div>可退堂數：<strong>{refundPreview.refundableCredits}</strong> 堂 × NT${refundPreview.unitPrice}</div>
+                      <div className="pt-1 border-t border-amber-200">
+                        實際退款金額：<strong className="text-red-600 text-base">NT$ {refundPreview.refundAmount.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">載入退款預覽中…</div>
+                  )}
+                  <div className="text-xs text-muted-foreground">退款後該訂單剩餘堂數將全數歸零，此操作無法還原。</div>
+                </div>
+              ) : <span />}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2985,21 +3008,24 @@ function CreditPackagesSection() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<CreditPackage | null>(null);
-  const [form, setForm] = useState({ name: "", credits: 0, bonusCredits: 0, price: 0, expiryDays: null as number | null, description: "", isActive: true, sortOrder: 0 });
+  const [form, setForm] = useState({ name: "", credits: 0, bonusCredits: 0, bonusExpiryDays: null as number | null, price: 0, expiryDays: null as number | null, description: "", isActive: true, sortOrder: 0 });
+  const [priceTouched, setPriceTouched] = useState(false);
 
   const { data: packages = [], isLoading } = useQuery<CreditPackage[]>({
     queryKey: ["/api/admin/credit-packages"],
   });
 
   const resetForm = () => {
-    setForm({ name: "", credits: 0, bonusCredits: 0, price: 0, expiryDays: null, description: "", isActive: true, sortOrder: 0 });
+    setForm({ name: "", credits: 0, bonusCredits: 0, bonusExpiryDays: null, price: 0, expiryDays: null, description: "", isActive: true, sortOrder: 0 });
+    setPriceTouched(false);
     setEditing(null);
   };
 
   const openAdd = () => { resetForm(); setShowDialog(true); };
   const openEdit = (pkg: CreditPackage) => {
     setEditing(pkg);
-    setForm({ name: pkg.name, credits: pkg.credits, bonusCredits: pkg.bonusCredits || 0, price: pkg.price, expiryDays: pkg.expiryDays, description: pkg.description || "", isActive: pkg.isActive, sortOrder: pkg.sortOrder });
+    setForm({ name: pkg.name, credits: pkg.credits, bonusCredits: pkg.bonusCredits || 0, bonusExpiryDays: (pkg as any).bonusExpiryDays ?? null, price: pkg.price, expiryDays: pkg.expiryDays, description: pkg.description || "", isActive: pkg.isActive, sortOrder: pkg.sortOrder });
+    setPriceTouched(true);
     setShowDialog(true);
   };
 
@@ -3076,21 +3102,33 @@ function CreditPackagesSection() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>堂數 *</Label>
-                <Input type="number" min="1" value={form.credits || ""} onChange={(e) => setForm({ ...form, credits: parseInt(e.target.value) || 0 })} data-testid="input-package-credits" />
+                <Label>付費堂數 *</Label>
+                <Input type="number" min="1" value={form.credits || ""} onChange={(e) => {
+                  const c = parseInt(e.target.value) || 0;
+                  setForm(prev => ({ ...prev, credits: c, price: priceTouched ? prev.price : c * 750 }));
+                }} data-testid="input-package-credits" />
+                <p className="text-[10px] text-muted-foreground mt-1">每堂預設 NT$ 750</p>
               </div>
               <div>
                 <Label>贈送堂數（買X送Y）</Label>
                 <Input type="number" min="0" value={form.bonusCredits || ""} onChange={(e) => setForm({ ...form, bonusCredits: parseInt(e.target.value) || 0 })} placeholder="0" data-testid="input-package-bonus-credits" />
               </div>
             </div>
-            <div>
-              <Label>定價 (TWD) *</Label>
-              <Input type="number" min="0" value={form.price || ""} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} data-testid="input-package-price" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>定價 (TWD) *</Label>
+                <Input type="number" min="0" value={form.price || ""} onChange={(e) => { setPriceTouched(true); setForm({ ...form, price: parseInt(e.target.value) || 0 }); }} data-testid="input-package-price" />
+                <p className="text-[10px] text-muted-foreground mt-1">預設 = 付費堂數 × 750；可自行覆寫</p>
+              </div>
+              <div>
+                <Label>付費堂有效天數（空白=永不過期）</Label>
+                <Input type="number" min="1" value={form.expiryDays ?? ""} onChange={(e) => setForm({ ...form, expiryDays: e.target.value ? parseInt(e.target.value) : null })} placeholder="例：180" data-testid="input-package-expiry" />
+              </div>
             </div>
             <div>
-              <Label>有效天數（空白=永不過期）</Label>
-              <Input type="number" min="1" value={form.expiryDays ?? ""} onChange={(e) => setForm({ ...form, expiryDays: e.target.value ? parseInt(e.target.value) : null })} placeholder="例：180" data-testid="input-package-expiry" />
+              <Label>贈送堂有效天數（空白=與付費堂相同）</Label>
+              <Input type="number" min="1" value={form.bonusExpiryDays ?? ""} onChange={(e) => setForm({ ...form, bonusExpiryDays: e.target.value ? parseInt(e.target.value) : null })} placeholder="例：60" data-testid="input-package-bonus-expiry" disabled={!form.bonusCredits} />
+              <p className="text-[10px] text-muted-foreground mt-1">贈送堂可設較短到期日；過期後自動失效且不影響退款計算</p>
             </div>
             <div>
               <Label>說明</Label>

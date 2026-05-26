@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, CREDIT_REFUND_UNIT_PRICE } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken, buildCoachNewBookingFlex, buildCoachCancelFlex } from "./line";
@@ -2765,8 +2765,10 @@ export async function registerRoutes(
       const franchiseName = franchise?.name || `分校 #${req.franchiseId}`;
       const adminName = [req.currentUser.lastName, req.currentUser.firstName].filter(Boolean).join("") || req.currentUser.username || "分校主任";
 
-      let creditAmount = credits;
+      let paidCredits = credits;
+      let bonusCredits = 0;
       let expiresAt: Date | null = null;
+      let bonusExpiresAt: Date | null = null;
       let finalAmount = 0;
       let pkgId = packageId || null;
 
@@ -2774,14 +2776,18 @@ export async function registerRoutes(
         const packages = await storage.getCreditPackages();
         const pkg = packages.find(p => p.id === packageId);
         if (!pkg) return res.status(400).json({ message: "方案不存在" });
-        creditAmount = pkg.credits + (pkg.bonusCredits || 0);
+        paidCredits = pkg.credits;
+        bonusCredits = pkg.bonusCredits || 0;
         finalAmount = pkg.price;
-        if (pkg.expiryDays) {
-          expiresAt = new Date(Date.now() + pkg.expiryDays * 24 * 60 * 60 * 1000);
+        if (pkg.expiryDays) expiresAt = new Date(Date.now() + pkg.expiryDays * 86400 * 1000);
+        if (bonusCredits > 0) {
+          bonusExpiresAt = pkg.bonusExpiryDays
+            ? new Date(Date.now() + pkg.bonusExpiryDays * 86400 * 1000)
+            : expiresAt;
         }
       }
 
-      if (!creditAmount || creditAmount <= 0) return res.status(400).json({ message: "堂數必須大於 0" });
+      if (!paidCredits || paidCredits <= 0) return res.status(400).json({ message: "堂數必須大於 0" });
 
       const baseDesc = description?.trim() || "分校主任手動加點";
       const fullDesc = `${baseDesc}｜${franchiseName} · ${adminName}`;
@@ -2789,7 +2795,7 @@ export async function registerRoutes(
       const purchase = await storage.createCreditPurchase({
         parentId,
         packageId: pkgId,
-        credits: creditAmount,
+        credits: paidCredits,
         originalAmount: finalAmount,
         discountAmount: 0,
         finalAmount,
@@ -2798,16 +2804,27 @@ export async function registerRoutes(
         expiresAt,
       });
 
-      const balance = await storage.addCredits(parentId, purchase.id, creditAmount, expiresAt);
-
+      const balance = await storage.addCredits(parentId, purchase.id, paidCredits, expiresAt, "paid");
       await storage.createCreditTransaction({
         parentId,
         type: "franchise_admin_adjust",
-        credits: creditAmount,
+        credits: paidCredits,
         balanceId: balance.id,
         purchaseId: purchase.id,
-        description: fullDesc,
+        description: `${fullDesc}（付費 ${paidCredits} 堂）`,
       });
+
+      if (bonusCredits > 0) {
+        const bonusBalance = await storage.addCredits(parentId, purchase.id, bonusCredits, bonusExpiresAt, "bonus");
+        await storage.createCreditTransaction({
+          parentId,
+          type: "franchise_admin_adjust",
+          credits: bonusCredits,
+          balanceId: bonusBalance.id,
+          purchaseId: purchase.id,
+          description: `${fullDesc}（加贈 ${bonusCredits} 堂${bonusExpiresAt ? `，${bonusExpiresAt.toLocaleDateString("zh-TW")} 到期` : ""}）`,
+        });
+      }
 
       const newBalance = await storage.getParentBalance(parentId);
       res.json({ success: true, purchase, newBalance });
@@ -3753,9 +3770,20 @@ export async function registerRoutes(
 
   app.post("/api/admin/credit-packages", isAdmin, async (req: any, res) => {
     try {
-      const { name, credits, bonusCredits, price, expiryDays, description, isActive, sortOrder } = req.body;
-      if (!name || !credits || !price) return res.status(400).json({ message: "請填寫方案名稱、堂數和定價" });
-      const pkg = await storage.createCreditPackage({ name, credits, bonusCredits: bonusCredits || 0, price, expiryDays: expiryDays || null, description: description || null, isActive: isActive !== false, sortOrder: sortOrder || 0 });
+      const { name, credits, bonusCredits, bonusExpiryDays, price, expiryDays, description, isActive, sortOrder } = req.body;
+      if (!name || !credits) return res.status(400).json({ message: "請填寫方案名稱與堂數" });
+      const finalPrice = price && price > 0 ? price : credits * CREDIT_REFUND_UNIT_PRICE;
+      const pkg = await storage.createCreditPackage({
+        name,
+        credits,
+        bonusCredits: bonusCredits || 0,
+        bonusExpiryDays: bonusExpiryDays || null,
+        price: finalPrice,
+        expiryDays: expiryDays || null,
+        description: description || null,
+        isActive: isActive !== false,
+        sortOrder: sortOrder || 0,
+      });
       res.json(pkg);
     } catch (error) {
       res.status(500).json({ message: "建立堂數方案失敗" });
@@ -3765,7 +3793,13 @@ export async function registerRoutes(
   app.patch("/api/admin/credit-packages/:id", isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const pkg = await storage.updateCreditPackage(id, req.body);
+      const data: any = { ...req.body };
+      if (data.bonusExpiryDays === undefined) {
+        // 保留現值，不主動清空
+      } else if (!data.bonusExpiryDays) {
+        data.bonusExpiryDays = null;
+      }
+      const pkg = await storage.updateCreditPackage(id, data);
       res.json(pkg);
     } catch (error) {
       res.status(500).json({ message: "更新堂數方案失敗" });
@@ -3852,8 +3886,10 @@ export async function registerRoutes(
       const { parentId, packageId, credits, description } = req.body;
       if (!parentId) return res.status(400).json({ message: "請選擇家長" });
 
-      let creditAmount = credits;
+      let paidCredits = credits;
+      let bonusCredits = 0;
       let expiresAt: Date | null = null;
+      let bonusExpiresAt: Date | null = null;
       let finalAmount = 0;
       let pkgId = packageId || null;
 
@@ -3861,19 +3897,25 @@ export async function registerRoutes(
         const packages = await storage.getCreditPackages();
         const pkg = packages.find(p => p.id === packageId);
         if (!pkg) return res.status(400).json({ message: "方案不存在" });
-        creditAmount = pkg.credits + (pkg.bonusCredits || 0);
+        paidCredits = pkg.credits;
+        bonusCredits = pkg.bonusCredits || 0;
         finalAmount = pkg.price;
-        if (pkg.expiryDays) {
-          expiresAt = new Date(Date.now() + pkg.expiryDays * 24 * 60 * 60 * 1000);
+        if (pkg.expiryDays) expiresAt = new Date(Date.now() + pkg.expiryDays * 86400 * 1000);
+        if (bonusCredits > 0) {
+          bonusExpiresAt = pkg.bonusExpiryDays
+            ? new Date(Date.now() + pkg.bonusExpiryDays * 86400 * 1000)
+            : expiresAt;
         }
       }
 
-      if (!creditAmount || creditAmount <= 0) return res.status(400).json({ message: "堂數必須大於 0" });
+      if (!paidCredits || paidCredits <= 0) return res.status(400).json({ message: "堂數必須大於 0" });
+
+      const baseDesc = description?.trim() || "總部手動加點";
 
       const purchase = await storage.createCreditPurchase({
         parentId,
         packageId: pkgId,
-        credits: creditAmount,
+        credits: paidCredits,
         originalAmount: finalAmount,
         discountAmount: 0,
         finalAmount,
@@ -3882,16 +3924,27 @@ export async function registerRoutes(
         expiresAt,
       });
 
-      const balance = await storage.addCredits(parentId, purchase.id, creditAmount, expiresAt);
-
+      const balance = await storage.addCredits(parentId, purchase.id, paidCredits, expiresAt, "paid");
       await storage.createCreditTransaction({
         parentId,
         type: "admin_adjust",
-        credits: creditAmount,
+        credits: paidCredits,
         balanceId: balance.id,
         purchaseId: purchase.id,
-        description: description || "總部手動加點",
+        description: `${baseDesc}（付費 ${paidCredits} 堂）`,
       });
+
+      if (bonusCredits > 0) {
+        const bonusBalance = await storage.addCredits(parentId, purchase.id, bonusCredits, bonusExpiresAt, "bonus");
+        await storage.createCreditTransaction({
+          parentId,
+          type: "admin_adjust",
+          credits: bonusCredits,
+          balanceId: bonusBalance.id,
+          purchaseId: purchase.id,
+          description: `${baseDesc}（加贈 ${bonusCredits} 堂${bonusExpiresAt ? `，${bonusExpiresAt.toLocaleDateString("zh-TW")} 到期` : ""}）`,
+        });
+      }
 
       const newBalance = await storage.getParentBalance(parentId);
       res.json({ success: true, purchase, newBalance });
@@ -3940,6 +3993,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/ecpay-refund-preview/:purchaseId", isAdmin, async (req: any, res) => {
+    try {
+      const purchaseId = parseInt(req.params.purchaseId);
+      if (isNaN(purchaseId)) return res.status(400).json({ message: "無效的付款 ID" });
+      const preview = await storage.computeRefundPreview(purchaseId);
+      if (!preview) return res.status(404).json({ message: "找不到付款資訊" });
+      res.json({ ...preview, unitPrice: CREDIT_REFUND_UNIT_PRICE });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "取得退款預覽失敗" });
+    }
+  });
+
   app.post("/api/admin/ecpay-refund/:purchaseId", isAdmin, async (req: any, res) => {
     try {
       const purchaseId = parseInt(req.params.purchaseId);
@@ -3955,34 +4020,50 @@ export async function registerRoutes(
         return res.status(400).json({ message: "此訂單缺少綠界內部訂單號（可能為舊訂單或未完成收款），無法發起綠界退款。請聯絡技術人員處理。" });
       }
 
-      const doActionParams: Record<string, string> = {
-        MerchantID: ECPAY_MERCHANT_ID,
-        MerchantTradeNo: purchase.ecpayTradeNo,
-        TradeNo: purchase.ecpayInternalTradeNo,
-        Action: "R",
-        TotalAmount: String(purchase.finalAmount),
-      };
-      doActionParams.CheckMacValue = computeCheckMacValue(doActionParams);
+      const preview = await storage.computeRefundPreview(purchaseId);
+      if (!preview) return res.status(404).json({ message: "找不到付款資訊" });
 
-      const ecpayDoActionUrl = ECPAY_IS_SANDBOX
-        ? "https://payment-stage.ecpay.com.tw/CreditDetail/DoAction"
-        : "https://payment.ecpay.com.tw/CreditDetail/DoAction";
-      const formBody = new URLSearchParams(doActionParams).toString();
-      const ecpayRes = await fetch(ecpayDoActionUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formBody,
-      });
-      const ecpayText = await ecpayRes.text();
-      console.log("[ecpay-refund] DoAction response:", ecpayText);
+      // 若可退款金額 > 0，呼叫綠界 DoAction；金額為 0 時跳過 ECPay 呼叫，
+      // 但仍需執行 refundEcpayPurchase 以歸零剩餘（含贈送）堂數，防止濫用。
+      if (preview.refundAmount > 0) {
+        const doActionParams: Record<string, string> = {
+          MerchantID: ECPAY_MERCHANT_ID,
+          MerchantTradeNo: purchase.ecpayTradeNo,
+          TradeNo: purchase.ecpayInternalTradeNo,
+          Action: "R",
+          TotalAmount: String(preview.refundAmount),
+        };
+        doActionParams.CheckMacValue = computeCheckMacValue(doActionParams);
 
-      const [rtnCode, rtnMsg] = ecpayText.split("|");
-      if (rtnCode !== "1") {
-        return res.status(502).json({ message: `綠界退款失敗：${rtnMsg || ecpayText}` });
+        const ecpayDoActionUrl = ECPAY_IS_SANDBOX
+          ? "https://payment-stage.ecpay.com.tw/CreditDetail/DoAction"
+          : "https://payment.ecpay.com.tw/CreditDetail/DoAction";
+        const formBody = new URLSearchParams(doActionParams).toString();
+        const ecpayRes = await fetch(ecpayDoActionUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formBody,
+        });
+        const ecpayText = await ecpayRes.text();
+        console.log("[ecpay-refund] DoAction response:", ecpayText);
+
+        const [rtnCode, rtnMsg] = ecpayText.split("|");
+        if (rtnCode !== "1") {
+          return res.status(502).json({ message: `綠界退款失敗：${rtnMsg || ecpayText}` });
+        }
+      } else {
+        console.log(`[ecpay-refund] purchase ${purchaseId} 計算可退款金額為 0（付費 ${preview.paidCredits} / 已用 ${preview.usedCredits}），跳過綠界呼叫，僅歸零剩餘堂數`);
       }
 
       const result = await storage.refundEcpayPurchase(purchaseId);
-      res.json({ message: "退款成功", creditsDeducted: result.creditsDeducted, purchase: result.purchase });
+      res.json({
+        message: `退款成功，已退 NT$${result.refundAmount}`,
+        refundAmount: result.refundAmount,
+        paidCredits: result.paidCredits,
+        usedCredits: result.usedCredits,
+        creditsDeducted: result.creditsDeducted,
+        purchase: result.purchase,
+      });
     } catch (error: any) {
       console.error("[ecpay-refund] error:", error);
       res.status(500).json({ message: error.message || "退款失敗" });
@@ -4491,7 +4572,7 @@ export async function registerRoutes(
       const purchase = await storage.createCreditPurchase({
         parentId,
         packageId: pkg.id,
-        credits: pkg.credits + (pkg.bonusCredits || 0),
+        credits: pkg.credits,
         originalAmount,
         discountAmount,
         finalAmount,

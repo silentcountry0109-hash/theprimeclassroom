@@ -1106,24 +1106,33 @@ function CreditsTab() {
           <div className="mt-3 pt-3 border-t border-tiffany/10">
             <p className="text-xs text-muted-foreground mb-2">各筆餘額明細</p>
             <div className="space-y-1">
-              {balances.filter(b => b.remainingCredits > 0).map((b) => (
-                <div key={b.id} className="flex items-center justify-between text-xs" data-testid={`balance-detail-${b.id}`}>
-                  <span className="text-muted-foreground">
-                    {b.createdAt ? new Date(b.createdAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric" }) : ""} 購入
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-foreground font-medium">{b.remainingCredits}/{b.originalCredits} 堂</span>
-                    {b.expiresAt ? (
-                      <span className="text-muted-foreground">
-                        {new Date(b.expiresAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })} 到期
+              {balances.filter(b => b.remainingCredits > 0).map((b) => {
+                const isBonus = (b as any).creditType === "bonus";
+                return (
+                  <div key={b.id} className="flex items-center justify-between text-xs" data-testid={`balance-detail-${b.id}`}>
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      {b.createdAt ? new Date(b.createdAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric" }) : ""} 購入
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isBonus ? "bg-coral/10 text-coral" : "bg-tiffany/10 text-tiffany"}`}>
+                        {isBonus ? "贈送" : "付費"}
                       </span>
-                    ) : (
-                      <span className="text-tiffany">永不到期</span>
-                    )}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-foreground font-medium">{b.remainingCredits}/{b.originalCredits} 堂</span>
+                      {b.expiresAt ? (
+                        <span className="text-muted-foreground">
+                          {new Date(b.expiresAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })} 到期
+                        </span>
+                      ) : (
+                        <span className="text-tiffany">永不到期</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+            <p className="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-tiffany/10" data-testid="text-refund-rule">
+              退費規則：可退款金額 = max(0, 付費堂數 − 已使用總堂數) × NT$750；贈送堂過期後自動失效且不影響此計算。
+            </p>
           </div>
         )}
       </div>

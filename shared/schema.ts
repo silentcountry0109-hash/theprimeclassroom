@@ -294,6 +294,7 @@ export const creditPackages = pgTable("credit_packages", {
   name: text("name").notNull(),
   credits: integer("credits").notNull(),
   bonusCredits: integer("bonus_credits").default(0).notNull(),
+  bonusExpiryDays: integer("bonus_expiry_days"),
   price: integer("price").notNull(),
   expiryDays: integer("expiry_days"),
   description: text("description"),
@@ -369,6 +370,7 @@ export const creditBalances = pgTable("credit_balances", {
   purchaseId: integer("purchase_id").references(() => creditPurchases.id),
   originalCredits: integer("original_credits").notNull(),
   remainingCredits: integer("remaining_credits").notNull(),
+  creditType: text("credit_type").default("paid").notNull(),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
