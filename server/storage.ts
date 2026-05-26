@@ -6,6 +6,11 @@ import {
   textbooks, textbookQuizzes, textbookFiles,
   curriculumUnits, curriculumFiles, curriculumMidtermExams,
   coachReminderLogs,
+  systemSettings,
+  REGISTRATION_GIFT_SETTING_KEY,
+  DEFAULT_REGISTRATION_GIFT_SETTING,
+  registrationGiftSettingSchema,
+  type RegistrationGiftSetting,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach,
@@ -300,6 +305,9 @@ export interface IStorage {
   getCurriculumMidtermExam(id: number): Promise<CurriculumMidtermExam | undefined>;
   createCurriculumMidtermExam(data: InsertCurriculumMidtermExam): Promise<CurriculumMidtermExam>;
   deleteCurriculumMidtermExam(id: number): Promise<void>;
+
+  getRegistrationGiftSetting(): Promise<RegistrationGiftSetting>;
+  setRegistrationGiftSetting(value: RegistrationGiftSetting): Promise<RegistrationGiftSetting>;
 
   hasCoachReminderLog(coachId: number, date: string, type: string): Promise<boolean>;
   createCoachReminderLog(coachId: number, date: string, type: string): Promise<void>;
@@ -3286,6 +3294,24 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoNothing();
   }
 
+  async getRegistrationGiftSetting(): Promise<RegistrationGiftSetting> {
+    const [row] = await db.select().from(systemSettings).where(eq(systemSettings.key, REGISTRATION_GIFT_SETTING_KEY));
+    if (!row) return { ...DEFAULT_REGISTRATION_GIFT_SETTING };
+    const parsed = registrationGiftSettingSchema.safeParse(row.value);
+    return parsed.success ? parsed.data : { ...DEFAULT_REGISTRATION_GIFT_SETTING };
+  }
+
+  async setRegistrationGiftSetting(value: RegistrationGiftSetting): Promise<RegistrationGiftSetting> {
+    const validated = registrationGiftSettingSchema.parse(value);
+    await db.insert(systemSettings)
+      .values({ key: REGISTRATION_GIFT_SETTING_KEY, value: validated })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: { value: validated, updatedAt: new Date() },
+      });
+    return validated;
+  }
+
   async deleteOldCoachReminderLogs(beforeDate: string): Promise<number> {
     const result = await db
       .delete(coachReminderLogs)
@@ -3298,6 +3324,20 @@ export class DatabaseStorage implements IStorage {
 export const storage = new DatabaseStorage();
 
 (async () => {
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS system_settings (
+      id SERIAL PRIMARY KEY,
+      key TEXT NOT NULL UNIQUE,
+      value JSONB NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+    await db.execute(sql`INSERT INTO system_settings (key, value)
+      VALUES (${REGISTRATION_GIFT_SETTING_KEY}, ${JSON.stringify(DEFAULT_REGISTRATION_GIFT_SETTING)}::jsonb)
+      ON CONFLICT (key) DO NOTHING`);
+  } catch (e) {
+    console.error("Failed to bootstrap system_settings:", e);
+  }
+
   try {
     const allChildren = await db.select().from(children);
 

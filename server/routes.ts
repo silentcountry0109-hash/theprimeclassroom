@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import twilio from "twilio";
 import { users } from "@shared/models/auth";
-import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema } from "@shared/schema";
+import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema, registrationGiftSettingSchema } from "@shared/schema";
 import { eq, and, or, isNotNull, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -368,28 +368,38 @@ const isCoach: RequestHandler = async (req: any, res, next) => {
   next();
 };
 
-/** 以 transaction 原子性地贈送 2 堂免費體驗堂數（冪等：已有記錄則跳過） */
+/** 以 transaction 原子性地依總部設定贈送免費體驗堂數（冪等：已有記錄則跳過） */
 async function grantFreeTrialIfNeeded(parentId: string): Promise<void> {
+  const setting = await storage.getRegistrationGiftSetting();
+  if (!setting.enabled || setting.credits <= 0) {
+    console.log(`[LINE Register] 註冊贈送已關閉或堂數為 0，略過 ${parentId}`);
+    return;
+  }
   const [existing] = await db.select({ id: creditBalances.id }).from(creditBalances).where(eq(creditBalances.parentId, parentId));
   if (existing) return;
+  const credits = setting.credits;
+  const expiresAt = setting.expiryDays
+    ? new Date(Date.now() + setting.expiryDays * 24 * 60 * 60 * 1000)
+    : null;
   await db.transaction(async (tx) => {
     const [freePurchase] = await tx.insert(creditPurchases).values({
       parentId,
-      credits: 2,
+      credits,
       originalAmount: 0,
       discountAmount: 0,
       finalAmount: 0,
       paymentMethod: "free_trial",
       paymentStatus: "completed",
+      expiresAt,
     }).returning();
     await tx.insert(creditBalances).values({
       parentId,
       purchaseId: freePurchase.id,
-      originalCredits: 2,
-      remainingCredits: 2,
-      expiresAt: null,
+      originalCredits: credits,
+      remainingCredits: credits,
+      expiresAt,
     });
-    console.log(`[LINE Register] 已贈送 2 堂免費體驗給 ${parentId}`);
+    console.log(`[LINE Register] 已贈送 ${credits} 堂免費體驗給 ${parentId}（到期日：${expiresAt?.toISOString() ?? "永久"}）`);
   });
 }
 
@@ -3866,6 +3876,28 @@ export async function registerRoutes(
       res.json(pkg);
     } catch (error) {
       res.status(500).json({ message: "更新堂數方案失敗" });
+    }
+  });
+
+  app.get("/api/admin/settings/registration-gift", isAdmin, async (_req: any, res) => {
+    try {
+      const setting = await storage.getRegistrationGiftSetting();
+      res.json(setting);
+    } catch (error) {
+      res.status(500).json({ message: "取得註冊贈送設定失敗" });
+    }
+  });
+
+  app.put("/api/admin/settings/registration-gift", isAdmin, async (req: any, res) => {
+    try {
+      const parsed = registrationGiftSettingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "設定格式錯誤", errors: parsed.error.flatten() });
+      }
+      const setting = await storage.setRegistrationGiftSetting(parsed.data);
+      res.json(setting);
+    } catch (error) {
+      res.status(500).json({ message: "更新註冊贈送設定失敗" });
     }
   });
 

@@ -483,6 +483,32 @@ export type InsertCurriculumFile = z.infer<typeof insertCurriculumFileSchema>;
 export type CurriculumMidtermExam = typeof curriculumMidtermExams.$inferSelect;
 export type InsertCurriculumMidtermExam = z.infer<typeof insertCurriculumMidtermExamSchema>;
 
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
+
+export const REGISTRATION_GIFT_SETTING_KEY = "registration_gift";
+
+export const registrationGiftSettingSchema = z.object({
+  enabled: z.boolean(),
+  credits: z.number().int().min(0),
+  expiryDays: z.number().int().positive().nullable(),
+});
+export type RegistrationGiftSetting = z.infer<typeof registrationGiftSettingSchema>;
+
+export const DEFAULT_REGISTRATION_GIFT_SETTING: RegistrationGiftSetting = {
+  enabled: true,
+  credits: 2,
+  expiryDays: null,
+};
+
 export const coachReminderLogs = pgTable("coach_reminder_logs", {
   id: serial("id").primaryKey(),
   coachId: integer("coach_id").notNull(),

@@ -99,7 +99,7 @@ import {
   UserX,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode } from "@shared/schema";
+import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode, RegistrationGiftSetting } from "@shared/schema";
 import { Search as SearchIcon } from "lucide-react";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS } from "@shared/constants";
@@ -2739,7 +2739,12 @@ function CreditsManagementTab() {
         ))}
       </div>
 
-      {subTab === "packages" && <CreditPackagesSection />}
+      {subTab === "packages" && (
+        <div className="space-y-6">
+          <RegistrationGiftSection />
+          <CreditPackagesSection />
+        </div>
+      )}
       {subTab === "promotions" && <PromotionsSection />}
       {subTab === "coupons" && <CouponsSection />}
       {subTab === "wallets" && <ParentWalletsSection />}
@@ -3001,6 +3006,122 @@ function EcpayPurchasesSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function RegistrationGiftSection() {
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery<RegistrationGiftSetting>({
+    queryKey: ["/api/admin/settings/registration-gift"],
+  });
+
+  const [enabled, setEnabled] = useState(true);
+  const [credits, setCredits] = useState<number>(2);
+  const [expiryDays, setExpiryDays] = useState<string>("");
+
+  useEffect(() => {
+    if (data) {
+      setEnabled(data.enabled);
+      setCredits(data.credits);
+      setExpiryDays(data.expiryDays == null ? "" : String(data.expiryDays));
+    }
+  }, [data]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload: RegistrationGiftSetting = {
+        enabled,
+        credits: Number.isFinite(credits) ? Math.max(0, Math.floor(credits)) : 0,
+        expiryDays: expiryDays.trim() === "" ? null : Math.max(1, Math.floor(Number(expiryDays))),
+      };
+      const res = await apiRequest("PUT", "/api/admin/settings/registration-gift", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "註冊贈送設定已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/registration-gift"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "儲存失敗", description: err?.message ?? "請稍後再試", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="bg-white rounded-md border border-gray-100 p-5" data-testid="card-registration-gift">
+      <div className="flex items-center gap-2 mb-1">
+        <Gift className="w-4 h-4 text-coral" />
+        <h2 className="text-base font-semibold text-foreground" data-testid="text-registration-gift-title">
+          註冊贈送設定
+        </h2>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">
+        家長完成 LINE 手機驗證後，依此設定自動贈送免費體驗堂數。已領取過的家長不受影響。
+      </p>
+
+      {isLoading ? (
+        <Skeleton className="h-32" />
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="switch-registration-gift-enabled" className="text-sm font-medium">啟用註冊贈送</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">關閉後，新註冊家長不會自動取得免費堂數</p>
+            </div>
+            <Switch
+              id="switch-registration-gift-enabled"
+              checked={enabled}
+              onCheckedChange={setEnabled}
+              data-testid="switch-registration-gift-enabled"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="input-registration-gift-credits" className="text-sm font-medium">贈送堂數</Label>
+            <Input
+              id="input-registration-gift-credits"
+              type="number"
+              min={0}
+              step={1}
+              value={credits}
+              disabled={!enabled}
+              onChange={(e) => setCredits(parseInt(e.target.value, 10) || 0)}
+              className="mt-1.5 max-w-[160px]"
+              data-testid="input-registration-gift-credits"
+            />
+            <p className="text-xs text-muted-foreground mt-1">設為 0 等同關閉註冊贈送</p>
+          </div>
+
+          <div>
+            <Label htmlFor="input-registration-gift-expiry" className="text-sm font-medium">有效期限（天數）</Label>
+            <Input
+              id="input-registration-gift-expiry"
+              type="number"
+              min={1}
+              step={1}
+              placeholder="留空代表永久不過期"
+              value={expiryDays}
+              disabled={!enabled}
+              onChange={(e) => setExpiryDays(e.target.value)}
+              className="mt-1.5 max-w-[200px]"
+              data-testid="input-registration-gift-expiry-days"
+            />
+            <p className="text-xs text-muted-foreground mt-1">自家長領取當下起算</p>
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              className="rounded-full"
+              data-testid="button-save-registration-gift"
+            >
+              <Save className="w-4 h-4 mr-1.5" />
+              {saveMutation.isPending ? "儲存中…" : "儲存設定"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
