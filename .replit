@@ -84,6 +84,9 @@ ECPAY_IS_SANDBOX = "true"
 VITE_LINE_OA_URL = "https://line.me/R/ti/p/@643apwlp"
 LINE_MESSAGING_CHANNEL_ID = "2009852161"
 
+[userenv.production]
+APP_BASE_URL = "https://www.theprimeclassroom.com"
+
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000

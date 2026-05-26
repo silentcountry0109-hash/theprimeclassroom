@@ -650,7 +650,8 @@ export async function registerRoutes(
       return res.redirect("/parent-login?error=line_not_configured");
     }
     const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-    const redirectUri = `${protocol}://${req.hostname}/api/auth/line/callback`;
+    const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || `${protocol}://${req.hostname}`;
+    const redirectUri = `${baseUrl}/api/auth/line/callback`;
     const state = Math.random().toString(36).slice(2);
     req.session.lineOAuthState = state;
     req.session.save(() => {
@@ -679,7 +680,8 @@ export async function registerRoutes(
       const channelId = process.env.LINE_CHANNEL_ID!;
       const channelSecret = process.env.LINE_CHANNEL_SECRET!;
       const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-      const redirectUri = `${protocol}://${req.hostname}/api/auth/line/callback`;
+      const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || `${protocol}://${req.hostname}`;
+      const redirectUri = `${baseUrl}/api/auth/line/callback`;
 
       const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
         method: "POST",
