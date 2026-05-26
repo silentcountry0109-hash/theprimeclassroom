@@ -15,17 +15,17 @@ export function PreviewAdminCancelNoIp() {
           <div className="bubble-row">
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #C97B7B 0%, #8B3A3A 100%)', padding: '14px 14px' }}>
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #90A4AE 0%, #546E7A 100%)', padding: '14px 14px' }}>
                 <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
-                  <div className="ip-speech-title" style={{ color: '#8B3A3A', fontSize: 14 }}>❌ 課程已被教室取消</div>
-                  <div className="ip-speech-sub" style={{ color: '#C97B7B', fontSize: 11 }}>點數已退回</div>
+                  <div className="ip-speech-title" style={{ color: '#546E7A', fontSize: 14 }}>❌ 課程已被教室取消</div>
+                  <div className="ip-speech-sub" style={{ color: '#78909C', fontSize: 11 }}>點數已退回，請聯繫分校</div>
                 </div>
               </div>
 
               <div className="card-body">
                 <div className="info-row">
                   <span className="info-label">孩子</span>
-                  <span className="info-value" style={{ fontWeight: 700, color: '#8B3A3A' }}>陳小明</span>
+                  <span className="info-value" style={{ fontWeight: 700, color: '#546E7A' }}>陳小明</span>
                 </div>
                 <div className="divider" />
                 <div className="info-row">
@@ -46,13 +46,13 @@ export function PreviewAdminCancelNoIp() {
                   </span>
                 </div>
                 <div className="divider" />
-                <div style={{ fontSize: 11, color: '#888', lineHeight: 1.6, background: '#FFF5F5', borderRadius: 8, padding: '6px 10px' }}>
+                <div style={{ fontSize: 11, color: '#666', lineHeight: 1.6, background: '#F5F7F8', borderRadius: 8, padding: '6px 10px' }}>
                   📞 如有疑問請聯繫分校：02-2345-6789
                 </div>
               </div>
 
               <div className="card-footer">
-                <button className="cta-btn" style={{ background: '#C97B7B', color: 'white' }}>
+                <button className="cta-btn" style={{ background: '#78909C', color: 'white' }}>
                   重新預約課程 →
                 </button>
               </div>
