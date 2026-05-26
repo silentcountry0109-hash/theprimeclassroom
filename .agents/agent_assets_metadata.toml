@@ -1,5 +1,70 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "1llwHPjhzX4r_bobuyQs4"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-hands-together.png"
+type = "image"
+title = "mascot hands-together"
+
+[[generated]]
+id = "ZZcmWNDMDfgpKPXfBZ96G"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-warning-sign.png"
+type = "image"
+title = "mascot warning-sign"
+
+[[generated]]
+id = "F5aoSh-n0_IetKUPmzJ_D"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-empty-wallet.png"
+type = "image"
+title = "mascot empty-wallet"
+
+[[generated]]
+id = "Sk5sNoCgJ-Naw_eXTwDlW"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-handshake.png"
+type = "image"
+title = "mascot handshake"
+
+[[generated]]
+id = "6osK87XPkiQFjRbCE1suN"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-waving.png"
+type = "image"
+title = "mascot waving"
+
+[[generated]]
+id = "58uMntKTD6u0qA1Hl0im8"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-thumbs-up.png"
+type = "image"
+title = "mascot thumbs-up"
+
+[[generated]]
+id = "pMBM_jn7JtfMwIcDJWFsr"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-holding-books.png"
+type = "image"
+title = "mascot holding-books"
+
+[[generated]]
+id = "iyh3vt2DmeN1hZyIGN48x"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-salute.png"
+type = "image"
+title = "mascot salute"
+
+[[generated]]
+id = "plbpULxXKBfoFhSZG0MG5"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-pointing-clock.png"
+type = "image"
+title = "mascot pointing-clock"
+
+[[generated]]
+id = "croU4F7pDjnWtVeraSWzT"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-writing-notebook.png"
+type = "image"
+title = "mascot writing-notebook"
+
+[[generated]]
+id = "Meu-kCyv1SrNFVJgkMsOm"
+uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-bowing.png"
+type = "image"
+title = "mascot bowing"
 
 [[outputs]]
 id = "0fac_NhxDsnWTwJqmw1kQ"
