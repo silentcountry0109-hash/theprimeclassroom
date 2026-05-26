@@ -1460,24 +1460,41 @@ export async function registerRoutes(
       const slot = await storage.getSlot(slotId);
       if (!slot) return res.status(404).json({ message: "時段不存在" });
 
-      const results: Array<{ weekOffset: number; date: string; slotId: number | null; available: number; alreadyBooked: boolean }> = [];
+      const results: Array<{ weekOffset: number; date: string; slotId: number | null; available: number; alreadyBooked: boolean; coachChanged: boolean; reason: "available" | "full" | "already_booked" | "no_slot" }> = [];
       const baseDate = new Date(slot.date + "T00:00:00");
 
       for (let w = 1; w <= weeks; w++) {
         const futureDate = new Date(baseDate);
         futureDate.setDate(futureDate.getDate() + 7 * w);
         const dateStr = futureDate.toISOString().split("T")[0];
-        const matchingSlot = await storage.findSlot(slot.franchiseId, slot.coachId, dateStr, slot.startTime, slot.endTime);
+        let matchingSlot = await storage.findSlot(slot.franchiseId, slot.coachId, dateStr, slot.startTime, slot.endTime);
+        let coachChanged = false;
+        if (!matchingSlot) {
+          // 回退：同分校、同時段（不限老師），處理老師調動的情境
+          const fallback = await storage.findSlot(slot.franchiseId, null, dateStr, slot.startTime, slot.endTime);
+          if (fallback) {
+            matchingSlot = fallback;
+            coachChanged = fallback.coachId !== slot.coachId;
+          }
+        }
         let alreadyBooked = false;
         if (matchingSlot && childId) {
           alreadyBooked = await storage.hasExistingBooking(matchingSlot.id, childId);
         }
+        const available = matchingSlot ? matchingSlot.maxSeats - matchingSlot.bookedSeats : 0;
+        let reason: "available" | "full" | "already_booked" | "no_slot";
+        if (!matchingSlot) reason = "no_slot";
+        else if (alreadyBooked) reason = "already_booked";
+        else if (available <= 0) reason = "full";
+        else reason = "available";
         results.push({
           weekOffset: w,
           date: dateStr,
           slotId: matchingSlot?.id || null,
-          available: matchingSlot ? matchingSlot.maxSeats - matchingSlot.bookedSeats : 0,
+          available,
           alreadyBooked,
+          coachChanged,
+          reason,
         });
       }
       res.json(results);

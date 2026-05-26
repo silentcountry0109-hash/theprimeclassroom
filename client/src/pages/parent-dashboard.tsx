@@ -1557,6 +1557,8 @@ interface RecurringSlotInfo {
   slotId: number | null;
   available: number;
   alreadyBooked: boolean;
+  coachChanged?: boolean;
+  reason?: "available" | "full" | "already_booked" | "no_slot";
 }
 
 function StepIndicator({ current, steps }: { current: number; steps: { label: string }[] }) {
@@ -1792,8 +1794,26 @@ function BookingFlowTab() {
               setRecurringLoading(false);
               return;
             }
+            const reasonCounts = {
+              no_slot: slots.filter((s) => s.reason === "no_slot").length,
+              full: slots.filter((s) => s.reason === "full").length,
+              already_booked: slots.filter((s) => s.reason === "already_booked").length,
+            };
+            const parts: string[] = [];
+            if (reasonCounts.no_slot > 0) parts.push(`${reasonCounts.no_slot} 週尚未開課`);
+            if (reasonCounts.full > 0) parts.push(`${reasonCounts.full} 週已額滿`);
+            if (reasonCounts.already_booked > 0) parts.push(`${reasonCounts.already_booked} 週已預約`);
+            toast({
+              title: "未來 4 週暫無可連排時段",
+              description: parts.length > 0
+                ? `${parts.join("、")}。請稍後再試或聯繫分校開課。`
+                : "目前未來 4 週尚無可預約的時段，請稍後再試或聯繫分校。",
+            });
+          } else {
+            toast({ title: "無法查詢連排時段", description: "請稍後再試。", variant: "destructive" });
           }
         } catch {
+          toast({ title: "無法查詢連排時段", description: "請稍後再試。", variant: "destructive" });
         }
         setRecurringLoading(false);
       }
@@ -1846,15 +1866,27 @@ function BookingFlowTab() {
     },
     onSuccess: (data: { results: Array<{ slotId: number; success: boolean; message?: string }> }) => {
       const successCount = data.results.filter((r) => r.success).length;
-      const failCount = data.results.filter((r) => !r.success).length;
+      const failResults = data.results.filter((r) => !r.success);
+      const failCount = failResults.length;
+      const failDetail = failResults
+        .map((r) => {
+          const rs = recurringSlots.find((s) => s.slotId === r.slotId);
+          const label = rs ? `第 ${rs.weekOffset} 週（${rs.date.slice(5)}）` : `時段 ${r.slotId}`;
+          return `${label}：${r.message || "預約失敗"}`;
+        })
+        .join("\n");
       if (successCount > 0) {
         toast({
           title: `成功預約 ${successCount} 週課程`,
-          description: failCount > 0 ? `${failCount} 個時段無法預約` : "週期性排課完成",
+          description: failCount > 0 ? `${failCount} 個時段無法預約\n${failDetail}` : "週期性排課完成",
         });
       }
       if (failCount > 0 && successCount === 0) {
-        toast({ title: "預約失敗", description: "所有時段皆無法預約", variant: "destructive" });
+        toast({
+          title: "預約失敗",
+          description: failDetail || "所有時段皆無法預約",
+          variant: "destructive",
+        });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/franchises", selectedFranchiseId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
@@ -2268,6 +2300,9 @@ function BookingFlowTab() {
                         <span className="text-xs text-red-500">已額滿</span>
                       ) : (
                         <span className="text-xs text-tiffany">餘 {rs.available}</span>
+                      )}
+                      {rs.coachChanged && (
+                        <div className="text-[10px] text-amber-600 mt-0.5">老師調動</div>
                       )}
                     </div>
                   </button>
