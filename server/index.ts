@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { sendLineMessage, sendLineFlexMessage, buildCoachDailySummaryFlex } from "./line";
+import { sendLineMessage, sendLineFlexMessage, buildCoachDailySummaryFlex, buildPreClassReminderFlex } from "./line";
 
 const app = express();
 const httpServer = createServer(app);
@@ -217,8 +217,17 @@ app.use((req, res, next) => {
             franchiseName = frRow?.name || "教室";
           }
 
-          const msg = `【質數教室】⏰ 上課提醒\n${childName} 今天 ${row.slotStart}–${row.slotEnd} 有課${coachName ? `\n老師：${coachName}` : ""}\n地點：${franchiseName}\n請準時出席！`;
-          await sendLineMessage(parentRow.lineUserId, msg);
+          const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+          const flex = buildPreClassReminderFlex({
+            childName,
+            date: targetDateStr,
+            time: `${row.slotStart}–${row.slotEnd}`,
+            teacher: coachName || "待確認",
+            location: franchiseName,
+            hoursUntil: 2,
+            bookingUrl: `${appBase}/dashboard?tab=bookings&bookingId=${row.bookingId}`,
+          });
+          await sendLineFlexMessage(parentRow.lineUserId, flex.altText, flex.contents);
           log(`[PreClassReminder] 已提醒 parentId=${row.parentId} bookingId=${row.bookingId}`);
         } catch (e) {
           log(`[PreClassReminder] 提醒失敗 bookingId=${row.bookingId}: ${e}`);

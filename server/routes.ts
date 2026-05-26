@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage, CREDIT_REFUND_UNIT_PRICE } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken, buildCoachNewBookingFlex, buildCoachCancelFlex } from "./line";
+import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken, buildCoachNewBookingFlex, buildCoachCancelFlex, buildLowCreditsFlex, buildNoCreditsFlex, buildTeacherScheduleChangeFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -1365,10 +1365,11 @@ export async function registerRoutes(
 
         // 點數不足提醒
         if (parentUser?.lineUserId && newBalance <= 1) {
-          const warnMsg = newBalance === 0
-            ? `【質數教室】🔴 點數已用完\n請盡快至 App 購買點數，確保課程不中斷。`
-            : `【質數教室】⚠️ 點數提醒\n${childName} 的點數僅剩 1 堂，請盡快購買以免影響課程。`;
-          await sendLineMessage(parentUser.lineUserId, warnMsg);
+          const appBase2 = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+          const creditFlex = newBalance === 0
+            ? buildNoCreditsFlex({ childName, topUpUrl: `${appBase2}/dashboard?tab=shop` })
+            : buildLowCreditsFlex({ childName, remainingCredits: newBalance, topUpUrl: `${appBase2}/dashboard?tab=shop` });
+          await sendLineFlexMessage(parentUser.lineUserId, creditFlex.altText, creditFlex.contents);
         }
 
         // 通知：分校主任
@@ -1493,10 +1494,10 @@ export async function registerRoutes(
             await sendLineFlexMessage(parentUser.lineUserId, recurringFlex.altText, recurringFlex.contents);
 
             if (newBalance <= 1) {
-              const warnMsg = newBalance === 0
-                ? `【質數教室】🔴 點數已用完\n請盡快至 App 購買點數，確保課程不中斷。`
-                : `【質數教室】⚠️ 點數提醒\n${childName} 的點數僅剩 1 堂，請盡快購買以免影響課程。`;
-              await sendLineMessage(parentUser.lineUserId, warnMsg);
+              const creditFlex = newBalance === 0
+                ? buildNoCreditsFlex({ childName, topUpUrl: `${appBase}/dashboard?tab=shop` })
+                : buildLowCreditsFlex({ childName, remainingCredits: newBalance, topUpUrl: `${appBase}/dashboard?tab=shop` });
+              await sendLineFlexMessage(parentUser.lineUserId, creditFlex.altText, creditFlex.contents);
             }
           }
         }
@@ -2536,7 +2537,7 @@ export async function registerRoutes(
     try {
       const slotId = parseInt(req.params.id);
       const franchiseId = req.franchiseId;
-      const { coachId, classroomId } = req.body;
+      const { coachId, classroomId, date, startTime, endTime } = req.body;
 
       if (!coachId) {
         return res.status(400).json({ message: "請指派老師" });
@@ -2551,6 +2552,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "老師不屬於此分校" });
       }
 
+      // 解析調整後的日期/時間（若未提供則沿用原時段）
+      const newDate = typeof date === "string" && date ? date : slot.date;
+      const newStartTime = typeof startTime === "string" && startTime ? startTime : slot.startTime;
+      const newEndTime = typeof endTime === "string" && endTime ? endTime : slot.endTime;
+      const scheduleChanged =
+        newDate !== slot.date || newStartTime !== slot.startTime || newEndTime !== slot.endTime;
+
+      if (scheduleChanged) {
+        if (newStartTime >= newEndTime) {
+          return res.status(400).json({ message: "結束時間必須晚於開始時間" });
+        }
+      }
+
       if (classroomId) {
         const allClassrooms = await storage.getClassroomsByFranchise(franchiseId);
         const cr = allClassrooms.find((c) => c.id === classroomId);
@@ -2558,31 +2572,45 @@ export async function registerRoutes(
           return res.status(400).json({ message: "教室不屬於此分校" });
         }
 
-        const roomConflicts = await storage.getClassroomOverlappingSlots(classroomId, slot.date, slot.startTime, slot.endTime, slotId);
+        const roomConflicts = await storage.getClassroomOverlappingSlots(classroomId, newDate, newStartTime, newEndTime, slotId);
         if (roomConflicts.length > 0) {
           const detail = roomConflicts.map((s) => `${s.startTime}-${s.endTime}`).join("、");
           return res.status(409).json({
-            message: `教室「${cr.name}」時段衝突：${slot.date} 已有時段 ${detail} 與此時段重疊`,
+            message: `教室「${cr.name}」時段衝突：${newDate} 已有時段 ${detail} 與此時段重疊`,
             type: "room_conflict",
             conflicts: roomConflicts,
           });
         }
       }
 
-      const coachConflicts = await storage.getCoachOverlappingSlots(coachId, slot.date, slot.startTime, slot.endTime, slotId);
+      const coachConflicts = await storage.getCoachOverlappingSlots(coachId, newDate, newStartTime, newEndTime, slotId);
       if (coachConflicts.length > 0) {
         const detail = coachConflicts.map((s) => `${s.franchiseName} ${s.startTime}-${s.endTime}`).join("、");
         return res.status(409).json({
-          message: `老師排課衝突：${slot.date} 老師已在 ${detail} 有排課`,
+          message: `老師排課衝突：${newDate} 老師已在 ${detail} 有排課`,
           type: "coach_conflict",
           conflicts: coachConflicts,
         });
       }
 
+      // 保存「異動前」的快照，供通知使用
       const previousCoachId = slot.coachId;
+      const previousDate = slot.date;
+      const previousStartTime = slot.startTime;
+      const previousEndTime = slot.endTime;
+
+      if (scheduleChanged) {
+        await storage.updateTimeSlotSchedule(slotId, franchiseId, {
+          date: newDate,
+          startTime: newStartTime,
+          endTime: newEndTime,
+        });
+      }
       const updated = await storage.updateTimeSlotCoachAndClassroom(slotId, franchiseId, coachId, classroomId ?? null);
 
-      if (coachId !== previousCoachId) {
+      const coachChanged = coachId !== previousCoachId;
+
+      if (coachChanged) {
         const coach = await storage.getCoach(coachId);
         if (coach?.userId) {
           const franchise = await storage.getFranchise(franchiseId);
@@ -2591,6 +2619,56 @@ export async function registerRoutes(
           const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coach.userId));
           if (coachUser?.lineUserId) await sendLineMessage(coachUser.lineUserId, `【質數教室】新排課通知\n${notifMsg}`);
         }
+      }
+
+      // 通知受影響家長：老師被替換 或 時段日期/時間異動
+      if (coachChanged || scheduleChanged) {
+        try {
+          const affectedBookings = await storage.getSlotBookings(slotId);
+          if (affectedBookings.length > 0) {
+            const franchise = await storage.getFranchise(franchiseId);
+            const franchiseName = franchise?.name || "教室";
+            const newCoach = await storage.getCoach(coachId);
+            const newCoachName = newCoach?.name || "新老師";
+            let prevCoachName: string | undefined;
+            if (previousCoachId) {
+              const prev = await storage.getCoach(previousCoachId);
+              prevCoachName = prev?.name;
+            }
+            const previousSlotStr = `${previousDate} ${previousStartTime}–${previousEndTime}`;
+            const newSlotStr = `${updated.date} ${updated.startTime}–${updated.endTime}`;
+            const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+
+            const changeParts: string[] = [];
+            if (scheduleChanged) changeParts.push(`時段（${previousSlotStr} → ${newSlotStr}）`);
+            if (coachChanged) changeParts.push(`老師${prevCoachName ? `（${prevCoachName} → ${newCoachName}）` : `為 ${newCoachName}`}`);
+
+            for (const b of affectedBookings) {
+              if (!b.parentId) continue;
+              const notifMsg = `您的孩子 ${b.childName} 在 ${previousSlotStr}（${franchiseName}）的課程已異動：${changeParts.join("、")}。`;
+              await storage.createNotification({
+                userId: b.parentId,
+                type: coachChanged && !scheduleChanged ? "slot_coach_changed" : "slot_schedule_changed",
+                title: "課程異動通知",
+                message: notifMsg,
+                isRead: false,
+              });
+              const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, b.parentId));
+              if (parentUser?.lineUserId) {
+                const flex = buildTeacherScheduleChangeFlex({
+                  childName: b.childName || "孩子",
+                  originalSlot: previousSlotStr,
+                  newSlot: newSlotStr,
+                  originalTeacher: coachChanged ? prevCoachName : undefined,
+                  newTeacher: newCoachName,
+                  location: franchiseName,
+                  bookingUrl: `${appBase}/dashboard?tab=bookings&bookingId=${b.id}`,
+                });
+                await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
+              }
+            }
+          }
+        } catch (e) { console.error("[LINE] 課程異動通知失敗:", e); }
       }
 
       res.json(updated);

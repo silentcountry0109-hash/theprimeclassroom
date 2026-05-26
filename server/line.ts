@@ -258,14 +258,6 @@ export function buildBookingSuccessFlex(params: {
           { type: "text", text: "The Prime 質數教室", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
         ],
       },
-      hero: {
-        type: "image",
-        url: `${BASE}/ip-character.png`,
-        size: "full",
-        aspectMode: "fit",
-        aspectRatio: "3:2",
-        backgroundColor: "#E8FAF9",
-      },
       body: {
         type: "box",
         layout: "vertical",
@@ -370,14 +362,6 @@ export function buildPreClassReminderFlex(params: {
           },
           { type: "text", text: `距離開課還有 ${params.hoursUntil} 小時`, color: "#FFFFFFBB", size: "xxs", margin: "xs" },
         ],
-      },
-      hero: {
-        type: "image",
-        url: `${BASE}/ip-reminder.png`,
-        size: "full",
-        aspectMode: "fit",
-        aspectRatio: "3:2",
-        backgroundColor: "#FFF4F3",
       },
       body: {
         type: "box",
@@ -726,14 +710,6 @@ export function buildWelcomeBindingFlex(cfg: CoachWelcomeConfig = {}): { altText
           },
         ],
       },
-      hero: {
-        type: "image",
-        url: `${BASE}/ip-character.png`,
-        size: "full",
-        aspectMode: "fit",
-        aspectRatio: "3:2",
-        backgroundColor: "#E8FAF9",
-      },
       body: {
         type: "box",
         layout: "vertical",
@@ -879,14 +855,6 @@ export function buildNewVisitorWelcomeFlex(): { altText: string; contents: objec
             margin: "xs",
           },
         ],
-      },
-      hero: {
-        type: "image",
-        url: `${BASE}/ip-character.png`,
-        size: "full",
-        aspectMode: "fit",
-        aspectRatio: "3:2",
-        backgroundColor: "#E8FAF9",
       },
       body: {
         type: "box",
@@ -1040,14 +1008,6 @@ export function buildParentWelcomeFlex(cfg: ParentWelcomeConfig = {}): { altText
             margin: "xs",
           },
         ],
-      },
-      hero: {
-        type: "image",
-        url: `${BASE}/ip-character.png`,
-        size: "full",
-        aspectMode: "fit",
-        aspectRatio: "3:2",
-        backgroundColor: "#E8FAF9",
       },
       body: {
         type: "box",
@@ -1427,14 +1387,6 @@ export function buildCourseCancelFlex(params: {
           { type: "text", text: "點數已退回，期待下次見！", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
         ],
       },
-      hero: {
-        type: "image",
-        url: `${BASE}/ip-cancel.png`,
-        size: "full",
-        aspectMode: "fit",
-        aspectRatio: "3:2",
-        backgroundColor: "#F4F5F6",
-      },
       body: {
         type: "box",
         layout: "vertical",
@@ -1472,6 +1424,320 @@ export function buildCourseCancelFlex(params: {
               type: "uri",
               label: "重新預約課程 →",
               uri: params.bookingUrl ?? `${BASE}/`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildAdminCancelFlex(params: {
+  childName: string;
+  date: string;
+  time: string;
+  location: string;
+  refundedCredits: number;
+  remainingCredits: number;
+  contactPhone?: string;
+  bookingUrl?: string;
+}): { altText: string; contents: object } {
+  return {
+    altText: `❌ 課程已被教室取消：${params.childName} ${params.date} ${params.time}`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#546E7A",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "❌  課程已被教室取消", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "點數已退回，請聯繫分校", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("孩子", params.childName, "#546E7A"),
+          separator(),
+          infoRow("📅 日期", `${params.date} ${params.time}`, "#BBBBBB", true),
+          infoRow("📍 地點", params.location, "#BBBBBB", true),
+          separator(),
+          {
+            type: "box",
+            layout: "horizontal",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "退回", color: "#AAAAAA", size: "xs", flex: 0 },
+              { type: "text", text: `✅ ${params.refundedCredits} 堂・剩餘 ${params.remainingCredits} 堂`, color: "#2E7D32", size: "xs", flex: 1, weight: "bold" },
+            ],
+          },
+          ...(params.contactPhone ? [{
+            type: "text" as const,
+            text: `📞 如有疑問請聯繫分校：${params.contactPhone}`,
+            color: "#666666",
+            size: "xs",
+            wrap: true,
+            margin: "sm",
+          }] : []),
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#78909C",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "重新預約課程 →",
+              uri: params.bookingUrl ?? `${BASE}/`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildLowCreditsFlex(params: {
+  childName: string;
+  remainingCredits: number;
+  topUpUrl?: string;
+}): { altText: string; contents: object } {
+  return {
+    altText: `⚠️ ${params.childName} 點數即將用完，僅剩 ${params.remainingCredits} 堂`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#C99544",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "⚠️  點數即將用完", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "建議盡快加值以免影響課程", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("孩子", params.childName, "#8B6914"),
+          separator(),
+          {
+            type: "box",
+            layout: "horizontal",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "剩餘", color: "#AAAAAA", size: "xs", flex: 0 },
+              { type: "text", text: `⚠️ 僅剩 ${params.remainingCredits} 堂`, color: "#8B6914", size: "xs", flex: 1, weight: "bold" },
+            ],
+          },
+          separator(),
+          {
+            type: "text",
+            text: "💡 立即加值，確保孩子課程不中斷！",
+            color: "#8B6914",
+            size: "xs",
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#C99544",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "立即前往加值 →",
+              uri: params.topUpUrl ?? `${BASE}/dashboard?tab=shop`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildNoCreditsFlex(params: {
+  childName: string;
+  topUpUrl?: string;
+}): { altText: string; contents: object } {
+  return {
+    altText: `🔴 ${params.childName} 點數已用完，請盡快加值`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#C97B7B",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "🔴  點數已用完", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "請盡快加值，確保課程不中斷", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("孩子", params.childName, "#A85A5A"),
+          separator(),
+          {
+            type: "box",
+            layout: "horizontal",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "剩餘", color: "#AAAAAA", size: "xs", flex: 0 },
+              { type: "text", text: `🔴 0 堂`, color: "#A85A5A", size: "xs", flex: 1, weight: "bold" },
+            ],
+          },
+          separator(),
+          {
+            type: "text",
+            text: "💳 未加值將無法繼續預約課程，請立即購買點數。",
+            color: "#A85A5A",
+            size: "xs",
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#C97B7B",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "立即購買點數 →",
+              uri: params.topUpUrl ?? `${BASE}/dashboard?tab=shop`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function buildTeacherScheduleChangeFlex(params: {
+  childName: string;
+  originalSlot: string;
+  newSlot: string;
+  originalTeacher?: string;
+  newTeacher?: string;
+  location?: string;
+  bookingUrl?: string;
+}): { altText: string; contents: object } {
+  const bodyContents: object[] = [
+    infoRow("👦 學生", params.childName, "#E65100"),
+    separator(),
+    infoRow("📅 原時段", params.originalSlot, "#BBBBBB", true),
+    infoRow("🔄 新時段", params.newSlot, "#E65100"),
+  ];
+  if (params.originalTeacher && params.newTeacher && params.originalTeacher !== params.newTeacher) {
+    bodyContents.push(infoRow("👩‍🏫 原老師", params.originalTeacher, "#BBBBBB", true));
+    bodyContents.push(infoRow("👩‍🏫 新老師", params.newTeacher, "#E65100"));
+  } else if (params.newTeacher) {
+    bodyContents.push(infoRow("👩‍🏫 老師", params.newTeacher));
+  }
+  if (params.location) {
+    bodyContents.push(infoRow("📍 地點", params.location));
+  }
+  bodyContents.push(separator());
+  bodyContents.push({
+    type: "text",
+    text: "⚠️ 如有疑問，請聯繫分校主任確認。",
+    color: "#888888",
+    size: "xs",
+    wrap: true,
+  });
+  return {
+    altText: `🔄 課程異動通知：${params.childName} ${params.newSlot}`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#FFA726",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "🔄  課程異動通知", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "您的排課時段已更新", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: bodyContents,
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "10px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#FFA726",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "查看課表異動詳情 →",
+              uri: params.bookingUrl ?? `${BASE}/dashboard?tab=bookings`,
             },
           },
         ],

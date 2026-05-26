@@ -49,7 +49,7 @@ import { LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { eq, and, ne, sql, desc, inArray, gte, lte, asc, gt, lt } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
-import { sendLineMessage } from "./line";
+import { sendLineMessage, sendLineFlexMessage, buildAdminCancelFlex } from "./line";
 
 export interface IStorage {
   getCoaches(): Promise<Coach[]>;
@@ -92,6 +92,7 @@ export interface IStorage {
   findSlot(franchiseId: number, coachId: number | null, date: string, startTime: string, endTime: string): Promise<TimeSlot | undefined>;
   createSlot(slot: InsertTimeSlot): Promise<TimeSlot>;
   updateTimeSlotCoachAndClassroom(slotId: number, franchiseId: number, coachId: number, classroomId: number | null): Promise<TimeSlot>;
+  updateTimeSlotSchedule(slotId: number, franchiseId: number, patch: { date?: string; startTime?: string; endTime?: string }): Promise<TimeSlot>;
   deleteSlot(id: number): Promise<void>;
 
   getBooking(id: number): Promise<any | undefined>;
@@ -664,6 +665,23 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(timeSlots)
       .set({ coachId, classroomId })
+      .where(and(eq(timeSlots.id, slotId), eq(timeSlots.franchiseId, franchiseId)))
+      .returning();
+    return updated;
+  }
+
+  async updateTimeSlotSchedule(
+    slotId: number,
+    franchiseId: number,
+    patch: { date?: string; startTime?: string; endTime?: string }
+  ): Promise<TimeSlot> {
+    const set: Record<string, any> = {};
+    if (patch.date !== undefined) set.date = patch.date;
+    if (patch.startTime !== undefined) set.startTime = patch.startTime;
+    if (patch.endTime !== undefined) set.endTime = patch.endTime;
+    const [updated] = await db
+      .update(timeSlots)
+      .set(set)
       .where(and(eq(timeSlots.id, slotId), eq(timeSlots.franchiseId, franchiseId)))
       .returning();
     return updated;
@@ -2404,8 +2422,9 @@ export class DatabaseStorage implements IStorage {
     const activeBookings = await this.getSlotBookings(slotId);
     if (activeBookings.length === 0) return;
 
-    const franchise = await db.select({ name: franchises.name }).from(franchises).where(eq(franchises.id, slot.franchiseId)).then(r => r[0]);
+    const franchise = await db.select({ name: franchises.name, phone: franchises.phone }).from(franchises).where(eq(franchises.id, slot.franchiseId)).then(r => r[0]);
     const franchiseName = franchise?.name || "教室";
+    const franchisePhone = franchise?.phone || undefined;
 
     for (const b of activeBookings) {
       await db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
@@ -2431,8 +2450,18 @@ export class DatabaseStorage implements IStorage {
           const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, b.parentId));
           if (parentUser?.lineUserId) {
             const newBalance = await this.getParentBalance(b.parentId);
-            const lineMsg = `【質數教室】❌ 課程已取消\n${b.childName} 在 ${slot.date} ${slot.startTime}–${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂，剩餘 ${newBalance} 堂。`;
-            await sendLineMessage(parentUser.lineUserId, lineMsg);
+            const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+            const flex = buildAdminCancelFlex({
+              childName: b.childName || "孩子",
+              date: slot.date,
+              time: `${slot.startTime}–${slot.endTime}`,
+              location: franchiseName,
+              refundedCredits: 1,
+              remainingCredits: newBalance,
+              contactPhone: franchisePhone,
+              bookingUrl: `${appBase}/dashboard?tab=search`,
+            });
+            await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
           }
         } catch (e) { console.error("[LINE] cancelSlotBookingsAndNotify 通知失敗:", e); }
       }
