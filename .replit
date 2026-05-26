@@ -86,6 +86,8 @@ LINE_MESSAGING_CHANNEL_ID = "2009852161"
 
 [userenv.production]
 APP_BASE_URL = "https://www.theprimeclassroom.com"
+DISABLE_TWILIO = "true"
+BYPASS_OTP_CODE = "123456"
 
 [postMerge]
 path = "scripts/post-merge.sh"
