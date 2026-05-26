@@ -3665,6 +3665,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/booked-franchises", isCredentialOrAuth, async (req: any, res) => {
+    try {
+      const userId = getSessionUserId(req);
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const ids = await storage.getBookedFranchisesByParent(userId);
+      res.json(ids);
+    } catch (error) {
+      res.status(500).json({ message: "取得已預約分校失敗" });
+    }
+  });
+
   app.post("/api/favorite-franchises/:franchiseId", isCredentialOrAuth, async (req: any, res) => {
     try {
       const userId = getSessionUserId(req);

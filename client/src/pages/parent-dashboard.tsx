@@ -1700,6 +1700,10 @@ function BookingFlowTab() {
     queryKey: ["/api/favorite-franchises"],
   });
 
+  const { data: bookedFranchiseIds = [] } = useQuery<number[]>({
+    queryKey: ["/api/booked-franchises"],
+  });
+
   const favoriteMutation = useMutation({
     mutationFn: async ({ franchiseId, isFavorite }: { franchiseId: number; isFavorite: boolean }) => {
       if (isFavorite) {
@@ -2664,11 +2668,15 @@ function BookingFlowTab() {
             .sort((a, b) => {
               const aFav = favoriteIds.includes(a.franchise.id) ? 1 : 0;
               const bFav = favoriteIds.includes(b.franchise.id) ? 1 : 0;
-              return bFav - aFav;
+              if (aFav !== bFav) return bFav - aFav;
+              const aBooked = bookedFranchiseIds.includes(a.franchise.id) ? 1 : 0;
+              const bBooked = bookedFranchiseIds.includes(b.franchise.id) ? 1 : 0;
+              return bBooked - aBooked;
             })
             .map((result) => {
             const f = result.franchise;
             const isFav = favoriteIds.includes(f.id);
+            const isBooked = bookedFranchiseIds.includes(f.id);
             const coverImg = f.coverPhoto || (f.photos && f.photos.length > 0 ? f.photos[0] : null) || getDefaultClassroomImage(f.id);
             return (
               <div
@@ -2698,6 +2706,15 @@ function BookingFlowTab() {
                         <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-tiffany transition-colors truncate">
                           {f.name}
                         </h3>
+                        {isBooked && (
+                          <span
+                            className="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] font-medium text-tiffany bg-tiffany/10 border border-tiffany/20 rounded-full px-1.5 py-0.5"
+                            data-testid={`badge-booked-${f.id}`}
+                          >
+                            <CalendarCheck className="w-2.5 h-2.5" />
+                            曾預約
+                          </span>
+                        )}
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-tiffany transition-colors flex-shrink-0" />
                     </div>

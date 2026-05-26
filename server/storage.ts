@@ -187,6 +187,7 @@ export interface IStorage {
   promoteAllGrades(): Promise<number>;
 
   getFavoriteFranchises(userId: string): Promise<number[]>;
+  getBookedFranchisesByParent(parentId: string): Promise<number[]>;
   addFavoriteFranchise(userId: string, franchiseId: number): Promise<FavoriteFranchise>;
   removeFavoriteFranchise(userId: string, franchiseId: number): Promise<void>;
 
@@ -2230,6 +2231,15 @@ export class DatabaseStorage implements IStorage {
       .from(favoriteFranchises)
       .where(eq(favoriteFranchises.userId, userId));
     return results.map(r => r.franchiseId);
+  }
+
+  async getBookedFranchisesByParent(parentId: string): Promise<number[]> {
+    const results = await db
+      .selectDistinct({ franchiseId: timeSlots.franchiseId })
+      .from(bookings)
+      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+      .where(eq(bookings.parentId, parentId));
+    return results.map(r => r.franchiseId).filter((id): id is number => id != null);
   }
 
   async addFavoriteFranchise(userId: string, franchiseId: number): Promise<FavoriteFranchise> {
