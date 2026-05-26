@@ -3831,6 +3831,25 @@ function BookingsTab() {
 
   const hasFilter = searchName || searchDate;
 
+  // 依「同一位學生 + 同一個時段」分組，把連排預約折疊成一張卡片
+  const groupedBookings = (() => {
+    const groups = new Map<string, FranchiseBooking[]>();
+    for (const b of filteredBookings) {
+      const key = `${b.childId}|${b.startTime}|${b.endTime}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(b);
+      else groups.set(key, [b]);
+    }
+    const list = Array.from(groups.entries()).map(([key, items]) => {
+      const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
+      return { key, items: sorted, earliestDate: sorted[0].date };
+    });
+    list.sort((a, b) => a.earliestDate.localeCompare(b.earliestDate));
+    return list;
+  })();
+
+  const studentCount = new Set(filteredBookings.map((b) => b.childId)).size;
+
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
@@ -3865,7 +3884,7 @@ function BookingsTab() {
         )}
         {hasFilter && (
           <span className="text-xs text-muted-foreground" data-testid="text-booking-filter-count">
-            共 {filteredBookings.length} 筆結果
+            共 {studentCount} 位學生 / {filteredBookings.length} 堂預約
           </span>
         )}
       </div>
@@ -3883,25 +3902,46 @@ function BookingsTab() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredBookings.map((booking) => {
-            const status = statusMap[booking.status] || statusMap.confirmed;
+          {groupedBookings.map(({ key, items }) => {
+            const first = items[0];
+            const count = items.length;
+            const dayLabels = items.map((b) => getDayLabel(b.date));
+            const allSameDay = dayLabels.every((d) => d === dayLabels[0]);
+            const subtitle = count > 1 && allSameDay
+              ? `每週${dayLabels[0]} ${first.startTime} - ${first.endTime}`
+              : `${first.startTime} - ${first.endTime}`;
             return (
-              <div key={booking.id} className="bg-white rounded-md border border-gray-100 p-4" data-testid={`franchise-booking-${booking.id}`}>
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="text-sm font-medium">{booking.childName}</p>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{booking.childGrade}年級</span>
-                      {booking.childSchool && <span className="text-xs text-muted-foreground">{booking.childSchool}</span>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {booking.date} ({getDayLabel(booking.date)}) {booking.startTime} - {booking.endTime}
-                    </p>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString("zh-TW") : ""}
-                  </span>
+              <div
+                key={key}
+                className="bg-white rounded-md border border-gray-100 p-4"
+                data-testid={`franchise-booking-group-${first.childId}-${first.startTime}-${first.endTime}`}
+              >
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <p className="text-sm font-medium">{first.childName}</p>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{first.childGrade}年級</span>
+                  {first.childSchool && <span className="text-xs text-muted-foreground">{first.childSchool}</span>}
+                  {count > 1 && (
+                    <span className="text-xs bg-tiffany/10 text-tiffany px-2 py-0.5 rounded-full">共 {count} 堂</span>
+                  )}
+                  <span className="text-xs text-muted-foreground ml-auto">{subtitle}</span>
+                </div>
+                <div className={count > 1 ? "border-t border-gray-100 pt-2 space-y-1" : ""}>
+                  {items.map((b) => {
+                    const status = statusMap[b.status] || statusMap.confirmed;
+                    const mmdd = b.date.length >= 10 ? b.date.slice(5) : b.date;
+                    return (
+                      <div
+                        key={b.id}
+                        className="flex items-center gap-2 text-xs"
+                        data-testid={`franchise-booking-row-${b.id}`}
+                      >
+                        <span className="text-muted-foreground tabular-nums">
+                          {mmdd}（週{getDayLabel(b.date)}）
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
