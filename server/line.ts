@@ -1105,24 +1105,35 @@ export function buildCoachNewBookingFlex(params: {
   time: string;
   location: string;
   dashboardUrl?: string;
+  isNewStudent?: boolean;
 }): { altText: string; contents: object } {
   const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  const isNew = !!params.isNewStudent;
+  const headerColor = isNew ? "#FF8A7A" : "#4FBDB4";
+  const headerTitle = isNew ? "🆕  新生第一堂課" : "📚  新課程預約";
+  const altText = isNew
+    ? `🆕 新生第一堂課：${params.childName} ${params.date} ${params.time}`
+    : `📚 新課程預約：${params.childName} ${params.date} ${params.time}`;
+  const studentLabel = isNew ? "🆕 新生" : "學生";
+  const footerText = isNew
+    ? "📘 請提前準備新生入門資料，歡迎這位新同學！"
+    : "🙌 請提前準備好課程，期待這次的授課！";
   return {
-    altText: `📚 新課程預約：${params.childName} ${params.date} ${params.time}`,
+    altText,
     contents: {
       type: "bubble",
       size: "kilo",
       header: {
         type: "box",
         layout: "vertical",
-        backgroundColor: "#4FBDB4",
+        backgroundColor: headerColor,
         paddingAll: "12px",
         contents: [
           {
             type: "box",
             layout: "horizontal",
             contents: [
-              { type: "text", text: "📚  新課程預約", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+              { type: "text", text: headerTitle, color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
             ],
           },
           { type: "text", text: "The Prime 質數教室", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
@@ -1134,7 +1145,7 @@ export function buildCoachNewBookingFlex(params: {
         spacing: "sm",
         paddingAll: "12px",
         contents: [
-          infoRow("學生", params.childName, "#4FBDB4"),
+          infoRow(studentLabel, params.childName, headerColor),
           separator(),
           infoRow("📅 日期", params.date),
           infoRow("🕙 時間", params.time),
@@ -1142,7 +1153,7 @@ export function buildCoachNewBookingFlex(params: {
           separator(),
           {
             type: "text",
-            text: "🙌 請提前準備好課程，期待這次的授課！",
+            text: footerText,
             color: "#888888",
             size: "xs",
             wrap: true,

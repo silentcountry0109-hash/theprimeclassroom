@@ -98,6 +98,7 @@ export interface IStorage {
   getBookingsByParent(parentId: string): Promise<any[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   hasExistingBooking(slotId: number, childId: number): Promise<boolean>;
+  hasPastBookingWithCoach(childId: number, coachId: number): Promise<boolean>;
   cancelBooking(id: number): Promise<void>;
   completeExpiredBookings(): Promise<number>;
 
@@ -1164,6 +1165,22 @@ export class DatabaseStorage implements IStorage {
           inArray(bookings.status, ["confirmed", "checked_in"])
         )
       );
+    return existing.length > 0;
+  }
+
+  async hasPastBookingWithCoach(childId: number, coachId: number): Promise<boolean> {
+    const existing = await db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+      .where(
+        and(
+          eq(bookings.childId, childId),
+          eq(timeSlots.coachId, coachId),
+          ne(bookings.status, "cancelled"),
+        )
+      )
+      .limit(1);
     return existing.length > 0;
   }
 

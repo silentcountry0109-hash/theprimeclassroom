@@ -234,6 +234,10 @@ export default function CoachDashboard() {
                                 <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                                   <Users className="w-3.5 h-3.5 text-blue-600" />
                                 </div>
+                              ) : n.type === "new_student_booking" ? (
+                                <div className="w-6 h-6 rounded-full bg-coral/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <Users className="w-3.5 h-3.5 text-coral" />
+                                </div>
                               ) : n.type === "booking_cancelled" ? (
                                 <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                                   <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
@@ -252,6 +256,9 @@ export default function CoachDashboard() {
                                   <span className={`text-sm font-medium ${!n.isRead ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</span>
                                   {n.type === "new_booking" && (
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 flex-shrink-0">新預約</span>
+                                  )}
+                                  {n.type === "new_student_booking" && (
+                                    <span data-testid={`badge-new-student-${n.id}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-coral/20 text-coral flex-shrink-0">🆕 新生</span>
                                   )}
                                   {!n.isRead && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
                                 </div>

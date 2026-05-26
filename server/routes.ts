@@ -1317,6 +1317,9 @@ export async function registerRoutes(
       if (balance < 1) {
         return res.status(400).json({ message: `堂數不足（目前剩餘 ${balance} 堂，需要 1 堂）`, code: "INSUFFICIENT_CREDITS", currentBalance: balance, required: 1 });
       }
+      const wasNewStudentForCoach = slot.coachId
+        ? !(await storage.hasPastBookingWithCoach(req.body.childId, slot.coachId))
+        : false;
       const booking = await storage.createBooking({
         slotId: req.body.slotId,
         childId: req.body.childId,
@@ -1379,9 +1382,19 @@ export async function registerRoutes(
           const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, slot.coachId));
           if (coachRec?.userId) {
             const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
-            await storage.createNotification({ userId: coachRec.userId, type: "new_booking", title: "新課程預約", message: `新學生 ${childName} 將在 ${slotDateStr} ${slotTime} 出席您的課程。` });
+            const isNewStudent = wasNewStudentForCoach;
+            const notifTitle = isNewStudent ? "🆕 新生第一堂課" : "新課程預約";
+            const notifMsg = isNewStudent
+              ? `🆕 新生 ${childName} 將在 ${slotDateStr} ${slotTime} 第一次來上您的課，請提前準備新生入門資料。`
+              : `學生 ${childName} 將在 ${slotDateStr} ${slotTime} 出席您的課程。`;
+            await storage.createNotification({
+              userId: coachRec.userId,
+              type: isNewStudent ? "new_student_booking" : "new_booking",
+              title: notifTitle,
+              message: notifMsg,
+            });
             if (coachUser?.lineUserId) {
-              const flex = buildCoachNewBookingFlex({ childName, date: slotDateStr, time: slotTime, location: franchiseName });
+              const flex = buildCoachNewBookingFlex({ childName, date: slotDateStr, time: slotTime, location: franchiseName, isNewStudent });
               await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
             }
           }
@@ -1409,6 +1422,18 @@ export async function registerRoutes(
       const balance = await storage.getParentBalance(userId);
       if (balance < slotIds.length) {
         return res.status(400).json({ message: `堂數不足（目前剩餘 ${balance} 堂，需要 ${slotIds.length} 堂）`, code: "INSUFFICIENT_CREDITS", currentBalance: balance, required: slotIds.length });
+      }
+      // 預先計算「新生 vs 舊生」基準（必須在建立任何 booking 之前查詢，
+      // 否則剛建立的 booking 會被當成既有歷史紀錄）
+      const preFetchedSlots = await Promise.all(
+        slotIds.map(async (sid: number) => ({ sid, slot: await storage.getSlot(sid) }))
+      );
+      const uniqueCoachIds = Array.from(new Set(
+        preFetchedSlots.map(({ slot }) => slot?.coachId).filter((c): c is number => !!c)
+      ));
+      const coachBaselineWasNew = new Map<number, boolean>();
+      for (const cid of uniqueCoachIds) {
+        coachBaselineWasNew.set(cid, !(await storage.hasPastBookingWithCoach(childId, cid)));
       }
       const results: { slotId: number; success: boolean; message?: string }[] = [];
       for (const slotId of slotIds) {
@@ -1479,24 +1504,38 @@ export async function registerRoutes(
       try {
         const successSlotIds = results.filter(r => r.success).map(r => r.slotId);
         const child = kids.find((k: any) => k.id === childId);
-        const childName = child?.name || "新學生";
-        for (const sid of successSlotIds) {
-          const s = await storage.getSlot(sid);
+        const childName = child?.name || "孩子";
+        const slotsWithData = await Promise.all(successSlotIds.map(async (sid) => ({ sid, slot: await storage.getSlot(sid) })));
+        slotsWithData.sort((a, b) => {
+          const ad = `${a.slot?.date || ""} ${a.slot?.startTime || ""}`;
+          const bd = `${b.slot?.date || ""} ${b.slot?.startTime || ""}`;
+          return ad.localeCompare(bd);
+        });
+        const markedNewForCoach = new Set<number>();
+        for (const { slot: s } of slotsWithData) {
           if (!s?.coachId) continue;
           const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, s.coachId));
           if (!coachRec?.userId) continue;
           const slotTime = `${s.startTime}–${s.endTime}`;
-          const notifMsg = `新學生 ${childName} 將在 ${s.date} ${slotTime} 出席您的課程。`;
+          let isNewStudent = false;
+          if (!markedNewForCoach.has(s.coachId) && coachBaselineWasNew.get(s.coachId)) {
+            isNewStudent = true;
+            markedNewForCoach.add(s.coachId);
+          }
+          const notifTitle = isNewStudent ? "🆕 新生第一堂課" : "新課程預約";
+          const notifMsg = isNewStudent
+            ? `🆕 新生 ${childName} 將在 ${s.date} ${slotTime} 第一次來上您的課，請提前準備新生入門資料。`
+            : `學生 ${childName} 將在 ${s.date} ${slotTime} 出席您的課程。`;
           await storage.createNotification({
             userId: coachRec.userId,
-            type: "new_booking",
-            title: "新課程預約",
+            type: isNewStudent ? "new_student_booking" : "new_booking",
+            title: notifTitle,
             message: notifMsg,
           });
           const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
           if (coachUser?.lineUserId) {
             const franchiseRec = await storage.getFranchise(s.franchiseId);
-            const flex = buildCoachNewBookingFlex({ childName, date: s.date, time: slotTime, location: franchiseRec?.name || "教室" });
+            const flex = buildCoachNewBookingFlex({ childName, date: s.date, time: slotTime, location: franchiseRec?.name || "教室", isNewStudent });
             await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
           }
         }
@@ -2912,6 +2951,17 @@ export async function registerRoutes(
       const { slotId, childId, walkInName, walkInGrade, walkInSchool, overrideCapacity } = req.body;
       if (!slotId) return res.status(400).json({ message: "缺少時段資訊" });
       if (!childId && !walkInName) return res.status(400).json({ message: "請選擇學生或填寫臨時學生資料" });
+      // 預先計算「新生 vs 舊生」基準（必須在建立 booking 之前查詢）
+      // walk-in：新建 child，必為新生；既有 childId：查既有預約紀錄
+      const _preSlot = await storage.getSlot(parseInt(slotId));
+      let preWasNewStudent = false;
+      if (_preSlot?.coachId) {
+        if (walkInName && !childId) {
+          preWasNewStudent = true;
+        } else if (childId) {
+          preWasNewStudent = !(await storage.hasPastBookingWithCoach(parseInt(childId), _preSlot.coachId));
+        }
+      }
       const result = await storage.createManualBookingExtended({
         slotId,
         franchiseId: req.franchiseId,
@@ -2952,6 +3002,35 @@ export async function registerRoutes(
           );
         }
       }
+
+      // 通知：老師（管理員手動預約）
+      try {
+        const slot = await storage.getSlot(parseInt(slotId));
+        if (slot?.coachId && result?.childId) {
+          const [coachRec] = await db.select().from(coaches).where(eq(coaches.id, slot.coachId));
+          if (coachRec?.userId) {
+            const franchise = await storage.getFranchise(slot.franchiseId);
+            const slotTime = `${slot.startTime}–${slot.endTime}`;
+            const childName = result.childName || "學生";
+            const isNewStudent = preWasNewStudent;
+            const notifTitle = isNewStudent ? "🆕 新生第一堂課" : "新課程預約";
+            const notifMsg = isNewStudent
+              ? `🆕 新生 ${childName} 將在 ${slot.date} ${slotTime} 第一次來上您的課，請提前準備新生入門資料。`
+              : `學生 ${childName} 將在 ${slot.date} ${slotTime} 出席您的課程。`;
+            await storage.createNotification({
+              userId: coachRec.userId,
+              type: isNewStudent ? "new_student_booking" : "new_booking",
+              title: notifTitle,
+              message: notifMsg,
+            });
+            const [coachUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, coachRec.userId));
+            if (coachUser?.lineUserId) {
+              const flex = buildCoachNewBookingFlex({ childName, date: slot.date, time: slotTime, location: franchise?.name || "教室", isNewStudent });
+              await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
+            }
+          }
+        }
+      } catch (e) { console.error("[LINE] manual-booking 老師通知失敗:", e); }
 
       res.json(result);
     } catch (error: any) {
