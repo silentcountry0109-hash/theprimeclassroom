@@ -101,3 +101,9 @@ id = "YyqAfpRfQQFdNsos8a36C"
 uri = "file://.local/tasks/cis-ui-design-guide.md"
 type = "text"
 title = "質數教室 CIS & UI 設計規範"
+
+[[outputs]]
+id = "np3XtLn5fPQTzqW0AGMZt"
+uri = "file://screenshots/ip-compare.png"
+type = "image"
+title = "IP 圖在卡片內的尺寸比對（上=原版／中=現在 V2／下=建議修正）"
