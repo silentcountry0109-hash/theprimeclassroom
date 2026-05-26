@@ -114,6 +114,34 @@
   display: block;
 }
 
+/* 無 IP 圖版本：純色塊頭 + 大 emoji + 標題（preview 用） */
+.card-header-band {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.card-header-emoji {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.15));
+}
+.card-header-text { flex: 1; min-width: 0; }
+.card-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+  line-height: 1.3;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.card-header-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.92);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
 /* IP 角色 + 說話泡泡並排列 */
 .card-ip-row {
   display: flex;

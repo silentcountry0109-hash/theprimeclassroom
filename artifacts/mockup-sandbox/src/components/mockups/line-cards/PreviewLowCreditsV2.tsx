@@ -1,7 +1,6 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-poses/ip-warning-sign.png`;
 
 export function PreviewLowCreditsV2() {
   return (
@@ -23,11 +22,11 @@ export function PreviewLowCreditsV2() {
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #FFE082 0%, #FFB300 100%)' }}>
-                <img className="card-ip-img" src={ipChar} alt="質數先生" />
-                <div className="ip-speech-bubble">
-                  <div className="ip-speech-title" style={{ color: '#B45309' }}>點數即將用完</div>
-                  <div className="ip-speech-sub" style={{ color: '#D97706' }}>僅剩 1 堂課可使用</div>
+              <div className="card-header-band" style={{ background: 'linear-gradient(135deg, #FFE082 0%, #FFB300 100%)' }}>
+                <div className="card-header-emoji">⚠️</div>
+                <div className="card-header-text">
+                  <div className="card-header-title" style={{ color: '#7C2D12' }}>點數即將用完</div>
+                  <div className="card-header-sub" style={{ color: '#9A3412' }}>僅剩 1 堂課可使用</div>
                 </div>
               </div>
 
