@@ -1,7 +1,6 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-reminder.png`;
 
 export function ContactBookFilled() {
   return (
@@ -16,11 +15,10 @@ export function ContactBookFilled() {
           <div className="bubble-row">
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #FFB7B2 0%, #f0847c 100%)' }}>
-                <img className="card-ip-img" src={ipChar} alt="質數先生" />
-                <div className="ip-speech-bubble">
-                  <div className="ip-speech-title" style={{ color: '#e06860' }}>聯絡簿已填寫</div>
-                  <div className="ip-speech-sub" style={{ color: '#f0847c' }}>今日課後記錄已完成</div>
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #FFB7B2 0%, #f0847c 100%)', padding: '14px 14px' }}>
+                <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
+                  <div className="ip-speech-title" style={{ color: '#e06860', fontSize: 14 }}>📒 聯絡簿已填寫</div>
+                  <div className="ip-speech-sub" style={{ color: '#f0847c', fontSize: 11 }}>今日課後記錄已完成</div>
                 </div>
               </div>
 

@@ -1,17 +1,13 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
 
 export function TeacherScheduleChange() {
   return (
     <div className="line-card-root">
       <div className="phone-shell">
-
         <div className="chat-header">
-          <div className="chat-header-avatar">
-            <img src={logo} alt="質數教室" />
-          </div>
+          <div className="chat-header-avatar"><img src={logo} alt="質數教室" /></div>
           質數教室
         </div>
 
@@ -26,17 +22,10 @@ export function TeacherScheduleChange() {
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              {/* IP 角色 + 說話泡泡 */}
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #FFA726 0%, #E65100 100%)' }}>
-                <img
-                  className="card-ip-img"
-                  src={ipChar}
-                  alt="質數先生"
-                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2)) hue-rotate(30deg)' }}
-                />
-                <div className="ip-speech-bubble">
-                  <div className="ip-speech-title" style={{ color: '#E65100' }}>課程異動通知</div>
-                  <div className="ip-speech-sub" style={{ color: '#F57C00' }}>您的排課時段已更新</div>
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #FFA726 0%, #E65100 100%)', padding: '14px 14px' }}>
+                <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
+                  <div className="ip-speech-title" style={{ color: '#E65100', fontSize: 14 }}>🔄 課程異動通知</div>
+                  <div className="ip-speech-sub" style={{ color: '#F57C00', fontSize: 11 }}>您的排課時段已更新</div>
                 </div>
               </div>
 

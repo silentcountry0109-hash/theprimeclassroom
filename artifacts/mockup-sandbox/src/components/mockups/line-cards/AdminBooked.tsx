@@ -1,7 +1,6 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
 
 export function AdminBooked() {
   return (
@@ -16,14 +15,13 @@ export function AdminBooked() {
           <div className="bubble-row">
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)' }}>
-                <img className="card-ip-img" src={ipChar} alt="質數先生" />
-                <div className="ip-speech-bubble">
-                  <div className="ip-speech-title">
-                    課程已加排！
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)', padding: '14px 14px' }}>
+                <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
+                  <div className="ip-speech-title" style={{ fontSize: 14 }}>
+                    ✅ 課程已加排！
                     <span className="admin-tag">分校代加</span>
                   </div>
-                  <div className="ip-speech-sub">由分校主任協助為您安排</div>
+                  <div className="ip-speech-sub" style={{ fontSize: 11 }}>由分校主任協助為您安排</div>
                 </div>
               </div>
 

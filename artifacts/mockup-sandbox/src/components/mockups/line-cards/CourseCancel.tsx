@@ -1,17 +1,13 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-cancel.png`; // 綠髮小朋友
 
 export function CourseCancel() {
   return (
     <div className="line-card-root">
       <div className="phone-shell">
-
         <div className="chat-header">
-          <div className="chat-header-avatar">
-            <img src={logo} alt="質數教室" />
-          </div>
+          <div className="chat-header-avatar"><img src={logo} alt="質數教室" /></div>
           質數教室
         </div>
 
@@ -26,17 +22,10 @@ export function CourseCancel() {
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              {/* IP 角色 + 說話泡泡 */}
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #90A4AE 0%, #546E7A 100%)' }}>
-                <img
-                  className="card-ip-img"
-                  src={ipChar}
-                  alt="質數先生"
-                  style={{ filter: 'grayscale(50%) opacity(0.85) drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
-                />
-                <div className="ip-speech-bubble">
-                  <div className="ip-speech-title" style={{ color: '#546E7A' }}>課程取消通知</div>
-                  <div className="ip-speech-sub" style={{ color: '#78909C' }}>點數已退回，期待下次見！</div>
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #90A4AE 0%, #546E7A 100%)', padding: '14px 14px' }}>
+                <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
+                  <div className="ip-speech-title" style={{ color: '#546E7A', fontSize: 14 }}>❌ 課程取消通知</div>
+                  <div className="ip-speech-sub" style={{ color: '#78909C', fontSize: 11 }}>點數已退回，期待下次見！</div>
                 </div>
               </div>
 

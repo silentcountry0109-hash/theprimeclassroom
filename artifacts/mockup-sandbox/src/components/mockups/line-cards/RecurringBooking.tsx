@@ -1,7 +1,6 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
 
 const SLOTS = [
   { date: '2026/05/03（日）', time: '10:00 – 11:00' },
@@ -23,11 +22,10 @@ export function RecurringBooking() {
           <div className="bubble-row">
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)' }}>
-                <img className="card-ip-img" src={ipChar} alt="質數先生" />
-                <div className="ip-speech-bubble">
-                  <div className="ip-speech-title">連排預約成功！</div>
-                  <div className="ip-speech-sub">共 12 堂課程已排定</div>
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)', padding: '14px 14px' }}>
+                <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
+                  <div className="ip-speech-title" style={{ fontSize: 14 }}>📅 連排預約成功！</div>
+                  <div className="ip-speech-sub" style={{ fontSize: 11 }}>共 12 堂課程已排定</div>
                 </div>
               </div>
 

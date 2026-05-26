@@ -14,18 +14,48 @@ export function AdminCancel() {
         <div className="chat-area">
           <div className="bubble-row">
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
-            <div className="text-bubble">
-              <span className="tb-title">【質數教室】❌ 課程已取消</span>
-              陳小明 在 <strong>2026/05/03（日）10:00</strong>
-              （台北信義分校）的課程
-              <br />
-              <span style={{ color: '#C97B7B' }}>已被教室取消</span>，
-              已退回 <strong>1 堂</strong>，剩餘 <strong>6 堂</strong>。
-              <br />
-              <br />
-              <span style={{ color: '#888', fontSize: 11 }}>
-                如有疑問請聯繫分校：02-2345-6789
-              </span>
+            <div className="flex-card">
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #90A4AE 0%, #546E7A 100%)', padding: '14px 14px' }}>
+                <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
+                  <div className="ip-speech-title" style={{ color: '#546E7A', fontSize: 14 }}>❌ 課程已被教室取消</div>
+                  <div className="ip-speech-sub" style={{ color: '#78909C', fontSize: 11 }}>點數已退回，請聯繫分校</div>
+                </div>
+              </div>
+
+              <div className="card-body">
+                <div className="info-row">
+                  <span className="info-label">孩子</span>
+                  <span className="info-value" style={{ fontWeight: 700, color: '#546E7A' }}>陳小明</span>
+                </div>
+                <div className="divider" />
+                <div className="info-row">
+                  <span className="info-label">📅 日期</span>
+                  <span className="info-value" style={{ textDecoration: 'line-through', color: '#bbb' }}>2026/05/03（日）10:00</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">📍 地點</span>
+                  <span className="info-value" style={{ textDecoration: 'line-through', color: '#bbb' }}>台北信義分校</span>
+                </div>
+                <div className="divider" />
+                <div className="info-row">
+                  <span className="info-label">退回</span>
+                  <span className="info-value">
+                    <span className="credit-badge" style={{ background: '#E8F5E9', borderColor: '#A5D6A7', color: '#2E7D32' }}>
+                      ✅ 1 堂・剩餘 6 堂
+                    </span>
+                  </span>
+                </div>
+                <div className="divider" />
+                <div style={{ fontSize: 11, color: '#666', lineHeight: 1.6, background: '#F5F7F8', borderRadius: 8, padding: '6px 10px' }}>
+                  📞 如有疑問請聯繫分校：02-2345-6789
+                </div>
+              </div>
+
+              <div className="card-footer">
+                <button className="cta-btn" style={{ background: '#78909C', color: 'white' }}>
+                  重新預約課程 →
+                </button>
+              </div>
             </div>
           </div>
           <div className="timestamp">下午 04:18</div>

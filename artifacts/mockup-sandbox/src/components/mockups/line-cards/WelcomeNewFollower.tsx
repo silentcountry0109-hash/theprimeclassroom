@@ -1,7 +1,6 @@
 import './_group.css';
 
 const logo = `${import.meta.env.BASE_URL}logo.png`;
-const ipChar = `${import.meta.env.BASE_URL}ip-character.png`;
 
 export function WelcomeNewFollower() {
   return (
@@ -13,7 +12,6 @@ export function WelcomeNewFollower() {
         </div>
 
         <div className="chat-area">
-          {/* 純文字歡迎開場 */}
           <div className="bubble-row">
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="text-bubble">
@@ -23,15 +21,13 @@ export function WelcomeNewFollower() {
             </div>
           </div>
 
-          {/* Flex 卡片 */}
           <div className="bubble-row" style={{ marginTop: 6 }}>
             <div className="sender-avatar"><img src={logo} alt="質數教室" /></div>
             <div className="flex-card">
-              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)' }}>
-                <img className="card-ip-img" src={ipChar} alt="質數先生" />
-                <div className="ip-speech-bubble">
-                  <div className="ip-speech-title">歡迎加入質數教室！</div>
-                  <div className="ip-speech-sub">立即預約免費診斷課程</div>
+              <div className="card-ip-row" style={{ background: 'linear-gradient(135deg, #81D8D0 0%, #4fbdb4 100%)', padding: '14px 14px' }}>
+                <div className="ip-speech-bubble" style={{ flex: 1, padding: '10px 14px' }}>
+                  <div className="ip-speech-title" style={{ fontSize: 14 }}>🎉 歡迎加入質數教室！</div>
+                  <div className="ip-speech-sub" style={{ fontSize: 11 }}>立即預約免費診斷課程</div>
                 </div>
               </div>
 
