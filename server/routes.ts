@@ -59,8 +59,13 @@ async function uploadPublicFile(
   const bucket = objectStorageClient.bucket(bucketName);
   const file = bucket.file(objectName);
   await file.save(buffer, { contentType, resumable: false });
-  await file.makePublic();
-  return `https://storage.googleapis.com/${bucketName}/${objectName}`;
+  try {
+    await file.makePublic();
+    return `https://storage.googleapis.com/${bucketName}/${objectName}`;
+  } catch (err: any) {
+    // 若 bucket 啟用 public access prevention，改用後端代理 URL
+    return `/public-objects/${bucketName}/${objectName}`;
+  }
 }
 
 async function uploadPrivatePdf(
@@ -123,12 +128,20 @@ async function deletePrivatePdf(storedPath: string): Promise<void> {
 }
 
 async function deletePublicFile(photoUrl: string): Promise<void> {
-  if (photoUrl.startsWith("https://storage.googleapis.com/")) {
+  if (photoUrl.startsWith("https://storage.googleapis.com/") || photoUrl.startsWith("/public-objects/")) {
     try {
-      const url = new URL(photoUrl);
-      const pathParts = url.pathname.split("/").filter(Boolean);
-      const bucketName = pathParts[0];
-      const objectName = pathParts.slice(1).join("/");
+      let bucketName: string;
+      let objectName: string;
+      if (photoUrl.startsWith("/public-objects/")) {
+        const parts = photoUrl.replace("/public-objects/", "").split("/");
+        bucketName = parts[0];
+        objectName = parts.slice(1).join("/");
+      } else {
+        const url = new URL(photoUrl);
+        const pathParts = url.pathname.split("/").filter(Boolean);
+        bucketName = pathParts[0];
+        objectName = pathParts.slice(1).join("/");
+      }
       await objectStorageClient.bucket(bucketName).file(objectName).delete();
     } catch { /* ignore if already deleted */ }
   } else if (photoUrl.startsWith("/uploads/")) {
@@ -564,6 +577,31 @@ export async function registerRoutes(
   // Legacy: serve files uploaded before the App Storage migration (e.g. coach photoUrl = "/uploads/xxx.jpg").
   // New uploads go to GCS; this route remains only for backward compatibility with existing DB records.
   app.use("/uploads", express.static(uploadsDir));
+
+  // 代理串流 GCS 公開檔案（在 bucket 啟用 public access prevention 時使用）。
+  // URL 格式：/public-objects/<bucketName>/<objectName...>
+  app.get(/^\/public-objects\/(.+)$/, async (req, res) => {
+    try {
+      const fullPath = req.params[0];
+      const parts = fullPath.split("/");
+      if (parts.length < 2) return res.status(400).send("Bad path");
+      const bucketName = parts[0];
+      const objectName = parts.slice(1).join("/");
+      const file = objectStorageClient.bucket(bucketName).file(objectName);
+      const [exists] = await file.exists();
+      if (!exists) return res.status(404).send("Not found");
+      const [metadata] = await file.getMetadata();
+      const contentType = metadata.contentType || "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      file.createReadStream()
+        .on("error", () => { if (!res.headersSent) res.status(500).end(); })
+        .pipe(res);
+    } catch (err) {
+      console.error("[public-objects]", err);
+      if (!res.headersSent) res.status(500).send("Failed to load file");
+    }
+  });
 
   await seedDatabase();
 
