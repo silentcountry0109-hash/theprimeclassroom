@@ -63,6 +63,7 @@ import heroClassroomImg from "@assets/hero_classroom.png";
 import brandPhilosophyImg from "@assets/brand_philosophy.png";
 import learningDetailImg from "@assets/learning_detail.png";
 import parentChildImg from "@assets/parent_child.png";
+import ctaDiagnosisImg from "@assets/ChatGPT_Image_2026年5月28日_下午03_31_57_1779953534103.png";
 import textbookDisplayImg from "@assets/textbook_display.png";
 import teacher1Img from "@assets/teacher_1.png";
 import teacher2Img from "@assets/teacher_2.png";
@@ -2046,7 +2047,7 @@ function CTASection() {
             transition={{ duration: 0.7 }}
           >
             <img
-              src={ctaBackgroundImage || parentChildImg}
+              src={ctaBackgroundImage || ctaDiagnosisImg}
               alt="家長與孩子一起學習"
               className="w-full h-[220px] sm:h-[300px] md:h-[360px] object-cover rounded-2xl shadow-lg"
             />
