@@ -50,7 +50,7 @@ import {
   Eye,
   XCircle,
 } from "lucide-react";
-import type { Coach, Faq, SuccessStory } from "@shared/schema";
+import type { Coach, Faq, SuccessStory, Franchise } from "@shared/schema";
 import { createContext, useContext } from "react";
 
 const SiteContentContext = createContext<Record<string, string>>({});
@@ -2219,14 +2219,76 @@ function FooterSection() {
   );
 }
 
-const BRANCH_LOCATIONS = [
-  { city: "台北市", districts: "大安區、信義區、中山區", count: 3 },
-  { city: "新北市", districts: "板橋區、中和區、新莊區", count: 3 },
-  { city: "桃園市", districts: "桃園區、中壢區", count: 2 },
-  { city: "台中市", districts: "西屯區、北屯區", count: 2 },
-  { city: "台南市", districts: "東區、永康區", count: 2 },
-  { city: "高雄市", districts: "苓雅區、三民區", count: 2 },
-];
+type BranchLocationCard = {
+  city: string;
+  district?: string;
+  districts: string;
+  count: number;
+  href: string;
+};
+
+function buildBranchLocations(franchises: Franchise[]): BranchLocationCard[] {
+  const active = franchises.filter((f) => f.isActive && f.city && f.district);
+  if (active.length === 0) return [];
+  const uniqueCities = Array.from(new Set(active.map((f) => f.city)));
+  const oneCardPerDistrict = uniqueCities.length <= 2;
+
+  if (oneCardPerDistrict) {
+    const byKey: Record<string, Franchise[]> = {};
+    const orderedKeys: string[] = [];
+    for (const f of active) {
+      const key = `${f.city}|${f.district}`;
+      if (!byKey[key]) {
+        byKey[key] = [];
+        orderedKeys.push(key);
+      }
+      byKey[key].push(f);
+    }
+    return orderedKeys.map((key) => {
+      const items = byKey[key];
+      const [city, district] = key.split("|");
+      const districtLabel = items.length > 1 ? `${district}（${items.length} 間教室）` : district;
+      return {
+        city,
+        district,
+        districts: districtLabel,
+        count: items.length,
+        href: `/search?city=${encodeURIComponent(city)}&district=${encodeURIComponent(district)}`,
+      };
+    });
+  }
+
+  const byCity: Record<string, Franchise[]> = {};
+  const orderedCities: string[] = [];
+  for (const f of active) {
+    if (!byCity[f.city]) {
+      byCity[f.city] = [];
+      orderedCities.push(f.city);
+    }
+    byCity[f.city].push(f);
+  }
+  return orderedCities.map((city) => {
+    const items = byCity[city];
+    const uniqueDistricts = Array.from(new Set(items.map((f) => f.district)));
+    const districtsLabel = uniqueDistricts.length > 4
+      ? `${uniqueDistricts.slice(0, 3).join("、")} 等 ${uniqueDistricts.length} 區`
+      : uniqueDistricts.join("、");
+    return {
+      city,
+      districts: districtsLabel,
+      count: items.length,
+      href: `/search?city=${encodeURIComponent(city)}`,
+    } as BranchLocationCard;
+  });
+}
+
+function getBranchGridClass(count: number): string {
+  if (count <= 1) return "grid grid-cols-1 max-w-md mx-auto gap-4 md:gap-6 mb-10 md:mb-14";
+  if (count === 2) return "grid grid-cols-1 sm:grid-cols-2 max-w-3xl mx-auto gap-4 md:gap-6 mb-10 md:mb-14";
+  if (count === 3) return "grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-14";
+  if (count === 4) return "grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-10 md:mb-14";
+  return "grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-14";
+}
 
 function StatsSection() {
   const stats = [
@@ -2266,34 +2328,49 @@ function StatsSection() {
 }
 
 function BranchLocationsSection() {
+  const badgeText = useSiteContent("branches.badge", "全台服務據點");
+  const titleText = useSiteContent("branches.title", "全台分校地圖");
+  const descText = useSiteContent("branches.description", "精選展示 6 大核心城市，全台 10+ 縣市均有服務據點，讓每個孩子都能就近找到優質師資");
+
+  const { data: franchises = [], isLoading } = useQuery<Franchise[]>({
+    queryKey: ["/api/franchises"],
+    staleTime: 30000,
+  });
+
+  const branches = buildBranchLocations(franchises);
+
+  if (!isLoading && branches.length === 0) {
+    return null;
+  }
+
   return (
     <section id="branches" className="py-14 md:py-24 px-4 md:px-6 bg-washi">
       <div className="max-w-6xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <div className="inline-flex items-center gap-2 bg-tiffany/10 text-tiffany text-sm font-medium px-3 py-1.5 rounded-full mb-4">
             <MapPin className="w-4 h-4" />
-            全台服務據點
+            {badgeText}
           </div>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4" data-testid="text-branches-title">
-            全台分校地圖
+            {titleText}
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            精選展示 6 大核心城市，全台 10+ 縣市均有服務據點，讓每個孩子都能就近找到優質師資
+          <p className="text-muted-foreground max-w-xl mx-auto whitespace-pre-line">
+            {descText}
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-14">
-          {BRANCH_LOCATIONS.map((branch, i) => (
+        <div className={getBranchGridClass(branches.length)}>
+          {branches.map((branch, i) => (
             <motion.a
-              key={branch.city}
-              href={`/search?city=${branch.city}`}
+              key={`${branch.city}-${branch.district || "city"}`}
+              href={branch.href}
               className="group bg-white rounded-2xl p-5 md:p-6 border border-gray-100 hover:border-tiffany/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300 block no-underline"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.08 }}
               data-testid={`card-branch-${i}`}
-              aria-label={`搜尋 ${branch.city} 的教室`}
+              aria-label={`搜尋 ${branch.city}${branch.district ? ` ${branch.district}` : ""} 的教室`}
             >
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-full bg-tiffany/10 flex items-center justify-center flex-shrink-0">

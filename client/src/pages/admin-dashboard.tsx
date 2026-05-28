@@ -3975,6 +3975,15 @@ const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
     ],
   },
   {
+    id: "branches",
+    label: "分校地圖區塊",
+    fields: [
+      { key: "branches.badge", label: "上方徽章文字" },
+      { key: "branches.title", label: "區塊主標題" },
+      { key: "branches.description", label: "區塊副標說明（會自動換行）", multiline: true },
+    ],
+  },
+  {
     id: "footer",
     label: "頁尾資訊",
     fields: [
@@ -4086,6 +4095,9 @@ const DEFAULT_VALUES: Record<string, string> = {
   "line.coach_welcome.footerHint": "請直接在下方輸入您的手機號碼 ↓",
   "cta.title": "立即預約免費診斷",
   "cta.description": "讓我們的認證老師為您的孩子進行一次免費的數學能力適性診斷，了解孩子的學習狀態，制定最適合的學習計畫。",
+  "branches.badge": "全台服務據點",
+  "branches.title": "全台分校地圖",
+  "branches.description": "精選展示 6 大核心城市，全台 10+ 縣市均有服務據點，讓每個孩子都能就近找到優質師資",
   "footer.description": "讓教學回歸「1 位老師」對「1 位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。",
   "footer.phone": "02-1234-5678",
   "footer.email": "hello@primemath.tw",
