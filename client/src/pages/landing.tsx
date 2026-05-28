@@ -126,13 +126,14 @@ const STUDENT_PHOTOS: Record<string, string> = {
 };
 
 const PARENT_TESTIMONIALS = [
-  { name: "陳媽媽", avatar: teacher1Img, child: "小宇三年級", quote: "孩子以前最怕數學，現在每週都期待上課！" },
-  { name: "林爸爸", avatar: teacher2Img, child: "小恩四年級", quote: "老師很有耐心，一對一教學效果真的很明顯。" },
-  { name: "王媽媽", avatar: teacher3Img, child: "小涵五年級", quote: "數學成績從 70 分進步到 95 分，太感動了！" },
-  { name: "張媽媽", avatar: teacher4Img, child: "小安二年級", quote: "質數教室讓孩子真正理解觀念，不是死背公式。" },
-  { name: "李爸爸", avatar: teacher5Img, child: "小芸六年級", quote: "升國中前的數學打底，選擇質數教室很放心。" },
-  { name: "黃媽媽", avatar: teacher6Img, child: "小翔三年級", quote: "老師會根據孩子的程度調整進度，很細心！" },
+  { name: "王爸爸", child: "王Ｏ宸五年級", quote: "分數小數單元曾是惡夢，來質數教室後孩子真的跟上了，省下超多親子衝突。" },
+  { name: "陳媽媽", child: "陳Ｏ樺三年級", quote: "系統能看到完整學習紀錄，一目了然，孩子進度掌握得很安心。" },
+  { name: "李媽媽", child: "李Ｏ傑四年級", quote: "沒有跟不上別人的壓力，約課也方便，孩子現在「不討厭數學」了。" },
+  { name: "王媽媽", child: "王Ｏ甯二年級", quote: "教材和上課模式都很喜歡，孩子二年級就能無壓力超修半年課程。" },
+  { name: "吳媽媽", child: "吳Ｏ雨六年級", quote: "老師明確點出孩子的學習盲點，針對個別狀況調整，進步很有感。" },
 ];
+
+const FALLBACK_HERO_AVATARS = [teacher1Img, teacher2Img, teacher3Img, teacher4Img, teacher5Img, teacher6Img];
 
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
 
@@ -248,6 +249,10 @@ function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
+  const { data: stories = [] } = useQuery<SuccessStory[]>({
+    queryKey: ["/api/success-stories"],
+  });
+
   useEffect(() => {
     if (isPaused) return;
     const timer = setInterval(() => {
@@ -258,14 +263,21 @@ function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string 
 
   const current = PARENT_TESTIMONIALS[activeIndex];
 
+  const avatarPool = useMemo(() => {
+    const fromStories = stories
+      .map((s) => s.photoUrl || STUDENT_PHOTOS[s.studentName])
+      .filter((url): url is string => !!url);
+    return fromStories.length > 0 ? fromStories : FALLBACK_HERO_AVATARS;
+  }, [stories]);
+
   const visibleAvatars = useMemo(() => {
-    const result = [];
+    const result: string[] = [];
     for (let i = 0; i < 4; i++) {
-      const idx = (activeIndex + i) % PARENT_TESTIMONIALS.length;
-      result.push(PARENT_TESTIMONIALS[idx]);
+      const idx = (activeIndex + i) % avatarPool.length;
+      result.push(avatarPool[idx]);
     }
     return result;
-  }, [activeIndex]);
+  }, [activeIndex, avatarPool]);
 
   return (
     <motion.div
@@ -279,11 +291,11 @@ function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string 
     >
       <div className="flex items-center gap-3">
         <div className="flex -space-x-2 md:-space-x-3">
-          {visibleAvatars.map((t, i) => (
+          {visibleAvatars.map((src, i) => (
             <motion.img
               key={`${activeIndex}-${i}`}
-              src={t.avatar}
-              alt={t.name}
+              src={src}
+              alt="家長頭像"
               className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white object-cover ${i === 3 ? "hidden sm:block" : ""}`}
               initial={{ opacity: 0, scale: 0.7, x: -10 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
