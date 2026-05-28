@@ -64,6 +64,9 @@ import brandPhilosophyImg from "@assets/brand_philosophy.png";
 import learningDetailImg from "@assets/learning_detail.png";
 import parentChildImg from "@assets/parent_child.png";
 import ctaDiagnosisImg from "@assets/ChatGPT_Image_2026年5月28日_下午03_31_57_1779953534103.png";
+import feat1IndividualImg from "@assets/個別指導_1779958868727.png";
+import feat2CertifiedImg from "@assets/專業認證師資_1779958868733.png";
+import feat3FlexibleImg from "@assets/彈性的預約制度_1779958868735.png";
 import textbookDisplayImg from "@assets/textbook_display.png";
 import teacher1Img from "@assets/teacher_1.png";
 import teacher2Img from "@assets/teacher_2.png";
@@ -1353,9 +1356,9 @@ function FeaturesSection() {
   const feat3Desc = useSiteContent("features.feat3.desc", "如同訂機票般簡單，家長可自由選擇教室、時段與老師，完全配合家庭的作息安排。");
 
   const features = [
-    { icon: Users, title: feat1Title, description: feat1Desc, image: learningDetailImg },
-    { icon: Shield, title: feat2Title, description: feat2Desc, image: teacher1Img },
-    { icon: Target, title: feat3Title, description: feat3Desc, image: parentChildImg },
+    { icon: Users, title: feat1Title, description: feat1Desc, image: feat1IndividualImg },
+    { icon: Shield, title: feat2Title, description: feat2Desc, image: feat2CertifiedImg },
+    { icon: Target, title: feat3Title, description: feat3Desc, image: feat3FlexibleImg },
   ];
 
   return (
