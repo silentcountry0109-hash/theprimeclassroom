@@ -558,19 +558,64 @@ function StoriesTab() {
   const [testimonial, setTestimonial] = useState("");
   const [grade, setGrade] = useState("");
   const [parentName, setParentName] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: stories = [], isLoading } = useQuery<SuccessStory[]>({
     queryKey: ["/api/admin/success-stories"],
   });
 
-  const openAdd = () => { setEditingStory(null); setStudentName(""); setTestimonial(""); setGrade(""); setParentName(""); setShowDialog(true); };
+  const openAdd = () => {
+    setEditingStory(null); setStudentName(""); setTestimonial(""); setGrade(""); setParentName("");
+    setPhotoUrl(""); setTags([]); setTagInput(""); setShowDialog(true);
+  };
   const openEdit = (s: SuccessStory) => {
     setEditingStory(s); setStudentName(s.studentName); setTestimonial(s.testimonial);
-    setGrade(s.grade?.toString() || ""); setParentName(s.parentName || ""); setShowDialog(true);
+    setGrade(s.grade?.toString() || ""); setParentName(s.parentName || "");
+    setPhotoUrl(s.photoUrl || ""); setTags(s.tags || []); setTagInput(""); setShowDialog(true);
   };
 
+  const handlePhotoUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "格式錯誤", description: "請選擇圖片檔", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "檔案過大", description: "圖片不可超過 5MB", variant: "destructive" });
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const res = await fetch("/api/admin/success-stories/upload-photo", {
+        method: "POST", body: formData, credentials: "include",
+      });
+      if (!res.ok) throw new Error("upload failed");
+      const data = await res.json();
+      setPhotoUrl(data.url);
+      toast({ title: "圖片已上傳" });
+    } catch (e) {
+      toast({ title: "上傳失敗", description: "請稍後再試", variant: "destructive" });
+    } finally {
+      setUploadingPhoto(false);
+      if (photoFileInputRef.current) photoFileInputRef.current.value = "";
+    }
+  };
+
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (t && !tags.includes(t) && tags.length < 5) {
+      setTags([...tags, t]); setTagInput("");
+    }
+  };
+  const removeTag = (t: string) => setTags(tags.filter((x) => x !== t));
+
   const saveMutation = useMutation({
-    mutationFn: async (data: { studentName: string; testimonial: string; grade?: number; parentName?: string }) => {
+    mutationFn: async (data: { studentName: string; testimonial: string; grade?: number; parentName?: string; photoUrl?: string | null; tags?: string[] }) => {
       if (editingStory) {
         const res = await apiRequest("PATCH", `/api/admin/success-stories/${editingStory.id}`, data);
         return res.json();
@@ -665,11 +710,76 @@ function StoriesTab() {
               <Label>感言</Label>
               <Textarea value={testimonial} onChange={(e) => setTestimonial(e.target.value)} placeholder="家長或學生的推薦感言" rows={4} data-testid="input-story-testimonial" />
             </div>
+            <div>
+              <Label>頭像照片</Label>
+              <div className="flex items-center gap-3 mt-1.5">
+                <div className="w-16 h-16 rounded-full border border-gray-200 overflow-hidden bg-gray-50 flex-shrink-0 flex items-center justify-center">
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="頭像" className="w-full h-full object-cover" data-testid="img-story-photo-preview" />
+                  ) : (
+                    <span className="text-xl text-gray-400">{studentName?.[0] || "?"}</span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => photoFileInputRef.current?.click()} disabled={uploadingPhoto} data-testid="button-upload-story-photo">
+                      <Upload className="w-3.5 h-3.5 mr-1" />
+                      {uploadingPhoto ? "上傳中..." : photoUrl ? "更換" : "上傳"}
+                    </Button>
+                    {photoUrl && (
+                      <Button type="button" variant="outline" size="sm" onClick={() => setPhotoUrl("")} data-testid="button-remove-story-photo">
+                        <X className="w-3.5 h-3.5 mr-1" />移除
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">建議 400×400 正方形，JPG/PNG，5MB 內</p>
+                </div>
+                <input
+                  ref={photoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); }}
+                  data-testid="input-story-photo-file"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>標籤（最多 5 個）</Label>
+              <div className="flex gap-2 mt-1.5">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                  placeholder="如：成績大幅提升"
+                  data-testid="input-story-tag"
+                />
+                <Button type="button" variant="outline" onClick={addTag} disabled={!tagInput.trim() || tags.length >= 5} data-testid="button-add-story-tag">新增</Button>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {tags.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 text-xs bg-amber-warm text-foreground/70 px-2 py-1 rounded-full" data-testid={`tag-story-${t}`}>
+                      {t}
+                      <button type="button" onClick={() => removeTag(t)} className="hover:text-foreground" data-testid={`button-remove-tag-${t}`}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
             <Button
-              onClick={() => saveMutation.mutate({ studentName, testimonial, grade: grade ? parseInt(grade) : undefined, parentName: parentName || undefined })}
+              onClick={() => saveMutation.mutate({
+                studentName, testimonial,
+                grade: grade ? parseInt(grade) : undefined,
+                parentName: parentName || undefined,
+                photoUrl: photoUrl || null,
+                tags,
+              })}
               disabled={!studentName || !testimonial || saveMutation.isPending}
               data-testid="button-submit-story"
             >

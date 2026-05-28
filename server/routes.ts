@@ -1923,6 +1923,17 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/success-stories/upload-photo", isAdmin, upload.single("photo"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "請選擇圖片" });
+      const photoUrl = await uploadPublicFile(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
+      res.json({ url: photoUrl });
+    } catch (error) {
+      console.error("[success-stories upload-photo]", error);
+      res.status(500).json({ message: "上傳失敗" });
+    }
+  });
+
   app.patch("/api/admin/success-stories/:id", isAdmin, async (req, res) => {
     try {
       const story = await storage.updateSuccessStory(parseInt(req.params.id), req.body);

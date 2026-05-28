@@ -1882,9 +1882,9 @@ function TestimonialsSection() {
                     <div className="flex flex-col md:flex-row gap-8 items-center">
                       <div className="flex-shrink-0">
                         <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-tiffany/20 shadow-md">
-                          {STUDENT_PHOTOS[stories[currentIndex].studentName] ? (
+                          {stories[currentIndex].photoUrl || STUDENT_PHOTOS[stories[currentIndex].studentName] ? (
                             <img
-                              src={STUDENT_PHOTOS[stories[currentIndex].studentName]}
+                              src={stories[currentIndex].photoUrl || STUDENT_PHOTOS[stories[currentIndex].studentName]}
                               alt={stories[currentIndex].studentName}
                               className="w-full h-full object-cover rounded-full"
                             />
