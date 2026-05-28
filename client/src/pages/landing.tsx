@@ -314,7 +314,7 @@ function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string 
         </div>
       </div>
 
-      <div className="relative h-12 sm:h-10 w-full max-w-md overflow-hidden">
+      <div className="relative min-h-[5.5rem] sm:min-h-[4.5rem] w-full max-w-md mt-1">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeIndex}
@@ -322,9 +322,9 @@ function HeroTestimonialCarousel({ socialProofText }: { socialProofText: string 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.4 }}
-            className="absolute inset-0 flex items-center justify-center gap-2 px-4"
+            className="absolute inset-0 flex items-start justify-center gap-2 px-4"
           >
-            <Quote className="w-3 h-3 text-tiffany/50 flex-shrink-0 -mt-2 self-start" />
+            <Quote className="w-3 h-3 text-tiffany/50 flex-shrink-0 mt-1.5" />
             <p className="text-xs sm:text-sm text-muted-foreground text-center leading-relaxed">
               {current.quote}
             </p>
