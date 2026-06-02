@@ -4571,6 +4571,15 @@ interface CreditPackageOption {
   isActive: boolean;
 }
 
+interface ParentSearchResult {
+  parentId: string;
+  parentName: string;
+  username: string | null;
+  phone: string | null;
+  balance: number;
+  matchedStudent: { name: string; studentCode: string | null } | null;
+}
+
 function ParentCreditsTab() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -4581,6 +4590,32 @@ function ParentCreditsTab() {
     credits: number;
     description: string;
   }>({ packageId: null, credits: 0, description: "" });
+
+  const [lookupQuery, setLookupQuery] = useState("");
+  const [lookupResult, setLookupResult] = useState<ParentSearchResult | null>(null);
+
+  const lookupMutation = useMutation({
+    mutationFn: async (q: string) => {
+      const res = await apiRequest("GET", `/api/franchise-admin/search-parent?q=${encodeURIComponent(q)}`);
+      return res.json() as Promise<ParentSearchResult>;
+    },
+    onSuccess: (data) => {
+      setLookupResult(data);
+    },
+    onError: (err: any) => {
+      setLookupResult(null);
+      toast({ title: err.message || "查無此家長", variant: "destructive" });
+    },
+  });
+
+  const runLookup = () => {
+    const q = lookupQuery.trim();
+    if (!q) {
+      toast({ title: "請輸入手機號碼或學生編號", variant: "destructive" });
+      return;
+    }
+    lookupMutation.mutate(q);
+  };
 
   const { data: wallets = [], isLoading } = useQuery<ParentWallet[]>({
     queryKey: ["/api/franchise-admin/parent-wallets"],
@@ -4611,9 +4646,12 @@ function ParentCreditsTab() {
       const res = await apiRequest("POST", "/api/franchise-admin/adjust-credits", data);
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       toast({ title: "加點成功", description: `新餘額：${data.newBalance} 堂` });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/parent-wallets"] });
+      setLookupResult((prev) =>
+        prev && prev.parentId === variables.parentId ? { ...prev, balance: data.newBalance } : prev
+      );
       setShowDialog(false);
       setSelectedParent(null);
     },
@@ -4635,6 +4673,74 @@ function ParentCreditsTab() {
         <p className="text-xs text-muted-foreground mt-1">
           可手動加點的家長為本分校相關（孩子曾在此分校預約，或已加入本分校學生名單）
         </p>
+      </div>
+
+      <div className="mb-6 bg-white rounded-md border border-tiffany/30 p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Search className="w-4 h-4 text-tiffany" />
+          <h3 className="text-sm font-semibold text-foreground">搜尋家長加點</h3>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          輸入家長手機號碼或學生編號，可直接幫尚未在本分校預約的家長加點
+        </p>
+        <div className="flex gap-2 max-w-md">
+          <Input
+            value={lookupQuery}
+            onChange={(e) => setLookupQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") runLookup(); }}
+            placeholder="手機號碼或學生編號"
+            data-testid="input-lookup-parent"
+          />
+          <Button
+            onClick={runLookup}
+            disabled={lookupMutation.isPending}
+            data-testid="button-lookup-parent"
+          >
+            {lookupMutation.isPending ? "搜尋中..." : "搜尋"}
+          </Button>
+        </div>
+
+        {lookupResult && (
+          <div
+            className="mt-3 bg-amber-warm/20 rounded-md border border-gray-100 p-4 flex items-center gap-4"
+            data-testid={`lookup-card-${lookupResult.parentId}`}
+          >
+            <div className="w-10 h-10 rounded-full bg-tiffany/10 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-tiffany" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground" data-testid={`text-lookup-name-${lookupResult.parentId}`}>
+                {lookupResult.parentName || lookupResult.username}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {lookupResult.phone ? lookupResult.phone : (lookupResult.username ? `@${lookupResult.username}` : "—")}
+                {lookupResult.matchedStudent && (
+                  <span>　學生：{lookupResult.matchedStudent.name}{lookupResult.matchedStudent.studentCode ? `（${lookupResult.matchedStudent.studentCode}）` : ""}</span>
+                )}
+              </p>
+            </div>
+            <div className="text-right mr-3">
+              <p className="text-lg font-bold text-foreground" data-testid={`text-lookup-balance-${lookupResult.parentId}`}>
+                {lookupResult.balance}
+              </p>
+              <p className="text-[10px] text-muted-foreground">剩餘堂數</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openAdjust({
+                parentId: lookupResult.parentId,
+                parentName: lookupResult.parentName,
+                username: lookupResult.username || "",
+                phone: lookupResult.phone,
+                balance: lookupResult.balance,
+              })}
+              data-testid={`button-lookup-adjust-${lookupResult.parentId}`}
+            >
+              <Plus className="w-4 h-4 mr-1" />加點
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="mb-3 relative max-w-sm">

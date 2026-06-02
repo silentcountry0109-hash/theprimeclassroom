@@ -3062,16 +3062,23 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/franchise-admin/search-parent", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const query = String(req.query.q || "").trim();
+      if (!query) return res.status(400).json({ message: "請輸入手機號碼或學生編號" });
+      const result = await storage.searchParentForCredits(query);
+      if (!result) return res.status(404).json({ message: "查無此家長，請確認手機號碼或學生編號" });
+      res.json(result);
+    } catch (error: any) {
+      console.error("[franchise-admin/search-parent] error:", error);
+      res.status(500).json({ message: error.message || "搜尋家長失敗" });
+    }
+  });
+
   app.post("/api/franchise-admin/adjust-credits", isFranchiseAdmin, async (req: any, res) => {
     try {
       const { parentId, packageId, credits, description } = req.body;
       if (!parentId) return res.status(400).json({ message: "請選擇家長" });
-
-      const students = await storage.getFranchiseStudents(req.franchiseId);
-      const relatedParentIds = new Set(students.map((s: any) => s.parentId).filter(Boolean));
-      if (!relatedParentIds.has(parentId)) {
-        return res.status(403).json({ message: "此家長與您管理的分校無關聯，無法加點" });
-      }
 
       const franchise = await storage.getFranchise(req.franchiseId);
       const franchiseName = franchise?.name || `分校 #${req.franchiseId}`;

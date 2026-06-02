@@ -221,6 +221,7 @@ export interface IStorage {
   getUnreadNotificationCount(userId: string): Promise<number>;
 
   getFranchiseStudents(franchiseId: number): Promise<any[]>;
+  searchParentForCredits(query: string): Promise<{ parentId: string; parentName: string; username: string | null; phone: string | null; balance: number; matchedStudent: { name: string; studentCode: string | null } | null } | null>;
   addFranchiseStudent(franchiseId: number, name: string, grade: number): Promise<any>;
   removeFranchiseStudent(franchiseId: number, childId: number): Promise<void>;
   getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]>;
@@ -848,6 +849,49 @@ export class DatabaseStorage implements IStorage {
       });
     }
     return result;
+  }
+
+  async searchParentForCredits(query: string): Promise<{ parentId: string; parentName: string; username: string | null; phone: string | null; balance: number; matchedStudent: { name: string; studentCode: string | null } | null } | null> {
+    const q = query.trim();
+    if (!q) return null;
+
+    let parentId: string | null = null;
+    let matchedStudent: { name: string; studentCode: string | null } | null = null;
+
+    const [byPhone] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, q), eq(users.role, "parent")));
+    if (byPhone) {
+      parentId = byPhone.id;
+    } else {
+      const [child] = await db
+        .select({ parentId: children.parentId, name: children.name, studentCode: children.studentCode })
+        .from(children)
+        .where(eq(children.studentCode, q));
+      if (child?.parentId) {
+        parentId = child.parentId;
+        matchedStudent = { name: child.name, studentCode: child.studentCode };
+      }
+    }
+
+    if (!parentId) return null;
+
+    const [parent] = await db
+      .select({ id: users.id, username: users.username, firstName: users.firstName, lastName: users.lastName, phone: users.phone })
+      .from(users)
+      .where(eq(users.id, parentId));
+    if (!parent) return null;
+
+    const balance = await this.getParentBalance(parent.id);
+    return {
+      parentId: parent.id,
+      parentName: `${parent.lastName || ""}${parent.firstName || ""}`.trim() || parent.username || "未設定",
+      username: parent.username,
+      phone: parent.phone,
+      balance,
+      matchedStudent,
+    };
   }
 
   async addFranchiseStudent(franchiseId: number, name: string, grade: number): Promise<any> {
