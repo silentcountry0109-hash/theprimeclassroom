@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ type LoginMode = "franchise" | "coach";
 
 export default function FranchiseLogin() {
   const [location, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const initialMode: LoginMode = location === "/coach-login" ? "coach" : "franchise";
   const [mode, setMode] = useState<LoginMode>(initialMode);
   const lsKey = mode === "franchise" ? "rememberedFranchiseUsername" : "rememberedCoachUsername";
@@ -66,6 +68,8 @@ export default function FranchiseLogin() {
       }
       if (mode === "franchise") {
         if (data.role === "franchise_admin") {
+          queryClient.setQueryData(["/api/credential-user"], data);
+          await queryClient.invalidateQueries({ queryKey: ["/api/credential-user"] });
           navigate("/franchise-admin");
         } else {
           setError("此帳號不是分校管理帳號");
@@ -75,6 +79,7 @@ export default function FranchiseLogin() {
           if (data.mustChangePassword) {
             setShowChangePassword(true);
           } else {
+            await queryClient.fetchQuery({ queryKey: ["/api/coach-user"], staleTime: 0 });
             navigate("/coach-dashboard");
           }
         } else {
@@ -304,6 +309,7 @@ export default function FranchiseLogin() {
                     setChangePasswordError(err.message || "修改密碼失敗");
                   } else {
                     setShowChangePassword(false);
+                    await queryClient.fetchQuery({ queryKey: ["/api/coach-user"], staleTime: 0 });
                     navigate("/coach-dashboard?firstLogin=1");
                   }
                 } catch {
