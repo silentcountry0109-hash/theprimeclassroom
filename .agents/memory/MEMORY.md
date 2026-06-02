@@ -1,0 +1,1 @@
+- [Mockup-sandbox preview screenshots](mockup-sandbox-screenshots.md) — app_preview hits :5000 (main app); screenshot mockup previews via external_url + dev domain instead.

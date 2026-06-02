@@ -66,6 +66,72 @@ uri = "file://artifacts/mockup-sandbox/public/ip-poses/ip-bowing.png"
 type = "image"
 title = "mascot bowing"
 
+[[generated]]
+id = "C_y1_nchdr9puPw8xbtgd"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-booking.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "w8WL_BY5e_mlbxlS9L13r"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-reminder.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "IMY8IiXIdwpXrO2D-dhPR"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-cancel.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "a9QxRaaYS6QvpqFsZi8WW"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-recurring.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "6LIQaFLJLamlQBzkr1bHL"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-admin.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "4ERqi5bgnxYD9_7CqydPw"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-contact.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "5trHcK-1ypbqoZMxE0Wr7"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-admincancel.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "4n84l7KPEBK80bPjnJItQ"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-lowcredits.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "Fp7FQg4OZO3G5oc15sWaT"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-nocredits.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "pqT0iH0Yn6dQBARFbSNYR"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-bind.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "NKFuZhoHjEc54g2O40g-M"
+uri = "file://artifacts/mockup-sandbox/public/images/ip-welcome.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "0fac_NhxDsnWTwJqmw1kQ"
 uri = "file://.local/質數教室_平台策略完整文件.md"
