@@ -1,0 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+.teacher-card-root,
+.teacher-card-root * {
+  font-family: 'Noto Sans TC', system-ui, sans-serif;
+  box-sizing: border-box;
+}
