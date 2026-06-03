@@ -1,1 +1,2 @@
 - [Mockup-sandbox preview screenshots](mockup-sandbox-screenshots.md) — app_preview hits :5000 (main app); screenshot mockup previews via external_url + dev domain instead.
+- [Taiwan schools list audits](taiwan-schools-audit.md) — authoritative MOE dataset 6087 JSON + district-parse/dedup/rename traps for shared/taiwan-schools.ts.
