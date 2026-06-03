@@ -13,7 +13,7 @@ import {
   type RegistrationGiftSetting,
   users,
   type Franchise, type InsertFranchise,
-  type Coach, type InsertCoach,
+  type Coach, type InsertCoach, type AggregatedCoach,
   type Child, type InsertChild,
   type TimeSlot, type InsertTimeSlot,
   type Booking, type InsertBooking,
@@ -52,7 +52,7 @@ import path from "path";
 import { sendLineMessage, sendLineFlexMessage, buildAdminCancelFlex } from "./line";
 
 export interface IStorage {
-  getCoaches(): Promise<Coach[]>;
+  getCoaches(): Promise<AggregatedCoach[]>;
   getAllCoaches(): Promise<Coach[]>;
   getCoach(id: number): Promise<Coach | undefined>;
   getCoachesByFranchise(franchiseId: number): Promise<Coach[]>;
@@ -349,8 +349,66 @@ function getTimePeriodCondition(periods: string[]): string {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getCoaches(): Promise<Coach[]> {
-    return db.select().from(coaches).where(eq(coaches.isCertified, true));
+  async getCoaches(): Promise<AggregatedCoach[]> {
+    const rows = await db
+      .select({ coach: coaches, franchiseName: franchises.name })
+      .from(coaches)
+      .leftJoin(franchises, eq(coaches.franchiseId, franchises.id))
+      .where(eq(coaches.isCertified, true))
+      .orderBy(asc(coaches.id));
+
+    // 以 union-find 合併「同一個人」：兩筆只要共享 userId 或 姓名 任一者即視為同一人。
+    // 這能涵蓋同一人在不同分校資料識別欄位不一致的情況（例：一筆有 userId、另一筆只有姓名）。
+    // 註：未採用 phone 作為合併鍵，因實務資料中同一支電話可能被不同老師共用（例：分校櫃檯號碼／
+    // 測試資料），以 phone 合併會錯誤地把不同人併在一起；userId 與姓名才是可靠的身分依據。
+    const parent = new Map<number, number>();
+    const find = (x: number): number => {
+      let root = x;
+      while (parent.get(root) !== root) root = parent.get(root)!;
+      while (parent.get(x) !== root) {
+        const next = parent.get(x)!;
+        parent.set(x, root);
+        x = next;
+      }
+      return root;
+    };
+    const union = (a: number, b: number) => {
+      parent.set(find(a), find(b));
+    };
+
+    for (const { coach } of rows) parent.set(coach.id, coach.id);
+
+    const seenByUserId = new Map<string, number>();
+    const seenByName = new Map<string, number>();
+    for (const { coach } of rows) {
+      if (coach.userId) {
+        const prev = seenByUserId.get(coach.userId);
+        if (prev !== undefined) union(prev, coach.id);
+        else seenByUserId.set(coach.userId, coach.id);
+      }
+      const prevName = seenByName.get(coach.name);
+      if (prevName !== undefined) union(prevName, coach.id);
+      else seenByName.set(coach.name, coach.id);
+    }
+
+    // 依合併群組聚合，維持各群組第一次出現（id 最小）的順序。
+    const merged = new Map<number, AggregatedCoach>();
+    const order: number[] = [];
+    for (const { coach, franchiseName } of rows) {
+      const root = find(coach.id);
+      // 分校標籤：去除「質數教室 」前綴讓標籤更精簡（例：大安教室）
+      const branch = franchiseName ? franchiseName.replace(/^質數教室\s*/, "") : null;
+      const existing = merged.get(root);
+      if (existing) {
+        // 一致頭像：任一筆有 photoUrl 即採用該值
+        if (!existing.photoUrl && coach.photoUrl) existing.photoUrl = coach.photoUrl;
+        if (branch && !existing.branchNames.includes(branch)) existing.branchNames.push(branch);
+      } else {
+        merged.set(root, { ...coach, branchNames: branch ? [branch] : [] });
+        order.push(root);
+      }
+    }
+    return order.map((r) => merged.get(r)!);
   }
 
   async getAllCoaches(): Promise<Coach[]> {

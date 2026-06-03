@@ -29,8 +29,17 @@ export const TEACHER_PHOTO_MAP: Record<string, string> = {
   "黃建宏": teacher6,
 };
 
-export function getCoachPhoto(name: string, id?: number, photoUrl?: string | null): string {
+function stableNameHash(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash + name.charCodeAt(i)) % 1000003;
+  }
+  return hash;
+}
+
+export function getCoachPhoto(name: string, _id?: number, photoUrl?: string | null): string {
   if (photoUrl) return photoUrl;
   if (TEACHER_PHOTO_MAP[name]) return TEACHER_PHOTO_MAP[name];
-  return getDefaultTeacherImage(id ?? (name.length > 0 ? name.charCodeAt(0) : 0));
+  // 預設頭像以「姓名」這個穩定鍵決定，確保同一個人永遠對應同一張預設圖
+  return getDefaultTeacherImage(stableNameHash(name));
 }

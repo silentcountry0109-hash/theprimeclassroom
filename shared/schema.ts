@@ -187,6 +187,7 @@ export type Franchise = typeof franchises.$inferSelect;
 export type InsertFranchise = z.infer<typeof insertFranchiseSchema>;
 export type Coach = typeof coaches.$inferSelect;
 export type InsertCoach = z.infer<typeof insertCoachSchema>;
+export type AggregatedCoach = Coach & { branchNames: string[] };
 export type Child = typeof children.$inferSelect;
 export type InsertChild = z.infer<typeof insertChildSchema>;
 export type TimeSlot = typeof timeSlots.$inferSelect;

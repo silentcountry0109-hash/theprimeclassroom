@@ -50,7 +50,7 @@ import {
   Eye,
   XCircle,
 } from "lucide-react";
-import type { Coach, Faq, SuccessStory, Franchise } from "@shared/schema";
+import type { Coach, AggregatedCoach, Faq, SuccessStory, Franchise } from "@shared/schema";
 import { createContext, useContext } from "react";
 
 const SiteContentContext = createContext<Record<string, string>>({});
@@ -1423,7 +1423,7 @@ function FeaturesSection() {
 }
 
 function CoachesSection() {
-  const { data: coaches = [], isLoading } = useQuery<Coach[]>({
+  const { data: coaches = [], isLoading } = useQuery<AggregatedCoach[]>({
     queryKey: ["/api/coaches"],
   });
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1536,6 +1536,7 @@ function CoachesSection() {
                       bookedSeats={2}
                       maxSeats={5}
                       isCertified={coach.isCertified}
+                      branchNames={coach.branchNames}
                     />
                   </div>
                 ))}

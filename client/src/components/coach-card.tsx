@@ -1,4 +1,4 @@
-import { Star, Award } from "lucide-react";
+import { Star, Award, MapPin } from "lucide-react";
 import { getCoachPhoto } from "@/lib/default-images";
 
 interface CoachCardProps {
@@ -11,6 +11,7 @@ interface CoachCardProps {
   bookedSeats?: number;
   maxSeats?: number;
   isCertified?: boolean;
+  branchNames?: string[] | null;
 }
 
 export default function CoachCard({
@@ -23,9 +24,13 @@ export default function CoachCard({
   bookedSeats = 0,
   maxSeats = 5,
   isCertified,
+  branchNames,
 }: CoachCardProps) {
   const resolvedPhoto = getCoachPhoto(name, coachId, photoUrl);
   const availableSeats = maxSeats - bookedSeats;
+  const branches = branchNames ?? [];
+  const shownBranches = branches.slice(0, 2);
+  const extraBranches = branches.length - shownBranches.length;
 
   return (
     <div
@@ -66,6 +71,29 @@ export default function CoachCard({
           )}
         </div>
       </div>
+
+      {branches.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2.5" data-testid={`branches-coach-${name}`}>
+          {shownBranches.map((b, i) => (
+            <span
+              key={b}
+              className="inline-flex items-center gap-0.5 bg-tiffany/10 border border-tiffany/40 text-[#2A8F86] rounded-full px-2 py-0.5 text-[11px] font-medium"
+              data-testid={`branch-tag-${name}-${i}`}
+            >
+              {i === 0 && <MapPin className="w-3 h-3" />}
+              {b}
+            </span>
+          ))}
+          {extraBranches > 0 && (
+            <span
+              className="inline-flex items-center bg-gray-100 text-gray-500 rounded-full px-2 py-0.5 text-[11px] font-medium"
+              data-testid={`branch-overflow-${name}`}
+            >
+              +{extraBranches} 分校
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-center gap-2 mt-3">
         {Array.from({ length: maxSeats }).map((_, i) => (
