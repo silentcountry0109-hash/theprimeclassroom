@@ -50,6 +50,10 @@ args = "Start application"
 task = "workflow.run"
 args = "coach-phone-sync-test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "otp-verification-test"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -66,6 +70,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx vitest run server/tests/coach-phone-sync.test.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "otp-verification-test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx vitest run server/tests/otp-verification.test.ts"
 
 [workflows.workflow.metadata]
 isValidation = true
