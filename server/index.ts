@@ -7,6 +7,11 @@ import { sendLineMessage, sendLineFlexMessage, buildCoachDailySummaryFlex, build
 const app = express();
 const httpServer = createServer(app);
 
+// 部署環境位於 Replit 邊緣代理之後（單一信任跳點）。設為 1 讓 Express 從
+// X-Forwarded-For「右側數來第 2 個」推導真實用戶端 IP（req.ip），並忽略用戶端
+// 自行偽造塞在左側的 IP，避免限流等安全控制被 X-Forwarded-For 偽造繞過。
+app.set("trust proxy", 1);
+
 app.use(express.json({
   verify: (req: any, _res, buf) => {
     req.rawBody = buf;

@@ -196,6 +196,94 @@ function recordOtpSend(phone: string): void {
   otpRateLimitStore.set(phone, Date.now());
 }
 
+// ── 防簡訊轟炸：同一「來源」（登入使用者或 IP）短時間內針對多個號碼大量發送的限流 ──
+// 現行 otpRateLimitStore 只擋「同一號碼 60 秒一次」，無法阻止攻擊者輪流換號碼觸發大量簡訊。
+// 這裡再加一層「同一來源」限流：在滑動視窗內最多 OTP_SOURCE_MAX_SENDS 次成功發送。
+//
+// ⚠️ 此 Map 為單一實例的記憶體狀態，多實例（水平擴充）部署下各實例各自計數，限流會被稀釋。
+//    若日後上線多實例，應改用共享儲存（Redis / DB）集中計數；現階段單實例足以提供基本防護。
+const OTP_SOURCE_WINDOW_MS = 10 * 60_000; // 滑動視窗 10 分鐘
+const OTP_SOURCE_MAX_SENDS = 5;           // 同一來源 10 分鐘內最多 5 次發送
+const otpSourceSendStore = new Map<string, number[]>();
+setInterval(() => {
+  const cutoff = Date.now() - OTP_SOURCE_WINDOW_MS;
+  for (const [key, arr] of otpSourceSendStore.entries()) {
+    const kept = arr.filter((ts) => ts >= cutoff);
+    if (kept.length === 0) otpSourceSendStore.delete(key);
+    else otpSourceSendStore.set(key, kept);
+  }
+}, 5 * 60_000);
+
+// 取得請求來源識別字串：優先用登入使用者 id，否則用用戶端 IP。
+// 一律用 Express 依「trust proxy」設定推導出的 req.ip，不直接讀取可被偽造的
+// X-Forwarded-For 標頭，避免攻擊者每次塞不同假 IP 來繞過來源限流。
+function getOtpRequestSource(req: any): string {
+  const userId = getSessionUserId(req);
+  if (userId) return `user:${userId}`;
+  const ip = req.ip || req.socket?.remoteAddress || "unknown";
+  return `ip:${ip}`;
+}
+
+// 回傳此來源仍需等待的秒數（0 代表未被限流）。
+function checkOtpSourceRateLimit(source: string): number {
+  const now = Date.now();
+  const arr = (otpSourceSendStore.get(source) ?? []).filter((ts) => now - ts < OTP_SOURCE_WINDOW_MS);
+  otpSourceSendStore.set(source, arr);
+  if (arr.length >= OTP_SOURCE_MAX_SENDS) {
+    return Math.ceil((OTP_SOURCE_WINDOW_MS - (now - arr[0])) / 1000);
+  }
+  return 0;
+}
+
+function recordOtpSourceSend(source: string): void {
+  const arr = otpSourceSendStore.get(source) ?? [];
+  arr.push(Date.now());
+  otpSourceSendStore.set(source, arr);
+}
+
+// ── 防暴力猜碼：confirm-otp 連續錯誤的鎖定 / 退避機制 ──
+// 同一號碼連續錯誤達 OTP_CONFIRM_MAX_FAILS 次後鎖定 OTP_CONFIRM_LOCKOUT_MS，期間直接回 429，
+// 不再呼叫 Twilio，避免被無限次試碼（並省下 Twilio 驗證請求）。驗證成功即清除計數。
+const OTP_CONFIRM_MAX_FAILS = 5;
+const OTP_CONFIRM_LOCKOUT_MS = 15 * 60_000; // 鎖定 15 分鐘
+const otpConfirmAttemptStore = new Map<string, { fails: number; lockedUntil: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, rec] of otpConfirmAttemptStore.entries()) {
+    // 已解鎖且無累積失敗的紀錄可清掉
+    if (rec.lockedUntil <= now && rec.fails === 0) otpConfirmAttemptStore.delete(key);
+  }
+}, 5 * 60_000);
+
+// 回傳鎖定剩餘秒數（0 代表未被鎖定）。
+function checkOtpConfirmLock(key: string): number {
+  const rec = otpConfirmAttemptStore.get(key);
+  if (!rec) return 0;
+  const remaining = rec.lockedUntil - Date.now();
+  return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+}
+
+function recordOtpConfirmFailure(key: string): void {
+  const rec = otpConfirmAttemptStore.get(key) ?? { fails: 0, lockedUntil: 0 };
+  rec.fails += 1;
+  if (rec.fails >= OTP_CONFIRM_MAX_FAILS) {
+    rec.lockedUntil = Date.now() + OTP_CONFIRM_LOCKOUT_MS;
+    rec.fails = 0; // 鎖定後重置計數，待解鎖後重新累計
+  }
+  otpConfirmAttemptStore.set(key, rec);
+}
+
+function clearOtpConfirmAttempts(key: string): void {
+  otpConfirmAttemptStore.delete(key);
+}
+
+// 測試輔助：重置所有 OTP 限流 / 鎖定狀態（模組層級 Map 在測試間會互相污染）。
+export function __resetOtpThrottleStores(): void {
+  otpRateLimitStore.clear();
+  otpSourceSendStore.clear();
+  otpConfirmAttemptStore.clear();
+}
+
 function hasTwilioCredentials(): boolean {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&
@@ -682,8 +770,14 @@ export async function registerRoutes(
       if (wait > 0) {
         return res.status(429).json({ message: `請等待 ${wait} 秒後再重新發送` });
       }
+      const source = getOtpRequestSource(req);
+      const sourceWait = checkOtpSourceRateLimit(source);
+      if (sourceWait > 0) {
+        return res.status(429).json({ message: "發送次數過多，請稍後再試" });
+      }
       await sendTwilioOtp(phone);
       recordOtpSend(phone);
+      recordOtpSourceSend(source);
       return res.json({ message: "驗證碼已發送" });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "發送失敗，請稍後再試";
@@ -819,8 +913,14 @@ export async function registerRoutes(
       if (wait > 0) {
         return res.status(429).json({ message: `請等待 ${wait} 秒後再重新發送` });
       }
+      const source = getOtpRequestSource(req);
+      const sourceWait = checkOtpSourceRateLimit(source);
+      if (sourceWait > 0) {
+        return res.status(429).json({ message: "發送次數過多，請稍後再試" });
+      }
       await sendTwilioOtp(phone);
       recordOtpSend(phone);
+      recordOtpSourceSend(source);
       res.json({ message: "驗證碼已發送" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "發送失敗，請稍後再試";
@@ -837,6 +937,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "請輸入有效的台灣手機號碼（09 開頭 10 碼）" });
       }
       if (!otp) return res.status(400).json({ message: "缺少必要欄位" });
+      const lockWait = checkOtpConfirmLock(phone);
+      if (lockWait > 0) {
+        const mins = Math.ceil(lockWait / 60);
+        return res.status(429).json({ message: `驗證錯誤次數過多，請於約 ${mins} 分鐘後再試` });
+      }
       let approved = false;
       try {
         approved = await checkTwilioOtp(phone, otp);
@@ -845,8 +950,10 @@ export async function registerRoutes(
         return res.status(500).json({ message: msg });
       }
       if (!approved) {
+        recordOtpConfirmFailure(phone);
         return res.status(400).json({ message: "驗證碼不正確或已過期，請重新發送" });
       }
+      clearOtpConfirmAttempts(phone);
       const [updated] = await db.update(users)
         .set({ phone, lineRegistrationComplete: true, updatedAt: new Date() })
         .where(eq(users.id, userId))
