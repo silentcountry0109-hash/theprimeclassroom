@@ -49,6 +49,10 @@ import {
   Milestone,
   Eye,
   XCircle,
+  UserPlus,
+  Gift,
+  CalendarCheck,
+  ClipboardCheck,
 } from "lucide-react";
 import type { Coach, AggregatedCoach, Faq, SuccessStory, Franchise } from "@shared/schema";
 import { createContext, useContext } from "react";
@@ -1565,27 +1569,37 @@ function CoachesSection() {
 }
 
 function ProcessSection() {
-  const procTitle = useSiteContent("process.title", "如何開始");
-  const procDesc = useSiteContent("process.description", "只需簡單四步驟，即可開始孩子的學習旅程");
-  const proc1Title = useSiteContent("process.step1.title", "搜尋教室");
-  const proc1Desc = useSiteContent("process.step1.desc", "選擇地區與年級，找到離您最近的教室");
-  const proc2Title = useSiteContent("process.step2.title", "選擇老師");
-  const proc2Desc = useSiteContent("process.step2.desc", "瀏覽老師資歷與評價，選擇最適合的老師");
-  const proc3Title = useSiteContent("process.step3.title", "預約時段");
-  const proc3Desc = useSiteContent("process.step3.desc", "選擇方便的時段，輕鬆完成線上預約");
-  const proc4Title = useSiteContent("process.step4.title", "開始學習");
-  const proc4Desc = useSiteContent("process.step4.desc", "孩子享受專業的數學個別指導");
+  const procTitle = useSiteContent("process.title", "從諮詢到報名");
+  const procDesc = useSiteContent("process.description", "從第一次接觸到正式上課，五個步驟陪孩子展開學習旅程");
+  const proc1Title = useSiteContent("process.step1.title", "家長創立帳號");
+  const proc1Desc = useSiteContent("process.step1.desc", "線上免費註冊，選擇地區與年級，找到離家最近的分校。");
+  const proc2Title = useSiteContent("process.step2.title", "獲得第一堂體驗課");
+  const proc2Desc = useSiteContent("process.step2.desc", "完成註冊即可獲得一堂免費體驗診斷課，零負擔認識質數教室。");
+  const proc3Title = useSiteContent("process.step3.title", "預約就近分校課程");
+  const proc3Desc = useSiteContent("process.step3.desc", "瀏覽老師資歷與評價，線上選擇方便的時段，輕鬆完成預約。");
+  const proc4Title = useSiteContent("process.step4.title", "到班實體體驗與檢測");
+  const proc4Desc = useSiteContent("process.step4.desc", "親自到分校上課，由老師進行數學能力檢測，了解孩子的學習狀態。");
+  const proc5Title = useSiteContent("process.step5.title", "專業師資提供適合學習進度說明");
+  const proc5Desc = useSiteContent("process.step5.desc", "老師依檢測結果，為孩子說明最適合的學習進度與規劃。");
 
   const [activeStep, setActiveStep] = useState(0);
   const [isInView, setIsInView] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
+
+  const steps = [
+    { icon: UserPlus, number: "01", title: proc1Title, description: proc1Desc },
+    { icon: Gift, number: "02", title: proc2Title, description: proc2Desc },
+    { icon: CalendarCheck, number: "03", title: proc3Title, description: proc3Desc },
+    { icon: ClipboardCheck, number: "04", title: proc4Title, description: proc4Desc },
+    { icon: GraduationCap, number: "05", title: proc5Title, description: proc5Desc },
+  ];
 
   useEffect(() => {
     const el = sectionRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => setIsInView(entry.isIntersecting),
-      { threshold: 0.3 }
+      { threshold: 0.2 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -1595,8 +1609,8 @@ function ProcessSection() {
     if (!isInView) return;
     let timeoutId: ReturnType<typeof setTimeout>;
     const advance = (current: number) => {
-      const isLast = current === 3;
-      const delay = isLast ? 1000 : 2500;
+      const isLast = current === steps.length - 1;
+      const delay = isLast ? 1200 : 2200;
       timeoutId = setTimeout(() => {
         const next = isLast ? 0 : current + 1;
         setActiveStep(next);
@@ -1606,15 +1620,6 @@ function ProcessSection() {
     advance(activeStep);
     return () => clearTimeout(timeoutId);
   }, [isInView]);
-
-  const steps = [
-    { icon: Search, number: "01", title: proc1Title, description: proc1Desc },
-    { icon: Users, number: "02", title: proc2Title, description: proc2Desc },
-    { icon: Clock, number: "03", title: proc3Title, description: proc3Desc },
-    { icon: GraduationCap, number: "04", title: proc4Title, description: proc4Desc },
-  ];
-
-  const circumference = 2 * Math.PI * 90;
 
   return (
     <section ref={sectionRef} className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
@@ -1629,131 +1634,66 @@ function ProcessSection() {
           </p>
         </motion.div>
 
-        <div className="md:hidden flex flex-col items-center">
-          <div className="relative w-72 h-72 mx-auto">
-            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 240 240" aria-hidden="true">
-              <circle cx="120" cy="120" r="90" fill="none" stroke="rgba(129,216,208,0.15)" strokeWidth="3" />
-              <circle
-                cx="120" cy="120" r="90"
-                fill="none"
-                stroke="rgba(129,216,208,0.75)"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeDasharray={`${activeStep * circumference / 4} ${circumference}`}
-                transform="rotate(-90 120 120)"
-                style={{ transition: "stroke-dasharray 0.7s ease-in-out" }}
-              />
-              <circle cx="120" cy="30" r="26" fill="white" />
-              <circle cx="210" cy="120" r="26" fill="white" />
-              <circle cx="120" cy="210" r="26" fill="white" />
-              <circle cx="30" cy="120" r="26" fill="white" />
-            </svg>
-
+        {/* Mobile: vertical timeline */}
+        <div className="md:hidden relative">
+          <div className="absolute left-6 top-3 bottom-3 w-0.5 bg-tiffany/15" aria-hidden="true" />
+          <div className="flex flex-col gap-3">
             {steps.map((step, i) => {
-              const nodeStyle = [
-                { left: "122px", top: "14px" },
-                { left: "230px", top: "122px" },
-                { left: "122px", top: "218px" },
-                { left: "14px", top: "122px" },
-              ][i];
               const isActive = i === activeStep;
               const isPast = i < activeStep;
               return (
                 <button
                   key={step.title}
-                  className={`absolute z-20 flex items-center gap-0.5 ${i === 2 ? "flex-col-reverse" : "flex-col"}`}
-                  style={nodeStyle}
                   onClick={() => setActiveStep(i)}
                   data-testid={`btn-process-step-${i}`}
                   aria-label={step.title}
+                  className="relative flex items-start gap-4 text-left"
                 >
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-500 shrink-0 ${
+                  <div className={`relative z-10 shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 ${
                     isActive
-                      ? "bg-tiffany/30 ring-2 ring-tiffany/70 shadow-md scale-110"
+                      ? "bg-tiffany/30 ring-2 ring-tiffany/60 shadow-md scale-105"
                       : isPast
                       ? "bg-tiffany/20"
-                      : "bg-gray-50 border border-gray-200"
+                      : "bg-white border border-gray-200"
                   }`}>
                     <step.icon className={`w-5 h-5 transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/40"}`} />
                   </div>
-                  <span
-                    className={`text-[10px] font-semibold text-center leading-tight transition-colors duration-300 ${isActive ? "text-tiffany" : "text-foreground/45"}`}
-                    style={{ maxWidth: 48 }}
-                  >
-                    {step.title}
-                  </span>
+                  <div className={`flex-1 rounded-2xl p-3 transition-all duration-500 ${isActive ? "bg-washi" : "bg-transparent"}`}>
+                    <span className={`block text-[10px] font-bold tracking-widest mb-0.5 transition-colors duration-300 ${isActive ? "text-tiffany" : "text-tiffany/40"}`}>
+                      {step.number}
+                    </span>
+                    <h3 className={`text-sm font-semibold mb-1 transition-colors duration-300 ${isActive ? "text-foreground" : "text-foreground/55"}`}>
+                      {step.title}
+                    </h3>
+                    <p className={`text-xs leading-relaxed transition-colors duration-300 ${isActive ? "text-muted-foreground" : "text-muted-foreground/50"}`}>
+                      {step.description}
+                    </p>
+                  </div>
                 </button>
               );
             })}
-
-            <motion.div
-              className="absolute z-30 pointer-events-none"
-              initial={{ left: 148, top: -4 }}
-              animate={{
-                left: [148, 252, 148, -14][activeStep],
-                top: [-4, 102, 240, 102][activeStep],
-              }}
-              transition={{ type: "spring", stiffness: 130, damping: 18 }}
-            >
-              <motion.img
-                src={robotMascotImg}
-                alt="質數小助手"
-                className="w-12 h-12 object-contain drop-shadow-sm"
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              />
-            </motion.div>
-
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-16">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeStep}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.85 }}
-                  transition={{ duration: 0.3 }}
-                  className="text-center"
-                >
-                  <span className="block text-[10px] font-bold text-tiffany/60 tracking-widest mb-1">{steps[activeStep].number}</span>
-                  <p className="text-sm font-semibold text-foreground mb-1.5">{steps[activeStep].title}</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">{steps[activeStep].description}</p>
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 mt-6">
-            {steps.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveStep(i)}
-                className={`rounded-full transition-all duration-500 ${
-                  i === activeStep ? "w-6 h-2 bg-tiffany" : "w-2 h-2 bg-tiffany/30"
-                }`}
-                aria-label={`步驟 ${i + 1}`}
-              />
-            ))}
           </div>
         </div>
 
+        {/* Desktop: horizontal flow */}
         <div className="hidden md:block relative">
           <motion.div
-            className="absolute z-20 pointer-events-none -translate-y-1/2"
+            className="absolute z-20 pointer-events-none -translate-x-1/2 -translate-y-1/2"
             style={{ top: 24 }}
-            animate={{ left: `calc(${(activeStep * 2 + 1) / 8 * 100}% + 20px)` }}
+            animate={{ left: `${((activeStep * 2 + 1) / (steps.length * 2)) * 100}%` }}
             transition={{ type: "spring", stiffness: 120, damping: 18 }}
           >
             <motion.img
               src={robotMascotImg}
               alt="質數小助手"
-              className="w-28 h-28 object-contain drop-shadow-md"
+              className="w-24 h-24 object-contain drop-shadow-md"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             />
           </motion.div>
 
-          <div className="grid grid-cols-4 gap-8">
-          {steps.map((step, i) => {
+          <div className="grid grid-cols-5 gap-5">
+            {steps.map((step, i) => {
               const isActive = i === activeStep;
               const isPast = i < activeStep;
               return (
@@ -1763,10 +1703,10 @@ function ProcessSection() {
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: i * 0.15 }}
+                  transition={{ duration: 0.6, delay: i * 0.12 }}
                 >
                   {i < steps.length - 1 && (
-                    <div className="absolute top-14 left-[58%] w-[84%] h-1 rounded-full overflow-hidden bg-tiffany/15">
+                    <div className="absolute top-14 left-[60%] w-[80%] h-1 rounded-full overflow-hidden bg-tiffany/15">
                       <div
                         className="h-full bg-tiffany/50 rounded-full transition-all duration-700 ease-in-out"
                         style={{ width: isPast ? "100%" : isActive ? "50%" : "0%" }}
@@ -1788,10 +1728,10 @@ function ProcessSection() {
                     >
                       <step.icon className={`w-7 h-7 transition-colors duration-500 ${isActive ? "text-tiffany" : "text-tiffany/50"}`} />
                     </div>
-                    <h3 className={`text-base font-semibold mb-2 transition-colors duration-500 ${isActive ? "text-foreground" : "text-foreground/50"}`}>
+                    <h3 className={`text-sm font-semibold mb-2 leading-snug transition-colors duration-500 ${isActive ? "text-foreground" : "text-foreground/50"}`}>
                       {step.title}
                     </h3>
-                    <p className={`text-sm leading-relaxed transition-colors duration-500 ${isActive ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
+                    <p className={`text-xs leading-relaxed transition-colors duration-500 ${isActive ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
                       {step.description}
                     </p>
                   </div>
@@ -1810,10 +1750,91 @@ function ProcessSection() {
                 i === activeStep ? "w-6 h-2 bg-tiffany" : "w-2 h-2 bg-tiffany/30"
               }`}
               aria-label={`步驟 ${i + 1}`}
-              data-testid={`btn-process-step-${i}`}
+              data-testid={`btn-process-dot-${i}`}
             />
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function ClassFlowSection() {
+  const title = useSiteContent("classflow.title", "課程進行方式");
+  const desc = useSiteContent(
+    "classflow.description",
+    "每一堂課都依循清楚的學習節奏，讓孩子穩穩吸收、扎實成長"
+  );
+  const note = useSiteContent(
+    "classflow.note",
+    "專業師資將於整個過程觀察孩子寫題的狀況，必要時進行引導與協助。讓學習的本身回到訓練孩子獨立完成解題，進而達到有效學習。"
+  );
+  const s1 = useSiteContent("classflow.step1", "觀念講解");
+  const s2 = useSiteContent("classflow.step2", "師資帶領示範解題");
+  const s3 = useSiteContent("classflow.step3", "確認寫題狀況");
+  const s4 = useSiteContent("classflow.step4", "專業師資引導協助");
+  const s5 = useSiteContent("classflow.step5", "再次進行問題演練");
+  const s6 = useSiteContent("classflow.step6", "當日課程總結");
+  const s7 = useSiteContent("classflow.step7", "回家演練加深記憶");
+
+  const steps = [
+    { icon: Lightbulb, title: s1 },
+    { icon: BookOpen, title: s2 },
+    { icon: Eye, title: s3 },
+    { icon: Users, title: s4 },
+    { icon: PenLine, title: s5 },
+    { icon: CheckCircle, title: s6 },
+    { icon: Repeat, title: s7 },
+  ];
+
+  return (
+    <section className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-washi">
+      <img src={deco15Img} alt="" className="absolute bottom-6 left-6 md:left-16 w-24 md:w-36 pointer-events-none select-none opacity-[0.13] animate-float-deco" aria-hidden="true" />
+      <div className="max-w-6xl mx-auto">
+        <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
+          <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
+            {title}
+          </h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">
+            {desc}
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4">
+          {steps.map((step, i) => (
+            <motion.div
+              key={step.title}
+              className="relative"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.08 }}
+              data-testid={`card-classflow-step-${i}`}
+            >
+              <div className="h-full bg-white rounded-2xl border border-gray-100 p-4 text-center flex flex-col items-center gap-2 hover:border-tiffany/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                <span className="text-[11px] font-bold tracking-widest text-tiffany/60">{String(i + 1).padStart(2, "0")}</span>
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-tiffany/10">
+                  <step.icon className="w-6 h-6 text-tiffany" />
+                </div>
+                <h3 className="text-sm font-semibold text-foreground leading-snug">{step.title}</h3>
+              </div>
+              {i < steps.length - 1 && (
+                <div className="hidden lg:flex absolute top-1/2 -right-2.5 -translate-y-1/2 z-10 text-tiffany/40">
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div className="mt-8 md:mt-12 max-w-3xl mx-auto" {...fadeInUp}>
+          <div className="rounded-2xl bg-white border border-tiffany/20 p-5 md:p-6 flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-tiffany shrink-0 mt-0.5" />
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed" data-testid="text-classflow-note">
+              {note}
+            </p>
+          </div>
+        </motion.div>
       </div>
     </section>
   );
@@ -2483,21 +2504,15 @@ export default function LandingPage() {
         <HeroSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <BrandPhilosophySection />
-        <StatsSection />
-        <WaveDivider from="#F0FBFA" to="#ffffff" />
+        <ProcessSection />
+        <FeaturesSection />
         <TeachingMethodSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
+        <ClassFlowSection />
         <LearningMapSection />
         <TextbookSection />
-        <WaveDivider from="#FAF9F6" to="#ffffff" />
-        <FeaturesSection />
-        <WaveDivider from="#ffffff" to="#FAF9F6" />
         <BranchLocationsSection />
         <CoachesSection />
-        <WaveDivider from="#FAF9F6" to="#ffffff" />
-        <ProcessSection />
-        <WaveDivider from="#ffffff" to="#FAF9F6" />
-        <TestimonialsSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <FAQSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />
