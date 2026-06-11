@@ -42,6 +42,7 @@ import {
   Layers,
   BarChart3,
   Repeat,
+  TrendingUp,
   Lightbulb,
   PenLine,
   Map,
@@ -792,10 +793,10 @@ function TeachingMethodSection() {
   const teach4Desc = useSiteContent("teaching.method4.desc", "每位孩子都有專屬的學習計畫與進度，老師依據評測結果量身打造最適合的學習路徑，讓吸收效率最大化。");
 
   const methods = [
-    { img: teachImg1, title: teach1Title, description: teach1Desc },
-    { img: teachImg2, title: teach2Title, description: teach2Desc },
-    { img: teachImg3, title: teach3Title, description: teach3Desc },
-    { img: teachImg4, title: teach4Title, description: teach4Desc },
+    { img: teachImg1, title: teach1Title, description: teach1Desc, icon: BookOpen },
+    { img: teachImg2, title: teach2Title, description: teach2Desc, icon: TrendingUp },
+    { img: teachImg3, title: teach3Title, description: teach3Desc, icon: CheckCircle },
+    { img: teachImg4, title: teach4Title, description: teach4Desc, icon: Target },
   ];
 
   return (
@@ -814,30 +815,68 @@ function TeachingMethodSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-          {methods.map((method, i) => (
-            <motion.div
-              key={method.title}
-              className="group relative bg-washi rounded-2xl p-5 md:p-8 border border-transparent hover:border-tiffany/20 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              data-testid={`card-teaching-method-${i}`}
-            >
-              <div className="flex items-start gap-4 md:gap-5">
-                <img
-                  src={method.img}
-                  alt={method.title}
-                  className="w-32 h-32 md:w-36 md:h-36 object-contain flex-shrink-0 group-hover:scale-150 group-hover:-translate-y-4 group-hover:drop-shadow-2xl transition-all duration-300"
-                />
-                <div className="flex-1">
-                  <h3 className="font-serif text-lg md:text-xl tracking-wide text-foreground mb-1.5 md:mb-2">{method.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed text-sm">{method.description}</p>
+        <div className="space-y-16 md:space-y-24">
+          {methods.map((method, i) => {
+            const Icon = method.icon;
+            const even = i % 2 === 0;
+            return (
+              <motion.div
+                key={method.title}
+                className={`group flex flex-col md:flex-row items-center gap-8 md:gap-12 lg:gap-16 ${
+                  even ? "" : "md:flex-row-reverse"
+                }`}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.05 }}
+                data-testid={`card-teaching-method-${i}`}
+              >
+                {/* Image side */}
+                <div className="w-full md:w-[45%] relative flex justify-center">
+                  <div
+                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[105%] h-[105%] rounded-[40%_60%_70%_30%/40%_50%_60%_50%] opacity-30 blur-2xl transition-transform duration-700 group-hover:scale-105 ${
+                      even ? "bg-tiffany" : "bg-amber-warm"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className={`absolute w-20 h-20 rounded-full opacity-40 blur-md ${
+                      even ? "-bottom-4 -right-4 bg-coral" : "-top-4 -left-4 bg-tiffany"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <img
+                    src={method.img}
+                    alt={method.title}
+                    className="w-3/4 max-w-[280px] md:max-w-[340px] h-auto object-contain relative z-10 drop-shadow-xl group-hover:scale-[1.03] transition-transform duration-500"
+                  />
                 </div>
-              </div>
-            </motion.div>
-          ))}
+
+                {/* Text side */}
+                <div className="w-full md:w-[55%] flex flex-col justify-center text-center md:text-left">
+                  <div className="inline-flex items-center gap-3 mb-4 self-center md:self-start">
+                    <span
+                      className={`flex items-center justify-center w-11 h-11 rounded-2xl bg-white shadow-sm text-lg font-bold font-serif ${
+                        even ? "text-tiffany" : "text-coral"
+                      }`}
+                    >
+                      0{i + 1}
+                    </span>
+                    <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-washi shadow-sm">
+                      <Icon className={`w-5 h-5 ${even ? "text-tiffany" : "text-coral"}`} />
+                    </span>
+                  </div>
+                  <h3 className="font-serif text-xl md:text-2xl lg:text-3xl tracking-wide text-foreground mb-3 md:mb-4 leading-snug">
+                    {method.title}
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed text-sm md:text-base max-w-xl mx-auto md:mx-0">
+                    {method.description}
+                  </p>
+                  <div className="mt-6 h-px w-20 bg-gradient-to-r from-tiffany/30 to-transparent mx-auto md:mx-0" />
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
       </div>
@@ -1377,10 +1416,23 @@ function FeaturesSection() {
     { icon: Target, title: feat3Title, description: feat3Desc, image: feat3FlexibleImg },
   ];
 
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const handlePrev = () =>
+    setCurrentIndex((prev) => (prev === 0 ? features.length - 1 : prev - 1));
+  const handleNext = () =>
+    setCurrentIndex((prev) => (prev === features.length - 1 ? 0 : prev + 1));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev === features.length - 1 ? 0 : prev + 1));
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [features.length]);
+
   return (
     <section id="features" className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-white">
       <img src={deco5Img} alt="" className="absolute top-8 right-4 md:right-10 w-24 md:w-36 pointer-events-none select-none opacity-[0.12] animate-float-deco" aria-hidden="true" />
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             {featTitle}
@@ -1390,36 +1442,84 @@ function FeaturesSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
-          {features.map((feature, i) => (
-            <motion.div
-              key={feature.title}
-              className="rounded-md border border-gray-100 bg-washi/50 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.15 }}
-            >
-              <div className="h-40 rounded-t-md">
-                <img
-                  src={feature.image}
-                  alt={feature.title}
-                  className="w-full h-full object-cover rounded-t-md"
-                />
-              </div>
-              <div className="p-6 text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-tiffany/10 mb-4 -mt-10 relative z-10 border-4 border-white">
-                  <feature.icon className="w-5 h-5 text-tiffany" />
+        <div className="relative bg-white rounded-3xl shadow-sm border border-tiffany/10 p-5 sm:p-8 md:p-10 lg:p-12 flex flex-col md:flex-row items-center gap-8 lg:gap-16">
+          {/* Image */}
+          <div className="w-full md:w-1/2 relative overflow-hidden rounded-2xl aspect-[4/3] shadow-sm bg-washi">
+            {features.map((feature, idx) => (
+              <img
+                key={feature.title}
+                src={feature.image}
+                alt={feature.title}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-in-out ${
+                  currentIndex === idx ? "opacity-100 scale-100 z-10" : "opacity-0 scale-105 z-0"
+                }`}
+                aria-hidden={currentIndex !== idx}
+                data-testid={`img-feature-${idx}`}
+              />
+            ))}
+          </div>
+
+          {/* Content */}
+          <div className="w-full md:w-1/2 relative min-h-[230px] sm:min-h-[210px] md:min-h-[260px] flex flex-col justify-center">
+            {features.map((feature, idx) => {
+              const Icon = feature.icon;
+              return (
+                <div
+                  key={feature.title}
+                  className={`transition-all duration-700 ease-in-out absolute inset-0 flex flex-col justify-center text-center md:text-left ${
+                    currentIndex === idx
+                      ? "opacity-100 translate-y-0 pointer-events-auto"
+                      : "opacity-0 translate-y-6 pointer-events-none"
+                  }`}
+                  aria-hidden={currentIndex !== idx}
+                  data-testid={`feature-slide-${idx}`}
+                >
+                  <div className="inline-flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-tiffany/10 text-tiffany mb-5 border border-tiffany/20 self-center md:self-start">
+                    <Icon className="w-7 h-7" strokeWidth={1.5} />
+                  </div>
+                  <h3 className="font-serif text-xl md:text-2xl lg:text-3xl tracking-wide text-foreground mb-3" data-testid={`text-feature-title-${idx}`}>
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed text-sm md:text-base lg:text-lg">
+                    {feature.description}
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            </motion.div>
-          ))}
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center justify-center mt-8 md:mt-10 gap-6">
+          <button
+            onClick={handlePrev}
+            className="w-11 h-11 rounded-full border border-tiffany/30 text-tiffany flex items-center justify-center hover:bg-tiffany hover:text-white transition-colors duration-300 bg-white shadow-sm"
+            aria-label="上一項"
+            data-testid="button-feature-prev"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-3">
+            {features.map((feature, idx) => (
+              <button
+                key={feature.title}
+                onClick={() => setCurrentIndex(idx)}
+                className={`transition-all duration-300 rounded-full h-2 ${
+                  currentIndex === idx ? "w-10 bg-tiffany" : "w-2 bg-tiffany/30 hover:bg-tiffany/60"
+                }`}
+                aria-label={`切換至第 ${idx + 1} 項`}
+                data-testid={`button-feature-dot-${idx}`}
+              />
+            ))}
+          </div>
+          <button
+            onClick={handleNext}
+            className="w-11 h-11 rounded-full border border-tiffany/30 text-tiffany flex items-center justify-center hover:bg-tiffany hover:text-white transition-colors duration-300 bg-white shadow-sm"
+            aria-label="下一項"
+            data-testid="button-feature-next"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
         </div>
       </div>
     </section>
