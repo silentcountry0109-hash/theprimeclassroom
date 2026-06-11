@@ -23,13 +23,13 @@ export function Path() {
   ];
 
   const desktopPositions = [
-    { left: '16.66%', top: '160px' },
-    { left: '50%', top: '160px' },
-    { left: '83.33%', top: '160px' },
-    { left: '83.33%', top: '400px' },
-    { left: '50%', top: '400px' },
-    { left: '16.66%', top: '400px' },
-    { left: '16.66%', top: '640px' },
+    { left: '12.5%', top: '100px' },
+    { left: '37.5%', top: '100px' },
+    { left: '62.5%', top: '100px' },
+    { left: '87.5%', top: '100px' },
+    { left: '87.5%', top: '380px' },
+    { left: '62.5%', top: '380px' },
+    { left: '37.5%', top: '380px' },
   ];
 
   return (
@@ -64,11 +64,11 @@ export function Path() {
         </div>
 
         {/* Desktop Journey Path (S-Shape) */}
-        <div className="hidden md:block relative w-full max-w-5xl mx-auto h-[800px] mb-20">
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 800" preserveAspectRatio="none">
+        <div className="hidden md:block relative w-full max-w-5xl mx-auto h-[520px] mb-16">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 520" preserveAspectRatio="none">
             {/* Background dashed path */}
             <path
-              d="M 166.6 160 L 783.3 160 Q 833.3 160 833.3 210 L 833.3 350 Q 833.3 400 783.3 400 L 216.6 400 Q 166.6 400 166.6 450 L 166.6 640"
+              d="M 125 100 L 825 100 Q 875 100 875 150 L 875 330 Q 875 380 825 380 L 375 380"
               fill="none"
               stroke="#E5E7EB"
               strokeWidth="4"
@@ -76,7 +76,7 @@ export function Path() {
             />
             {/* Animated dashed path overlay */}
             <path
-              d="M 166.6 160 L 783.3 160 Q 833.3 160 833.3 210 L 833.3 350 Q 833.3 400 783.3 400 L 216.6 400 Q 166.6 400 166.6 450 L 166.6 640"
+              d="M 125 100 L 825 100 Q 875 100 875 150 L 875 330 Q 875 380 825 380 L 375 380"
               fill="none"
               stroke="#81D8D0"
               strokeWidth="4"
@@ -94,7 +94,7 @@ export function Path() {
             return (
               <div
                 key={step.id}
-                className="absolute flex flex-col items-center justify-start w-56 z-10 transition-transform duration-500"
+                className="absolute flex flex-col items-center justify-start w-48 z-10 transition-transform duration-500"
                 style={{
                   left: pos.left,
                   top: pos.top,
