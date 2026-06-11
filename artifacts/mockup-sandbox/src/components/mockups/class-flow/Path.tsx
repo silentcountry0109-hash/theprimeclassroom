@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, BookOpen, Eye, Users, PenLine, CheckCircle, Repeat, Sparkles } from 'lucide-react';
+import { Lightbulb, BookOpen, Eye, Users, PenLine, CheckCircle, Repeat, Trophy, Sparkles } from 'lucide-react';
 import './_group.css';
 
 export function Path() {
@@ -7,7 +7,7 @@ export function Path() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setActiveStep((prev) => (prev >= 7 ? 0 : prev + 1));
+      setActiveStep((prev) => (prev >= 8 ? 0 : prev + 1));
     }, 1500);
     return () => clearInterval(timer);
   }, []);
@@ -20,6 +20,7 @@ export function Path() {
     { id: 5, title: '再次進行問題演練', icon: PenLine },
     { id: 6, title: '當日課程總結', icon: CheckCircle },
     { id: 7, title: '回家演練加深記憶', icon: Repeat },
+    { id: 8, title: '完整完成單元學習', icon: Trophy },
   ];
 
   const desktopPositions = [
@@ -30,6 +31,7 @@ export function Path() {
     { left: '87.5%', top: '380px' },
     { left: '62.5%', top: '380px' },
     { left: '37.5%', top: '380px' },
+    { left: '12.5%', top: '380px' },
   ];
 
   return (
@@ -66,17 +68,17 @@ export function Path() {
         {/* Desktop Journey Path (S-Shape) */}
         <div className="hidden md:block relative w-full max-w-5xl mx-auto h-[520px] mb-16">
           <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 520" preserveAspectRatio="none">
-            {/* Background dashed path */}
+            {/* Background dashed loop */}
             <path
-              d="M 125 100 L 825 100 Q 875 100 875 150 L 875 330 Q 875 380 825 380 L 375 380"
+              d="M 175 100 L 825 100 Q 875 100 875 150 L 875 330 Q 875 380 825 380 L 175 380 Q 125 380 125 330 L 125 150 Q 125 100 175 100 Z"
               fill="none"
               stroke="#E5E7EB"
               strokeWidth="4"
               strokeDasharray="8 8"
             />
-            {/* Animated dashed path overlay */}
+            {/* Animated dashed loop overlay */}
             <path
-              d="M 125 100 L 825 100 Q 875 100 875 150 L 875 330 Q 875 380 825 380 L 375 380"
+              d="M 175 100 L 825 100 Q 875 100 875 150 L 875 330 Q 875 380 825 380 L 175 380 Q 125 380 125 330 L 125 150 Q 125 100 175 100 Z"
               fill="none"
               stroke="#81D8D0"
               strokeWidth="4"

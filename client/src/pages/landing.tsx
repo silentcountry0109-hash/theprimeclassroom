@@ -54,6 +54,7 @@ import {
   Gift,
   CalendarCheck,
   ClipboardCheck,
+  Trophy,
 } from "lucide-react";
 import type { Coach, AggregatedCoach, Faq, SuccessStory, Franchise } from "@shared/schema";
 import { createContext, useContext } from "react";
@@ -1860,21 +1861,55 @@ function ClassFlowSection() {
   const s5 = useSiteContent("classflow.step5", "再次進行問題演練");
   const s6 = useSiteContent("classflow.step6", "當日課程總結");
   const s7 = useSiteContent("classflow.step7", "回家演練加深記憶");
+  const s8 = useSiteContent("classflow.step8", "完整完成單元學習");
 
   const steps = [
-    { icon: Lightbulb, title: s1 },
-    { icon: BookOpen, title: s2 },
-    { icon: Eye, title: s3 },
-    { icon: Users, title: s4 },
-    { icon: PenLine, title: s5 },
-    { icon: CheckCircle, title: s6 },
-    { icon: Repeat, title: s7 },
+    { id: 1, icon: Lightbulb, title: s1 },
+    { id: 2, icon: BookOpen, title: s2 },
+    { id: 3, icon: Eye, title: s3 },
+    { id: 4, icon: Users, title: s4 },
+    { id: 5, icon: PenLine, title: s5 },
+    { id: 6, icon: CheckCircle, title: s6 },
+    { id: 7, icon: Repeat, title: s7 },
+    { id: 8, icon: Trophy, title: s8 },
   ];
+
+  const desktopPositions = [
+    { left: "12.5%", top: "100px" },
+    { left: "37.5%", top: "100px" },
+    { left: "62.5%", top: "100px" },
+    { left: "87.5%", top: "100px" },
+    { left: "87.5%", top: "380px" },
+    { left: "62.5%", top: "380px" },
+    { left: "37.5%", top: "380px" },
+    { left: "12.5%", top: "380px" },
+  ];
+
+  const loopPath =
+    "M 175 100 L 825 100 Q 875 100 875 150 L 875 330 Q 875 380 825 380 L 175 380 Q 125 380 125 330 L 125 150 Q 125 100 175 100 Z";
+
+  const [activeStep, setActiveStep] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveStep((prev) => (prev >= 8 ? 0 : prev + 1));
+    }, 1500);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <section className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 bg-washi">
+      <style>{`
+        @keyframes cf-dash-flow { from { stroke-dashoffset: 32; } to { stroke-dashoffset: 0; } }
+        .cf-path-anim { animation: cf-dash-flow 1s linear infinite; }
+        @keyframes cf-pulse-ring {
+          0% { box-shadow: 0 0 0 0 rgba(129, 216, 208, 0.7); }
+          70% { box-shadow: 0 0 0 15px rgba(129, 216, 208, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(129, 216, 208, 0); }
+        }
+        .cf-active-pulse { animation: cf-pulse-ring 1.5s infinite; }
+      `}</style>
       <img src={deco15Img} alt="" className="absolute bottom-6 left-6 md:left-16 w-24 md:w-36 pointer-events-none select-none opacity-[0.13] animate-float-deco" aria-hidden="true" />
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto relative">
         <motion.div className="text-center mb-10 md:mb-16" {...fadeInUp}>
           <h2 className="font-serif text-2xl md:text-4xl tracking-[0.1em] text-foreground mb-3 md:mb-4">
             {title}
@@ -1884,36 +1919,114 @@ function ClassFlowSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4">
-          {steps.map((step, i) => (
-            <motion.div
-              key={step.title}
-              className="relative"
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
-              data-testid={`card-classflow-step-${i}`}
-            >
-              <div className="h-full bg-white rounded-2xl border border-gray-100 p-4 text-center flex flex-col items-center gap-2 hover:border-tiffany/30 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
-                <span className="text-[11px] font-bold tracking-widest text-tiffany/60">{String(i + 1).padStart(2, "0")}</span>
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-tiffany/10">
-                  <step.icon className="w-6 h-6 text-tiffany" />
+        {/* Desktop loop path */}
+        <div className="hidden md:block relative w-full max-w-5xl mx-auto h-[520px] mb-12">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 520" preserveAspectRatio="none">
+            <path d={loopPath} fill="none" stroke="#E5E7EB" strokeWidth="4" strokeDasharray="8 8" />
+            <path d={loopPath} fill="none" stroke="#81D8D0" strokeWidth="4" strokeDasharray="16 16" className="cf-path-anim" />
+          </svg>
+
+          {steps.map((step, idx) => {
+            const pos = desktopPositions[idx];
+            const isLit = step.id <= activeStep;
+            const isActive = step.id === activeStep;
+            const Icon = step.icon;
+
+            return (
+              <div
+                key={step.id}
+                className="absolute flex flex-col items-center justify-start w-48 z-10"
+                style={{ left: pos.left, top: pos.top, transform: "translate(-50%, -36px)" }}
+                data-testid={`card-classflow-step-${idx}`}
+              >
+                <div
+                  className={`relative rounded-full border-[4px] flex items-center justify-center transition-all duration-500 ${
+                    isLit ? "bg-tiffany border-tiffany shadow-lg" : "bg-white border-gray-200"
+                  } ${isActive ? "cf-active-pulse scale-110" : ""}`}
+                  style={{ width: "72px", height: "72px" }}
+                >
+                  <Icon className={`w-8 h-8 transition-colors duration-500 ${isLit ? "text-white" : "text-gray-400"}`} />
+                  <div
+                    className={`absolute -top-2 -right-2 text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center transition-all duration-500 ${
+                      isLit ? "bg-coral text-white" : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    {String(step.id).padStart(2, "0")}
+                  </div>
                 </div>
-                <h3 className="text-sm font-semibold text-foreground leading-snug">{step.title}</h3>
+
+                <div
+                  className={`mt-4 px-5 py-3 rounded-xl transition-all duration-500 w-full text-center shadow-sm ${
+                    isActive
+                      ? "bg-white border-2 border-tiffany shadow-md -translate-y-1"
+                      : isLit
+                      ? "bg-white border border-gray-200 opacity-90"
+                      : "bg-white/60 border border-gray-100 opacity-60 grayscale"
+                  }`}
+                >
+                  <h3 className={`font-serif font-bold text-sm lg:text-base ${isActive ? "text-tiffany" : "text-foreground"}`}>
+                    {step.title}
+                  </h3>
+                </div>
               </div>
-              {i < steps.length - 1 && (
-                <div className="hidden lg:flex absolute top-1/2 -right-2.5 -translate-y-1/2 z-10 text-tiffany/40">
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              )}
-            </motion.div>
-          ))}
+            );
+          })}
         </div>
 
-        <motion.div className="mt-8 md:mt-12 max-w-3xl mx-auto" {...fadeInUp}>
-          <div className="rounded-2xl bg-white border border-tiffany/20 p-5 md:p-6 flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-tiffany shrink-0 mt-0.5" />
+        {/* Mobile vertical path */}
+        <div className="md:hidden relative flex flex-col pt-4 pb-4 mb-8">
+          <svg className="absolute left-[39px] top-12 bottom-12 w-2 h-[calc(100%-96px)] pointer-events-none" preserveAspectRatio="none">
+            <line x1="4" y1="0" x2="4" y2="100%" fill="none" stroke="#E5E7EB" strokeWidth="3" strokeDasharray="8 8" />
+            <line x1="4" y1="0" x2="4" y2="100%" fill="none" stroke="#81D8D0" strokeWidth="3" strokeDasharray="16 16" className="cf-path-anim" />
+          </svg>
+
+          {steps.map((step, idx) => {
+            const isLit = step.id <= activeStep;
+            const isActive = step.id === activeStep;
+            const Icon = step.icon;
+
+            return (
+              <div key={step.id} className="flex gap-5 relative z-10 mb-8 last:mb-0 w-full" data-testid={`card-classflow-step-mobile-${idx}`}>
+                <div
+                  className={`relative w-20 h-20 shrink-0 rounded-full border-[3px] flex items-center justify-center transition-all duration-500 ${
+                    isLit ? "bg-tiffany border-tiffany shadow-md" : "bg-white border-gray-200"
+                  } ${isActive ? "cf-active-pulse scale-105" : ""}`}
+                >
+                  <Icon className={`w-8 h-8 transition-colors duration-500 ${isLit ? "text-white" : "text-gray-400"}`} />
+                  <div
+                    className={`absolute top-0 right-0 translate-x-1 -translate-y-1 text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center transition-all duration-500 ${
+                      isLit ? "bg-coral text-white" : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    {String(step.id).padStart(2, "0")}
+                  </div>
+                </div>
+
+                <div className="flex-1 flex flex-col justify-center">
+                  <div
+                    className={`px-4 py-3 rounded-xl transition-all duration-500 shadow-sm ${
+                      isActive
+                        ? "bg-white border-l-4 border-l-tiffany border border-gray-100 shadow-md"
+                        : isLit
+                        ? "bg-white border border-gray-100"
+                        : "bg-white/50 border border-transparent"
+                    }`}
+                  >
+                    <h3 className={`font-serif font-bold text-base ${isActive ? "text-tiffany" : "text-foreground"}`}>
+                      {step.title}
+                    </h3>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <motion.div className="mt-2 md:mt-0 max-w-3xl mx-auto" {...fadeInUp}>
+          <div className="rounded-2xl bg-amber-warm border border-coral/30 p-5 md:p-6 flex items-start gap-3">
+            <div className="bg-coral/20 p-2 rounded-lg shrink-0 mt-0.5">
+              <Sparkles className="w-5 h-5 text-coral" />
+            </div>
             <p className="text-sm md:text-base text-muted-foreground leading-relaxed" data-testid="text-classflow-note">
               {note}
             </p>
