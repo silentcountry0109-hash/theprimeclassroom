@@ -111,7 +111,6 @@ import studentGirl1 from "@assets/student_girl_1.png";
 import studentBoy3 from "@assets/student_boy_3.png";
 import studentGirl2 from "@assets/student_girl_2.png";
 import newTextbookImg from "@assets/Gemini_Generated_Image_xth2anxth2anxth2_1776664904973.png";
-import newBrandImg from "@assets/工作區域_6_1776664958904.png";
 
 const TEACHER_PHOTOS: Record<string, string> = {
   "林佳慧": teacher1Img,
@@ -700,7 +699,6 @@ function BrandPhilosophySection() {
   const brandTitle = useSiteContent("brand.title", "品牌與教學理念");
   const brandDescription = useSiteContent("brand.description", "The Prime 質數教室，專注國小數學個別指導。我們相信每個孩子都有獨特的學習節奏，不該被統一的進度框架限制。透過一對一的個別指導，讓每位孩子都能按照自己的步調，扎實地建立數學基礎。");
   const brandQuote = useSiteContent("brand.quote", "不是補習，是真正理解數學。當孩子真正理解了，分數自然會來。");
-  const brandHeroImage = useSiteContent("brand.heroImage", "");
   const brandPhil1Title = useSiteContent("brand.phil1.title", "個別指導・個別進度");
   const brandPhil1Desc = useSiteContent("brand.phil1.desc", "每位孩子都有專屬的學習計畫，老師一對一關注，不是大班齊頭式教學");
   const brandPhil2Title = useSiteContent("brand.phil2.title", "理解優先・不靠死背");
@@ -728,20 +726,6 @@ function BrandPhilosophySection() {
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             {brandDescription}
           </p>
-        </motion.div>
-
-        <motion.div
-          className="rounded-2xl overflow-hidden mb-10 md:mb-14"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-        >
-          <img
-            src={brandHeroImage || newBrandImg}
-            alt="質數教室的溫暖教學環境"
-            className="w-full h-auto object-contain"
-          />
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10 md:mb-14">
