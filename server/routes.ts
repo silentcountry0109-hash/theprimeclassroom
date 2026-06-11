@@ -223,34 +223,9 @@ function isLineRedirectUriAllowed(uri: string): boolean {
   return allowed.includes(uri.replace(/\/$/, ""));
 }
 
-function isTwilioBypassed(): boolean {
-  // 強制略過 Twilio：DISABLE_TWILIO=true 即可生效（即使 production 也行，
-  // 但需要明確設定環境變數，避免意外關閉真實驗證）。
-  return process.env.DISABLE_TWILIO === "true";
-}
-
-function bypassModeActive(): boolean {
-  // 前端要顯示「測試模式」提示的條件：強制略過模式，或 dev 環境下未設定 Twilio 憑證（會走 dev fallback）。
-  return isTwilioBypassed() || (isDev && !hasTwilioCredentials());
-}
-
 async function sendTwilioOtp(phone: string): Promise<void> {
-  // 強制略過 Twilio 模式：不論憑證是否齊全，都不打 Twilio API。
-  if (isTwilioBypassed()) {
-    if (process.env.BYPASS_OTP_CODE) {
-      console.log(`[BYPASS OTP] DISABLE_TWILIO=true，萬用驗證碼模式啟用，跳過 SMS 發送（phone=${phone}）`);
-      return;
-    }
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
-    const now = Date.now();
-    devOtpStore.set(phone, { otp, expiresAt: now + 5 * 60_000, sentAt: now, attempts: 0 });
-    console.log(`[BYPASS OTP] DISABLE_TWILIO=true，跳過 Twilio。OTP for ${phone}: ${otp}`);
-    return;
-  }
-  if (process.env.BYPASS_OTP_CODE) {
-    console.log(`[BYPASS OTP] 萬用驗證碼模式啟用，跳過 SMS 發送（phone=${phone}）`);
-    return;
-  }
+  // 純本地開發（dev）且未設定 Twilio 憑證時，將 OTP 印到 console，方便開發測試。
+  // production 一律走真實 Twilio 簡訊發送。
   if (isDev && !hasTwilioCredentials()) {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const now = Date.now();
@@ -294,24 +269,8 @@ async function sendTwilioOtp(phone: string): Promise<void> {
 }
 
 async function checkTwilioOtp(phone: string, code: string): Promise<boolean> {
-  if (process.env.BYPASS_OTP_CODE && String(code) === process.env.BYPASS_OTP_CODE) {
-    console.log(`[BYPASS OTP] 萬用驗證碼通過（phone=${phone}）`);
-    return true;
-  }
-  // 強制略過 Twilio 模式：以 devOtpStore 為準，不打 Twilio API。
-  if (isTwilioBypassed()) {
-    const now = Date.now();
-    const record = devOtpStore.get(phone);
-    if (!record) return false;
-    if (now > record.expiresAt) { devOtpStore.delete(phone); return false; }
-    if (record.attempts >= 3) { devOtpStore.delete(phone); return false; }
-    if (record.otp !== String(code)) {
-      devOtpStore.set(phone, { ...record, attempts: record.attempts + 1 });
-      return false;
-    }
-    devOtpStore.delete(phone);
-    return true;
-  }
+  // 純本地開發（dev）且未設定 Twilio 憑證時，以 devOtpStore 為準驗證。
+  // production 一律透過 Twilio Verify 驗證。
   if (isDev && !hasTwilioCredentials()) {
     const now = Date.now();
     const record = devOtpStore.get(phone);
@@ -557,14 +516,6 @@ export async function registerRoutes(
   cleanupCredentialOnlyParents().catch((e) => console.error("[Cleanup] 啟動清理失敗：", e));
   registerAuthRoutes(app);
 
-  // ── 啟動時提示 Twilio 略過模式 ────────────────────────────────────────────
-  if (isTwilioBypassed()) {
-    console.warn(
-      "⚠️ [Twilio] DISABLE_TWILIO=true — Twilio 已暫時停用，使用萬用／dev 驗證碼。" +
-      " 如需恢復真實簡訊驗證，請移除或設為 false 後重啟。"
-    );
-  }
-
   // ── 啟動時確認 LINE Messaging API 金鑰是否設定 ──────────────────────────
   if (!process.env.LINE_MESSAGING_CHANNEL_SECRET) {
     console.warn(
@@ -733,7 +684,7 @@ export async function registerRoutes(
       }
       await sendTwilioOtp(phone);
       recordOtpSend(phone);
-      return res.json({ message: "驗證碼已發送", bypassMode: bypassModeActive() });
+      return res.json({ message: "驗證碼已發送" });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "發送失敗，請稍後再試";
       return res.status(500).json({ message: msg });
@@ -870,7 +821,7 @@ export async function registerRoutes(
       }
       await sendTwilioOtp(phone);
       recordOtpSend(phone);
-      res.json({ message: "驗證碼已發送", bypassMode: bypassModeActive() });
+      res.json({ message: "驗證碼已發送" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "發送失敗，請稍後再試";
       res.status(500).json({ message: msg });

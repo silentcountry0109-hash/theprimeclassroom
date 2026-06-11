@@ -17,7 +17,6 @@ export default function ParentRegisterVerifyPhone() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [otpSent, setOtpSent] = useState(false);
-  const [bypassMode, setBypassMode] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [error, setError] = useState("");
@@ -53,17 +52,12 @@ export default function ParentRegisterVerifyPhone() {
     }
     setOtpLoading(true);
     try {
-      const resp = await apiRequest("POST", "/api/auth/line/send-otp", { phone });
-      const data = await resp.json().catch(() => ({}));
-      const isBypass = !!data?.bypassMode;
-      setBypassMode(isBypass);
+      await apiRequest("POST", "/api/auth/line/send-otp", { phone });
       setOtpSent(true);
       startCountdown();
       toast({
         title: "驗證碼已發送",
-        description: isBypass
-          ? "目前為測試模式，請聯絡管理員取得驗證碼"
-          : `簡訊已送至 ${phone}`,
+        description: `簡訊已送至 ${phone}`,
       });
     } catch (e: any) {
       setError(e?.message || "發送失敗，請稍後再試");
@@ -168,15 +162,6 @@ export default function ParentRegisterVerifyPhone() {
                 <p className="text-sm text-foreground">驗證碼已發送至</p>
                 <p className="font-medium text-tiffany">{phone}</p>
               </div>
-
-              {bypassMode && (
-                <div
-                  className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 leading-relaxed text-center"
-                  data-testid="text-bypass-mode-hint"
-                >
-                  目前為測試模式（簡訊服務暫時停用），請聯絡管理員取得 6 位數驗證碼後再輸入。
-                </div>
-              )}
 
               <div>
                 <Label className="text-sm mb-3 block text-center">請輸入 6 位數驗證碼</Label>
