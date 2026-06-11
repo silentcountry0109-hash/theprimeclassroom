@@ -35,10 +35,10 @@ export const modules: ModuleMap = {
   "./components/mockups/materials/HQUpload.tsx": () => import("../components/mockups/materials/HQUpload.tsx"),
   "./components/mockups/multi-booking/Step1SelectSlots.tsx": () => import("../components/mockups/multi-booking/Step1SelectSlots.tsx"),
   "./components/mockups/multi-booking/Step2ConfirmList.tsx": () => import("../components/mockups/multi-booking/Step2ConfirmList.tsx"),
-  "./components/mockups/schedule-picker/SchedulePicker.tsx": () => import("../components/mockups/schedule-picker/SchedulePicker.tsx"),
   "./components/mockups/teacher-card/Current.tsx": () => import("../components/mockups/teacher-card/Current.tsx"),
   "./components/mockups/teacher-card/VariantA.tsx": () => import("../components/mockups/teacher-card/VariantA.tsx"),
   "./components/mockups/teacher-card/VariantB.tsx": () => import("../components/mockups/teacher-card/VariantB.tsx"),
   "./components/mockups/teacher-card/VariantC.tsx": () => import("../components/mockups/teacher-card/VariantC.tsx"),
-  "./components/mockups/teacher-card/VariantD.tsx": () => import("../components/mockups/teacher-card/VariantD.tsx")
+  "./components/mockups/teacher-card/VariantD.tsx": () => import("../components/mockups/teacher-card/VariantD.tsx"),
+  "./components/mockups/schedule-picker/SchedulePicker.tsx": () => import("../components/mockups/schedule-picker/SchedulePicker.tsx")
 };
