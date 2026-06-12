@@ -70,7 +70,7 @@ import brandPhilosophyImg from "@assets/brand_philosophy.png";
 import learningDetailImg from "@assets/learning_detail.png";
 import parentChildImg from "@assets/parent_child.png";
 import ctaDiagnosisImg from "@assets/ChatGPT_Image_2026年5月28日_下午03_31_57_1779953534103.png";
-import feat1IndividualImg from "@assets/個別指導_1779958868727.png";
+import feat1IndividualImg from "@assets/ChatGPT_Image_2026年6月12日_下午02_42_44_1781246603456.png";
 import feat2CertifiedImg from "@assets/ChatGPT_Image_2026年6月12日_下午02_11_26_1781244751848.png";
 import feat3FlexibleImg from "@assets/ChatGPT_Image_2026年6月12日_下午02_21_07_1781245286684.png";
 import textbookDisplayImg from "@assets/textbook_display.png";
