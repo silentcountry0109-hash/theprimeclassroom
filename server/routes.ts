@@ -700,8 +700,8 @@ export async function registerRoutes(
         return res.status(403).json({ message: "帳號或密碼錯誤" });
       }
       if (user.role === "coach") {
-        const [coach] = await db.select().from(coaches).where(eq(coaches.userId, user.id));
-        if (coach && !coach.isActive) {
+        const coachRecords = await db.select().from(coaches).where(eq(coaches.userId, user.id));
+        if (coachRecords.length > 0 && !coachRecords.some((c) => c.isActive)) {
           return res.status(403).json({ message: "此帳號已被停用，請聯繫管理員" });
         }
       }
