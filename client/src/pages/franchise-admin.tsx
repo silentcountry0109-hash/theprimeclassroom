@@ -863,6 +863,7 @@ function FranchiseInfoTab() {
   const [businessHours, setBusinessHours] = useState<BusinessHours>(defaultBusinessHours);
   const [specialHours, setSpecialHours] = useState<SpecialDayEntry[]>([]);
   const [newSpecialDate, setNewSpecialDate] = useState("");
+  const [newSpecialEndDate, setNewSpecialEndDate] = useState("");
   const [newSpecialIsOpen, setNewSpecialIsOpen] = useState(false);
   const [newSpecialOpenTime, setNewSpecialOpenTime] = useState("09:00");
   const [newSpecialCloseTime, setNewSpecialCloseTime] = useState("21:00");
@@ -881,6 +882,7 @@ function FranchiseInfoTab() {
       setSpecialHours(special ?? []);
     }
     setNewSpecialDate("");
+    setNewSpecialEndDate("");
     setNewSpecialIsOpen(false);
     setNewSpecialOpenTime("09:00");
     setNewSpecialCloseTime("21:00");
@@ -888,17 +890,56 @@ function FranchiseInfoTab() {
     setEditing(true);
   };
 
+  const enumerateDates = (start: string, end: string): string[] => {
+    const dates: string[] = [];
+    const startDate = new Date(`${start}T00:00:00`);
+    const endDate = new Date(`${end}T00:00:00`);
+    for (let d = startDate; d <= endDate; d.setDate(d.getDate() + 1)) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      dates.push(`${y}-${m}-${day}`);
+    }
+    return dates;
+  };
+
   const addSpecialDay = () => {
     if (!newSpecialDate) return;
-    if (specialHours.some((s) => s.date === newSpecialDate)) {
-      toast({ title: "此日期已設定過，請先刪除再重新加入", variant: "destructive" });
+    const endDate = newSpecialEndDate || newSpecialDate;
+    if (endDate < newSpecialDate) {
+      toast({ title: "結束日不可早於開始日", variant: "destructive" });
       return;
     }
-    const entry: SpecialDayEntry = { date: newSpecialDate, isOpen: newSpecialIsOpen };
-    if (newSpecialIsOpen) { entry.openTime = newSpecialOpenTime; entry.closeTime = newSpecialCloseTime; }
-    if (newSpecialNote.trim()) entry.note = newSpecialNote.trim();
-    setSpecialHours([...specialHours, entry].sort((a, b) => a.date.localeCompare(b.date)));
+    const allDates = enumerateDates(newSpecialDate, endDate);
+    const note = newSpecialNote.trim();
+    const added: SpecialDayEntry[] = [];
+    const skipped: string[] = [];
+    const existingDates = new Set(specialHours.map((s) => s.date));
+    for (const date of allDates) {
+      if (existingDates.has(date)) {
+        skipped.push(date);
+        continue;
+      }
+      existingDates.add(date);
+      const entry: SpecialDayEntry = { date, isOpen: newSpecialIsOpen };
+      if (newSpecialIsOpen) { entry.openTime = newSpecialOpenTime; entry.closeTime = newSpecialCloseTime; }
+      if (note) entry.note = note;
+      added.push(entry);
+    }
+    if (added.length === 0) {
+      toast({ title: "這些日期都已設定過，請先刪除再重新加入", variant: "destructive" });
+      return;
+    }
+    setSpecialHours([...specialHours, ...added].sort((a, b) => a.date.localeCompare(b.date)));
+    const description = added.length === 1
+      ? `已加入 ${added[0].date}`
+      : `已加入 ${added.length} 天（${added[0].date} ～ ${added[added.length - 1].date}）`;
+    toast({
+      title: "新增成功",
+      description: skipped.length > 0 ? `${description}，已略過 ${skipped.length} 天重複日期` : description,
+    });
     setNewSpecialDate("");
+    setNewSpecialEndDate("");
     setNewSpecialIsOpen(false);
     setNewSpecialOpenTime("09:00");
     setNewSpecialCloseTime("21:00");
@@ -1172,13 +1213,25 @@ function FranchiseInfoTab() {
             <div className="bg-gray-50/70 rounded-md p-3 space-y-2">
               <p className="text-xs text-muted-foreground mb-1">新增特殊日期</p>
               <div className="flex items-center gap-2 flex-wrap">
-                <Input
-                  type="date"
-                  value={newSpecialDate}
-                  onChange={(e) => setNewSpecialDate(e.target.value)}
-                  className="w-36 h-8 text-sm"
-                  data-testid="input-special-date"
-                />
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="date"
+                    value={newSpecialDate}
+                    onChange={(e) => setNewSpecialDate(e.target.value)}
+                    className="w-36 h-8 text-sm"
+                    data-testid="input-special-date"
+                  />
+                  <span className="text-muted-foreground text-sm">～</span>
+                  <Input
+                    type="date"
+                    value={newSpecialEndDate}
+                    min={newSpecialDate || undefined}
+                    onChange={(e) => setNewSpecialEndDate(e.target.value)}
+                    className="w-36 h-8 text-sm"
+                    placeholder="結束日（可留空）"
+                    data-testid="input-special-end-date"
+                  />
+                </div>
                 <div className="flex items-center gap-1.5">
                   <Switch
                     checked={newSpecialIsOpen}
