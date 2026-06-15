@@ -1930,6 +1930,8 @@ function BookingFlowTab() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/franchises", selectedFranchiseId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent/transactions"] });
 
       if (successCount > 0 && localStorage.getItem("autoCalendarSync") === "true") {
         setTimeout(() => {

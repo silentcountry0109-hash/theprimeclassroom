@@ -53,6 +53,22 @@ import fs from "fs";
 import path from "path";
 import { sendLineMessage, sendLineFlexMessage, buildAdminCancelFlex } from "./line";
 
+// 可接受外部傳入的資料庫交易 context（db 或 transaction），
+// 讓「建立預約 + 扣點」「取消 + 退點」能綁在同一筆交易內全部成功或全部回滾。
+type DbExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export interface ReconcileReport {
+  dryRun: boolean;
+  scannedParents: number;
+  fixedParents: {
+    parentId: string;
+    oldBalance: number;
+    newBalance: number;
+    bucketFixes: { balanceId: number; before: number; after: number }[];
+  }[];
+  skippedForManualReview: { parentId: string; reason: string }[];
+}
+
 export interface IStorage {
   getCoaches(): Promise<AggregatedCoach[]>;
   getAllCoaches(): Promise<Coach[]>;
@@ -99,11 +115,14 @@ export interface IStorage {
 
   getBooking(id: number): Promise<any | undefined>;
   getBookingsByParent(parentId: string): Promise<any[]>;
-  createBooking(booking: InsertBooking): Promise<Booking>;
+  createBooking(booking: InsertBooking, executor?: DbExecutor): Promise<Booking>;
+  createBookingAndDeduct(booking: InsertBooking, description?: string): Promise<Booking>;
+  cancelBookingAndRefund(bookingId: number, parentId: string, description?: string): Promise<void>;
   hasExistingBooking(slotId: number, childId: number): Promise<boolean>;
   hasPastBookingWithCoach(childId: number, coachId: number): Promise<boolean>;
-  cancelBooking(id: number): Promise<void>;
+  cancelBooking(id: number, executor?: DbExecutor): Promise<void>;
   completeExpiredBookings(): Promise<number>;
+  reconcileCreditBalances(opts?: { dryRun?: boolean }): Promise<ReconcileReport>;
 
   getFaqs(): Promise<Faq[]>;
   getAllFaqs(): Promise<Faq[]>;
@@ -1102,66 +1121,90 @@ export class DatabaseStorage implements IStorage {
   }): Promise<any> {
     const { slotId, franchiseId, childId, walkInName, walkInGrade, walkInSchool, overrideCapacity } = params;
 
-    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, slotId));
-    if (!slot) throw new Error("時段不存在");
-    if (slot.franchiseId !== franchiseId) throw new Error("此時段不屬於您的分校");
+    // 整段（含建立預約 + 扣家長 1 點）綁在同一筆交易：扣點失敗則預約不建立。
+    return db.transaction(async (tx) => {
+      const [slot] = await tx.select().from(timeSlots).where(eq(timeSlots.id, slotId));
+      if (!slot) throw new Error("時段不存在");
+      if (slot.franchiseId !== franchiseId) throw new Error("此時段不屬於您的分校");
 
-    const now = new Date();
-    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
-    if (now > slotEnd) throw new Error("此時段已結束，無法加排");
+      const now = new Date();
+      const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
+      if (now > slotEnd) throw new Error("此時段已結束，無法加排");
 
-    if (!overrideCapacity && slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿，請勾選「主任特批超額」");
+      if (!overrideCapacity && slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿，請勾選「主任特批超額」");
 
-    let child: { id: number; name: string; grade: number; parentId: string | null };
+      let child: { id: number; name: string; grade: number; parentId: string | null };
 
-    if (walkInName && walkInGrade) {
-      const [created] = await db.insert(children).values({
-        parentId: null,
-        name: walkInName.trim(),
-        grade: walkInGrade,
-        school: walkInSchool?.trim() || null,
-      }).returning();
-      child = created as any;
-      const existing = await db.select().from(franchiseStudents)
-        .where(and(eq(franchiseStudents.childId, created.id), eq(franchiseStudents.franchiseId, franchiseId)));
-      if (existing.length === 0) {
-        await db.insert(franchiseStudents).values({ franchiseId, childId: created.id });
+      if (walkInName && walkInGrade) {
+        const [created] = await tx.insert(children).values({
+          parentId: null,
+          name: walkInName.trim(),
+          grade: walkInGrade,
+          school: walkInSchool?.trim() || null,
+        }).returning();
+        child = created as any;
+        const existing = await tx.select().from(franchiseStudents)
+          .where(and(eq(franchiseStudents.childId, created.id), eq(franchiseStudents.franchiseId, franchiseId)));
+        if (existing.length === 0) {
+          await tx.insert(franchiseStudents).values({ franchiseId, childId: created.id });
+        }
+      } else if (childId) {
+        const [found] = await tx.select().from(children).where(eq(children.id, childId));
+        if (!found) throw new Error("學生不存在");
+        const franchiseBookings = await tx.select({ id: bookings.id }).from(bookings)
+          .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
+          .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId))).limit(1);
+        const linked = await tx.select({ id: franchiseStudents.id }).from(franchiseStudents)
+          .where(and(eq(franchiseStudents.childId, childId), eq(franchiseStudents.franchiseId, franchiseId))).limit(1);
+        if (franchiseBookings.length === 0 && linked.length === 0) throw new Error("此學生非本分校學生，無法加排");
+        child = found as any;
+      } else {
+        throw new Error("請選擇學生或填寫臨時學生資料");
       }
-    } else if (childId) {
-      const [found] = await db.select().from(children).where(eq(children.id, childId));
-      if (!found) throw new Error("學生不存在");
-      const franchiseBookings = await db.select({ id: bookings.id }).from(bookings)
+
+      const existingBooking = await tx.select().from(bookings).where(
+        and(eq(bookings.slotId, slotId), eq(bookings.childId, child.id), inArray(bookings.status, ["confirmed", "checked_in"]))
+      );
+      if (existingBooking.length > 0) throw new Error("此學生已預約此時段");
+
+      const overlapping = await tx
+        .select({ date: timeSlots.date, startTime: timeSlots.startTime, endTime: timeSlots.endTime })
+        .from(bookings)
         .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
-        .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId))).limit(1);
-      const linked = await db.select({ id: franchiseStudents.id }).from(franchiseStudents)
-        .where(and(eq(franchiseStudents.childId, childId), eq(franchiseStudents.franchiseId, franchiseId))).limit(1);
-      if (franchiseBookings.length === 0 && linked.length === 0) throw new Error("此學生非本分校學生，無法加排");
-      child = found as any;
-    } else {
-      throw new Error("請選擇學生或填寫臨時學生資料");
-    }
+        .where(and(
+          eq(bookings.childId, child.id),
+          eq(timeSlots.date, slot.date),
+          inArray(bookings.status, ["confirmed", "checked_in"]),
+          sql`${timeSlots.startTime} < ${slot.endTime}`,
+          sql`${timeSlots.endTime} > ${slot.startTime}`,
+        ));
+      if (overlapping.length > 0) {
+        const c = overlapping[0];
+        throw new Error(`此學生在 ${c.date} ${c.startTime}-${c.endTime} 已有其他預約，時間衝突`);
+      }
 
-    const existingBooking = await db.select().from(bookings).where(
-      and(eq(bookings.slotId, slotId), eq(bookings.childId, child.id), inArray(bookings.status, ["confirmed", "checked_in"]))
-    );
-    if (existingBooking.length > 0) throw new Error("此學生已預約此時段");
+      // 若學生隸屬於某家長（既有學生），先確認家長點數足夠再加排，比照前台行為阻擋。
+      // walk-in 臨時學生 parentId 為 null，無家庭錢包，不扣點。
+      if (child.parentId) {
+        const bal = await this.getParentBalance(child.parentId, tx);
+        if (bal < 1) throw new Error(`家長堂數不足（目前剩餘 ${bal} 堂，需要 1 堂），無法加排`);
+      }
 
-    const overlapping = await this.getChildOverlappingBookings(child.id, slot.date, slot.startTime, slot.endTime);
-    if (overlapping.length > 0) {
-      const c = overlapping[0];
-      throw new Error(`此學生在 ${c.date} ${c.startTime}-${c.endTime} 已有其他預約，時間衝突`);
-    }
+      await tx.update(timeSlots).set({ bookedSeats: sql`${timeSlots.bookedSeats} + 1` }).where(eq(timeSlots.id, slotId));
 
-    await db.update(timeSlots).set({ bookedSeats: sql`${timeSlots.bookedSeats} + 1` }).where(eq(timeSlots.id, slotId));
+      const [created] = await tx.insert(bookings).values({
+        slotId,
+        childId: child.id,
+        parentId: child.parentId ?? null,
+        status: "confirmed",
+      }).returning();
 
-    const [created] = await db.insert(bookings).values({
-      slotId,
-      childId: child.id,
-      parentId: child.parentId ?? null,
-      status: "confirmed",
-    }).returning();
+      if (child.parentId) {
+        await this.deductCredits(child.parentId, 1, created.id, "後台手動預約扣除 1 堂", tx);
+      }
 
-    return { ...created, childName: child.name };
+      return { ...created, childName: child.name };
+    });
   }
 
   async getBooking(id: number): Promise<any | undefined> {
@@ -1222,28 +1265,28 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions));
   }
 
-  async createBooking(booking: InsertBooking): Promise<Booking> {
-    const [slot] = await db
-      .select()
-      .from(timeSlots)
-      .where(eq(timeSlots.id, booking.slotId));
+  async createBooking(booking: InsertBooking, executor?: DbExecutor): Promise<Booking> {
+    const run = async (tx: DbExecutor): Promise<Booking> => {
+      const [slot] = await tx
+        .select()
+        .from(timeSlots)
+        .where(eq(timeSlots.id, booking.slotId));
 
-    if (!slot) throw new Error("時段不存在");
-    if (slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿");
+      if (!slot) throw new Error("時段不存在");
+      if (slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿");
 
-    const existing = await db
-      .select()
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.slotId, booking.slotId),
-          eq(bookings.childId, booking.childId),
-          eq(bookings.status, "confirmed")
-        )
-      );
-    if (existing.length > 0) throw new Error("此孩子已預約過此時段，無法重複預約");
+      const existing = await tx
+        .select()
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.slotId, booking.slotId),
+            eq(bookings.childId, booking.childId),
+            eq(bookings.status, "confirmed")
+          )
+        );
+      if (existing.length > 0) throw new Error("此孩子已預約過此時段，無法重複預約");
 
-    return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${booking.childId})`);
 
       const overlapping = await tx
@@ -1277,6 +1320,27 @@ export class DatabaseStorage implements IStorage {
 
       const [created] = await tx.insert(bookings).values(booking).returning();
       return created;
+    };
+
+    return executor ? run(executor) : db.transaction(run);
+  }
+
+  // 建立預約 + 扣 1 點，綁在同一筆資料庫交易：扣點失敗則預約不建立，
+  // 預約建立失敗則點數不扣，避免「有預約沒扣點」或「扣了點沒預約」。
+  async createBookingAndDeduct(booking: InsertBooking, description = "預約課程扣除 1 堂"): Promise<Booking> {
+    if (!booking.parentId) throw new Error("缺少家長資訊，無法扣點");
+    return db.transaction(async (tx) => {
+      const created = await this.createBooking(booking, tx);
+      await this.deductCredits(booking.parentId!, 1, created.id, description, tx);
+      return created;
+    });
+  }
+
+  // 取消預約 + 退 1 點，綁在同一筆交易，避免「退了交易紀錄但餘額沒回」或反之。
+  async cancelBookingAndRefund(bookingId: number, parentId: string, description = "取消預約退回 1 堂"): Promise<void> {
+    await db.transaction(async (tx) => {
+      await this.cancelBooking(bookingId, tx);
+      await this.refundCredits(parentId, bookingId, description, tx);
     });
   }
 
@@ -1310,17 +1374,18 @@ export class DatabaseStorage implements IStorage {
     return existing.length > 0;
   }
 
-  async cancelBooking(id: number): Promise<void> {
-    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+  async cancelBooking(id: number, executor?: DbExecutor): Promise<void> {
+    const conn = executor ?? db;
+    const [booking] = await conn.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) throw new Error("預約不存在");
     if (booking.status !== "confirmed") throw new Error("此預約無法取消");
 
-    await db
+    await conn
       .update(bookings)
       .set({ status: "cancelled" })
       .where(eq(bookings.id, id));
 
-    await db
+    await conn
       .update(timeSlots)
       .set({ bookedSeats: sql`GREATEST(${timeSlots.bookedSeats} - 1, 0)` })
       .where(eq(timeSlots.id, booking.slotId));
@@ -2548,13 +2613,16 @@ export class DatabaseStorage implements IStorage {
     const franchisePhone = franchise?.phone || undefined;
 
     for (const b of activeBookings) {
-      await db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
-
       if (b.parentId) {
+        // 取消狀態 + 退點綁同一筆交易，逐筆一致，避免中途失敗造成部分家長沒退到。
         try {
-          await this.refundCredits(b.parentId, b.id, `教室取消課程退回 1 堂（${slot.date} ${slot.startTime}）`);
+          await db.transaction(async (tx) => {
+            await tx.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
+            await this.refundCredits(b.parentId!, b.id, `教室取消課程退回 1 堂（${slot.date} ${slot.startTime}）`, tx);
+          });
         } catch (refundErr) {
-          console.error("Refund failed for booking", b.id, refundErr);
+          console.error("Cancel+refund failed for booking", b.id, refundErr);
+          continue;
         }
 
         const notifMsg = `您的孩子 ${b.childName} 在 ${slot.date} ${slot.startTime}-${slot.endTime}（${franchiseName}）的課程已被教室取消，已退回 1 堂。`;
@@ -2585,6 +2653,9 @@ export class DatabaseStorage implements IStorage {
             await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
           }
         } catch (e) { console.error("[LINE] cancelSlotBookingsAndNotify 通知失敗:", e); }
+      } else {
+        // 無家長的臨時學生（walk-in）：無點數可退，僅取消預約。
+        await db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
       }
     }
   }
@@ -2903,9 +2974,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(creditPurchases).where(eq(creditPurchases.parentId, parentId)).orderBy(desc(creditPurchases.createdAt));
   }
 
-  async getParentBalance(parentId: string): Promise<number> {
+  async getParentBalance(parentId: string, executor?: DbExecutor): Promise<number> {
+    const conn = executor ?? db;
     const now = new Date();
-    const [result] = await db.select({ total: sql<number>`COALESCE(SUM(${creditBalances.remainingCredits}), 0)` })
+    const [result] = await conn.select({ total: sql<number>`COALESCE(SUM(${creditBalances.remainingCredits}), 0)` })
       .from(creditBalances)
       .where(and(
         eq(creditBalances.parentId, parentId),
@@ -2926,76 +2998,169 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(creditBalances.expiresAt), asc(creditBalances.id));
   }
 
-  async deductCredits(parentId: string, amount: number, bookingId?: number, description?: string): Promise<CreditTransaction> {
-    const now = new Date();
-    const balances = await db.select().from(creditBalances)
-      .where(and(
-        eq(creditBalances.parentId, parentId),
-        gt(creditBalances.remainingCredits, 0),
-        sql`(${creditBalances.expiresAt} IS NULL OR ${creditBalances.expiresAt} > ${now})`
-      ))
-      .orderBy(asc(creditBalances.expiresAt), asc(creditBalances.id));
+  // 扣點：更新各 balance bucket 的剩餘點數 + 寫入交易紀錄，全部包在同一筆交易內，
+  // 任一步失敗即整筆回滾，避免「交易紀錄與餘額對不上」。可接受外部 executor 以與建立預約綁同一筆交易。
+  async deductCredits(parentId: string, amount: number, bookingId?: number, description?: string, executor?: DbExecutor): Promise<CreditTransaction> {
+    const run = async (tx: DbExecutor): Promise<CreditTransaction> => {
+      const now = new Date();
+      const balances = await tx.select().from(creditBalances)
+        .where(and(
+          eq(creditBalances.parentId, parentId),
+          gt(creditBalances.remainingCredits, 0),
+          sql`(${creditBalances.expiresAt} IS NULL OR ${creditBalances.expiresAt} > ${now})`
+        ))
+        .orderBy(asc(creditBalances.expiresAt), asc(creditBalances.id));
 
-    let remaining = amount;
-    let lastBalanceId: number | null = null;
+      let remaining = amount;
+      let lastBalanceId: number | null = null;
 
-    for (const bal of balances) {
-      if (remaining <= 0) break;
-      const deduct = Math.min(remaining, bal.remainingCredits);
-      await db.update(creditBalances)
-        .set({ remainingCredits: bal.remainingCredits - deduct })
-        .where(eq(creditBalances.id, bal.id));
-      remaining -= deduct;
-      lastBalanceId = bal.id;
-    }
+      for (const bal of balances) {
+        if (remaining <= 0) break;
+        const deduct = Math.min(remaining, bal.remainingCredits);
+        // 以原子化的條件式更新（剩餘 >= 欲扣）避免併發下扣成負數
+        const [updated] = await tx.update(creditBalances)
+          .set({ remainingCredits: sql`${creditBalances.remainingCredits} - ${deduct}` })
+          .where(and(eq(creditBalances.id, bal.id), gte(creditBalances.remainingCredits, deduct)))
+          .returning();
+        if (!updated) continue;
+        remaining -= deduct;
+        lastBalanceId = bal.id;
+      }
 
-    if (remaining > 0) {
-      throw new Error("點數餘額不足");
-    }
+      if (remaining > 0) {
+        throw new Error("點數餘額不足");
+      }
 
-    const [tx] = await db.insert(creditTransactions).values({
-      parentId,
-      type: "deduct",
-      credits: -amount,
-      balanceId: lastBalanceId,
-      bookingId: bookingId || null,
-      description: description || "預約扣除堂數",
-    }).returning();
-    return tx;
+      const [created] = await tx.insert(creditTransactions).values({
+        parentId,
+        type: "deduct",
+        credits: -amount,
+        balanceId: lastBalanceId,
+        bookingId: bookingId || null,
+        description: description || "預約扣除堂數",
+      }).returning();
+      return created;
+    };
+
+    return executor ? run(executor) : db.transaction(run);
   }
 
-  async refundCredits(parentId: string, bookingId: number, description?: string): Promise<CreditTransaction | null> {
-    const [deductTx] = await db.select().from(creditTransactions)
-      .where(and(
-        eq(creditTransactions.parentId, parentId),
-        eq(creditTransactions.bookingId, bookingId),
-        eq(creditTransactions.type, "deduct"),
-      ))
-      .orderBy(desc(creditTransactions.createdAt))
-      .limit(1);
+  // 退點：回補對應 bucket 的剩餘點數 + 寫入退點紀錄，包在同一筆交易內。
+  async refundCredits(parentId: string, bookingId: number, description?: string, executor?: DbExecutor): Promise<CreditTransaction | null> {
+    const run = async (tx: DbExecutor): Promise<CreditTransaction | null> => {
+      const [deductTx] = await tx.select().from(creditTransactions)
+        .where(and(
+          eq(creditTransactions.parentId, parentId),
+          eq(creditTransactions.bookingId, bookingId),
+          eq(creditTransactions.type, "deduct"),
+        ))
+        .orderBy(desc(creditTransactions.createdAt))
+        .limit(1);
 
-    if (!deductTx) return null;
+      if (!deductTx) return null;
 
-    const refundAmount = Math.abs(deductTx.credits);
+      // 已退過則不重複退（同一 booking 已存在 refund 紀錄）
+      const [existingRefund] = await tx.select().from(creditTransactions)
+        .where(and(
+          eq(creditTransactions.parentId, parentId),
+          eq(creditTransactions.bookingId, bookingId),
+          eq(creditTransactions.type, "refund"),
+        ))
+        .limit(1);
+      if (existingRefund) return existingRefund;
 
-    if (deductTx.balanceId) {
-      const [bal] = await db.select().from(creditBalances).where(eq(creditBalances.id, deductTx.balanceId));
-      if (bal) {
-        await db.update(creditBalances)
-          .set({ remainingCredits: bal.remainingCredits + refundAmount })
-          .where(eq(creditBalances.id, bal.id));
+      const refundAmount = Math.abs(deductTx.credits);
+
+      if (deductTx.balanceId) {
+        await tx.update(creditBalances)
+          .set({ remainingCredits: sql`${creditBalances.remainingCredits} + ${refundAmount}` })
+          .where(eq(creditBalances.id, deductTx.balanceId));
       }
+
+      const [created] = await tx.insert(creditTransactions).values({
+        parentId,
+        type: "refund",
+        credits: refundAmount,
+        balanceId: deductTx.balanceId,
+        bookingId,
+        description: description || "取消預約退回堂數",
+      }).returning();
+      return created;
+    };
+
+    return executor ? run(executor) : db.transaction(run);
+  }
+
+  // 一次性資料校正：偵測真實家長中 balance bucket 剩餘點數與其 deduct/refund 交易對不上的情況並修正。
+  // 以「每個 bucket 的 originalCredits + 該 bucket 的 deduct/refund 淨額」推算正確剩餘，
+  // 並排除 sim-* 種子帳號、以及無法可靠重建的帳號（有 payment_refund 或 deduct/refund 缺 balanceId）以免誤改。
+  async reconcileCreditBalances(opts?: { dryRun?: boolean }): Promise<ReconcileReport> {
+    const dryRun = opts?.dryRun ?? true;
+    const report: ReconcileReport = { dryRun, scannedParents: 0, fixedParents: [], skippedForManualReview: [] };
+
+    const parentRows = await db.selectDistinct({ parentId: creditBalances.parentId })
+      .from(creditBalances)
+      .where(sql`${creditBalances.parentId} NOT LIKE 'sim-%'`);
+
+    for (const { parentId } of parentRows) {
+      report.scannedParents++;
+      const buckets = await db.select().from(creditBalances).where(eq(creditBalances.parentId, parentId));
+      const txs = await db.select().from(creditTransactions).where(eq(creditTransactions.parentId, parentId));
+
+      // 若有 payment_refund（會把 bucket 歸零，破壞 original±deduct/refund 的推算前提）
+      // 或有 deduct/refund 缺 balanceId（無法歸屬到 bucket），則跳過交人工處理，避免誤改。
+      const hasPaymentRefund = txs.some(t => t.type === "payment_refund");
+      const hasUnattributed = txs.some(t => (t.type === "deduct" || t.type === "refund") && !t.balanceId);
+      if (hasPaymentRefund || hasUnattributed) {
+        report.skippedForManualReview.push({
+          parentId,
+          reason: hasPaymentRefund ? "有線上付款退款紀錄（payment_refund）" : "有未歸屬 bucket 的扣/退點紀錄",
+        });
+        continue;
+      }
+
+      const netByBucket = new Map<number, number>();
+      for (const t of txs) {
+        if ((t.type === "deduct" || t.type === "refund") && t.balanceId != null) {
+          netByBucket.set(t.balanceId, (netByBucket.get(t.balanceId) ?? 0) + t.credits);
+        }
+      }
+
+      const bucketFixes: { balanceId: number; before: number; after: number }[] = [];
+      let oldBalance = 0;
+      let newBalance = 0;
+      for (const bal of buckets) {
+        const net = netByBucket.get(bal.id) ?? 0; // deduct 為負、refund 為正
+        let expected = bal.originalCredits + net;
+        if (expected < 0) expected = 0;
+        if (expected > bal.originalCredits) expected = bal.originalCredits;
+        oldBalance += bal.remainingCredits;
+        newBalance += expected;
+        if (expected !== bal.remainingCredits) {
+          bucketFixes.push({ balanceId: bal.id, before: bal.remainingCredits, after: expected });
+        }
+      }
+
+      if (bucketFixes.length === 0) continue;
+
+      if (!dryRun) {
+        await db.transaction(async (tx) => {
+          for (const fix of bucketFixes) {
+            await tx.update(creditBalances).set({ remainingCredits: fix.after }).where(eq(creditBalances.id, fix.balanceId));
+          }
+          await tx.insert(creditTransactions).values({
+            parentId,
+            type: "adjust",
+            credits: newBalance - oldBalance,
+            description: `系統校正：餘額由 ${oldBalance} 修正為 ${newBalance}（依交易紀錄重算）`,
+          });
+        });
+      }
+
+      report.fixedParents.push({ parentId, oldBalance, newBalance, bucketFixes });
     }
 
-    const [tx] = await db.insert(creditTransactions).values({
-      parentId,
-      type: "refund",
-      credits: refundAmount,
-      balanceId: deductTx.balanceId,
-      bookingId,
-      description: description || "取消預約退回堂數",
-    }).returning();
-    return tx;
+    return report;
   }
 
   async addCredits(parentId: string, purchaseId: number, credits: number, expiresAt: Date | null, creditType: "paid" | "bonus" = "paid"): Promise<CreditBalance> {

@@ -1499,16 +1499,20 @@ export async function registerRoutes(
       const wasNewStudentForCoach = slot.coachId
         ? !(await storage.hasPastBookingWithCoach(req.body.childId, slot.coachId))
         : false;
-      const booking = await storage.createBooking({
-        slotId: req.body.slotId,
-        childId: req.body.childId,
-        parentId: userId,
-      });
+      let booking;
       try {
-        await storage.deductCredits(userId, 1, booking.id, "預約課程扣除 1 堂");
-      } catch (deductErr: any) {
-        await storage.cancelBooking(booking.id);
-        return res.status(400).json({ message: "堂數扣除失敗，預約已取消", code: "DEDUCT_FAILED" });
+        // 建立預約 + 扣 1 點綁同一筆交易：任一步失敗整筆回滾，不會留下「有預約沒扣點」。
+        booking = await storage.createBookingAndDeduct({
+          slotId: req.body.slotId,
+          childId: req.body.childId,
+          parentId: userId,
+        });
+      } catch (bookErr: any) {
+        const msg = bookErr?.message || "預約失敗，請稍後再試";
+        if (msg.includes("餘額不足") || msg.includes("堂數不足")) {
+          return res.status(400).json({ message: msg, code: "INSUFFICIENT_CREDITS" });
+        }
+        return res.status(400).json({ message: msg });
       }
       try {
         const child = kids.find((k: any) => k.id === req.body.childId);
@@ -1629,14 +1633,8 @@ export async function registerRoutes(
             results.push({ slotId, success: false, message: "需於 3 天前預約課程" });
             continue;
           }
-          const booking = await storage.createBooking({ slotId, childId, parentId: userId });
-          try {
-            await storage.deductCredits(userId, 1, booking.id, "預約課程扣除 1 堂");
-          } catch (deductErr: any) {
-            await storage.cancelBooking(booking.id);
-            results.push({ slotId, success: false, message: "堂數不足" });
-            continue;
-          }
+          // 每筆預約：建立 + 扣 1 點綁同一筆交易，逐筆維持一致（某筆失敗不留殘留）。
+          await storage.createBookingAndDeduct({ slotId, childId, parentId: userId });
           results.push({ slotId, success: true });
         } catch (err: any) {
           results.push({ slotId, success: false, message: err.message });
@@ -1800,12 +1798,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "課程開始前 4 小時內無法取消，系統仍會扣除點數計費。如有特殊情況，請聯繫教室。" });
       }
 
-      await storage.cancelBooking(bookingId);
-      try {
-        await storage.refundCredits(userId, bookingId, "取消預約退回 1 堂");
-      } catch (refundErr) {
-        console.error("Credit refund failed for booking", bookingId, refundErr);
-      }
+      // 取消預約 + 退 1 點綁同一筆交易：退點失敗則取消一起回滾，餘額與交易紀錄永遠一致。
+      await storage.cancelBookingAndRefund(bookingId, userId, "取消預約退回 1 堂");
 
       // 通知：家長（取消確認）
       try {
@@ -4440,6 +4434,19 @@ export async function registerRoutes(
       res.json({ success: true, purchase, newBalance });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "加點失敗" });
+    }
+  });
+
+  // 一次性點數餘額校正：偵測真實家長中餘額與交易紀錄對不上者並修正。
+  // 預設 dry-run（僅預覽不寫入）；帶 ?apply=true 才實際修正。可重複執行。
+  app.post("/api/admin/reconcile-credits", isAdmin, async (req: any, res) => {
+    try {
+      const apply = req.query.apply === "true" || req.body?.apply === true;
+      const report = await storage.reconcileCreditBalances({ dryRun: !apply });
+      res.json(report);
+    } catch (error: any) {
+      console.error("[admin/reconcile-credits] error:", error);
+      res.status(500).json({ message: error.message || "校正失敗" });
     }
   });
 

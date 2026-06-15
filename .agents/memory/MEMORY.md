@@ -3,3 +3,4 @@
 - [School list dual sources](school-list-sources.md) — school dropdowns must merge built-in list + DB custom_schools via getMerged* helpers + useCustomSchools hook.
 - [Coach record merging](coach-record-merging.md) — same-person coach rows merge by userId OR name only; phone is shared across distinct teachers so it's not a reliable merge key.
 - [Landing CMS content keys](landing-cms-keys.md) — new useSiteContent landing field needs 3 edits (landing.tsx + admin-dashboard fields list + defaults map) or it's uneditable in admin.
+- [Credit balance reconciliation](credit-reconcile.md) — reconcile per-bucket (original ± deduct/refund), NOT global balance-vs-net-tx, or seeded test accounts get wrongly zeroed.
