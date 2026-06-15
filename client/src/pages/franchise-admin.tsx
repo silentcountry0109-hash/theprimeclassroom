@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { TAIWAN_CITIES, getDistricts, getSchools } from "@shared/taiwan-schools";
+import { TAIWAN_CITIES, getMergedDistricts, getMergedSchools } from "@shared/taiwan-schools";
+import { useCustomSchools } from "@/hooks/use-custom-schools";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, getActiveFranchiseId } from "@/lib/queryClient";
@@ -2732,8 +2733,9 @@ function TimeSlotsTab() {
     }
     return "";
   }, [mbWalkInSchoolCity, mbWalkInSchoolDistrict, mbWalkInSchoolName]);
-  const mbWalkInSchoolDistricts = useMemo(() => mbWalkInSchoolCity ? getDistricts(mbWalkInSchoolCity) : [], [mbWalkInSchoolCity]);
-  const mbWalkInSchoolNames = useMemo(() => (mbWalkInSchoolCity && mbWalkInSchoolDistrict) ? getSchools(mbWalkInSchoolCity, mbWalkInSchoolDistrict) : [], [mbWalkInSchoolCity, mbWalkInSchoolDistrict]);
+  const customSchools = useCustomSchools();
+  const mbWalkInSchoolDistricts = useMemo(() => mbWalkInSchoolCity ? getMergedDistricts(mbWalkInSchoolCity, customSchools) : [], [mbWalkInSchoolCity, customSchools]);
+  const mbWalkInSchoolNames = useMemo(() => (mbWalkInSchoolCity && mbWalkInSchoolDistrict) ? getMergedSchools(mbWalkInSchoolCity, mbWalkInSchoolDistrict, customSchools) : [], [mbWalkInSchoolCity, mbWalkInSchoolDistrict, customSchools]);
   const [mbOverride, setMbOverride] = useState(false);
 
   const closeMb = () => {

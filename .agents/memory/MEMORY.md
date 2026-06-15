@@ -1,4 +1,5 @@
 - [Mockup-sandbox preview screenshots](mockup-sandbox-screenshots.md) — app_preview hits :5000 (main app); screenshot mockup previews via external_url + dev domain instead.
 - [Taiwan schools list audits](taiwan-schools-audit.md) — authoritative MOE dataset 6087 JSON + district-parse/dedup/rename traps for shared/taiwan-schools.ts.
+- [School list dual sources](school-list-sources.md) — school dropdowns must merge built-in list + DB custom_schools via getMerged* helpers + useCustomSchools hook.
 - [Coach record merging](coach-record-merging.md) — same-person coach rows merge by userId OR name only; phone is shared across distinct teachers so it's not a reliable merge key.
 - [Landing CMS content keys](landing-cms-keys.md) — new useSiteContent landing field needs 3 edits (landing.tsx + admin-dashboard fields list + defaults map) or it's uneditable in admin.

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCredentialAuth } from "@/hooks/use-credential-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -103,6 +103,8 @@ import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Produ
 import { Search as SearchIcon } from "lucide-react";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS } from "@shared/constants";
+import { TAIWAN_CITIES, getDistricts, getMergedSchools, isBuiltInSchool } from "@shared/taiwan-schools";
+import { useCustomSchools } from "@/hooks/use-custom-schools";
 
 interface AdminStats {
   totalStudents: number;
@@ -137,6 +139,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string } =
     { id: "franchises", label: "加盟分校", icon: Building2 },
     { id: "coaches", label: "老師管理", icon: GraduationCap },
     { id: "timeslots", label: "時段管理", icon: Clock },
+    { id: "schools", label: "學校管理", icon: School },
     { id: "users", label: "帳號管理", icon: UserCog },
     { id: "announcements", label: "公告管理", icon: Megaphone },
     { id: "shop", label: "商城管理", icon: ShoppingBag },
@@ -208,6 +211,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string } =
             {activeTab === "franchises" && <FranchisesTab />}
             {activeTab === "coaches" && <CoachesTab />}
             {activeTab === "timeslots" && <TimeSlotsTab />}
+            {activeTab === "schools" && <SchoolManagementTab />}
             {activeTab === "users" && <UsersTab />}
             {activeTab === "announcements" && <AnnouncementsTab />}
             {activeTab === "shop" && <ShopManagementTab />}
@@ -1734,6 +1738,171 @@ function TimeSlotsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function parseApiError(e: any, fallback: string): string {
+  const msg = e?.message || "";
+  const idx = msg.indexOf(": ");
+  if (idx >= 0) {
+    const body = msg.slice(idx + 2);
+    try { return JSON.parse(body).message || fallback; } catch { return body || fallback; }
+  }
+  return msg || fallback;
+}
+
+function SchoolManagementTab() {
+  const { toast } = useToast();
+  const customSchools = useCustomSchools();
+
+  const [filterCity, setFilterCity] = useState("");
+  const [filterDistrict, setFilterDistrict] = useState("");
+
+  const [addCity, setAddCity] = useState("");
+  const [addDistrict, setAddDistrict] = useState("");
+  const [addName, setAddName] = useState("");
+
+  const filterDistricts = useMemo(() => (filterCity ? getDistricts(filterCity) : []), [filterCity]);
+  const addDistricts = useMemo(() => (addCity ? getDistricts(addCity) : []), [addCity]);
+
+  const schoolsToShow = useMemo(() => {
+    if (!filterCity || !filterDistrict) return [];
+    return getMergedSchools(filterCity, filterDistrict, customSchools).map((name) => {
+      const custom = customSchools.find(
+        (s) => s.city === filterCity && s.district === filterDistrict && s.name === name,
+      );
+      return { name, custom: custom ?? null, builtIn: isBuiltInSchool(filterCity, filterDistrict, name) };
+    });
+  }, [filterCity, filterDistrict, customSchools]);
+
+  const addMutation = useMutation({
+    mutationFn: async (data: { city: string; district: string; name: string }) => {
+      const res = await apiRequest("POST", "/api/admin/custom-schools", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "學校已新增" });
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-schools"] });
+      setAddName("");
+    },
+    onError: (e: any) => {
+      toast({ title: "新增失敗", description: parseApiError(e, "請稍後再試"), variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/custom-schools/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "已刪除" });
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-schools"] });
+    },
+    onError: (e: any) => {
+      toast({ title: "刪除失敗", description: parseApiError(e, "請稍後再試"), variant: "destructive" });
+    },
+  });
+
+  const handleAdd = () => {
+    const name = addName.trim();
+    if (!addCity || !addDistrict || !name) {
+      toast({ title: "請完整填寫", description: "請選擇縣市、行政區並輸入學校名稱", variant: "destructive" });
+      return;
+    }
+    addMutation.mutate({ city: addCity, district: addDistrict, name });
+  };
+
+  return (
+    <div className="max-w-4xl">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-foreground" data-testid="text-schools-title">學校管理</h1>
+        <p className="text-sm text-muted-foreground">
+          補上內建清單缺漏的國小。新增後會同時出現在家長綁定孩子學校與分校現場報名的選單中。
+        </p>
+      </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-4 mb-6">
+        <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+          <Plus className="w-4 h-4 text-tiffany" />新增學校
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <Select value={addCity} onValueChange={(v) => { setAddCity(v); setAddDistrict(""); }}>
+            <SelectTrigger data-testid="select-add-school-city"><SelectValue placeholder="縣市" /></SelectTrigger>
+            <SelectContent>
+              {TAIWAN_CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={addDistrict} onValueChange={setAddDistrict} disabled={!addCity}>
+            <SelectTrigger data-testid="select-add-school-district"><SelectValue placeholder="行政區" /></SelectTrigger>
+            <SelectContent>
+              {addDistricts.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            placeholder="學校名稱（例：○○國小）"
+            data-testid="input-add-school-name"
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          />
+          <Button onClick={handleAdd} disabled={addMutation.isPending} className="rounded-full" data-testid="button-add-school">
+            <Plus className="w-4 h-4 mr-1.5" />新增
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-4">
+        <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+          <School className="w-4 h-4 text-tiffany" />瀏覽學校清單
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+          <Select value={filterCity} onValueChange={(v) => { setFilterCity(v); setFilterDistrict(""); }}>
+            <SelectTrigger data-testid="select-filter-school-city"><SelectValue placeholder="選擇縣市" /></SelectTrigger>
+            <SelectContent>
+              {TAIWAN_CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterDistrict} onValueChange={setFilterDistrict} disabled={!filterCity}>
+            <SelectTrigger data-testid="select-filter-school-district"><SelectValue placeholder="選擇行政區" /></SelectTrigger>
+            <SelectContent>
+              {filterDistricts.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {!filterCity || !filterDistrict ? (
+          <p className="text-sm text-muted-foreground text-center py-8">請選擇縣市與行政區以檢視學校清單</p>
+        ) : schoolsToShow.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">此行政區尚無學校</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {schoolsToShow.map((s) => (
+              <div
+                key={s.name}
+                className={`flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-sm border ${s.custom ? "border-tiffany/40 bg-tiffany/5" : "border-gray-200 bg-gray-50"}`}
+                data-testid={`school-item-${s.name}`}
+              >
+                <span className="text-foreground">{s.name}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${s.custom ? "bg-tiffany/15 text-tiffany" : "bg-gray-200 text-muted-foreground"}`}>
+                  {s.custom ? "自訂" : "內建"}
+                </span>
+                {s.custom && (
+                  <button
+                    onClick={() => deleteMutation.mutate(s.custom!.id)}
+                    disabled={deleteMutation.isPending}
+                    className="text-muted-foreground hover:text-coral transition-colors"
+                    data-testid={`button-delete-school-${s.name}`}
+                    title="移除此學校"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

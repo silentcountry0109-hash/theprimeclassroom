@@ -212,6 +212,24 @@ export const insertSiteContentSchema = createInsertSchema(siteContent).omit({ id
 export type SiteContent = typeof siteContent.$inferSelect;
 export type InsertSiteContent = z.infer<typeof insertSiteContentSchema>;
 
+export const customSchools = pgTable("custom_schools", {
+  id: serial("id").primaryKey(),
+  city: text("city").notNull(),
+  district: text("district").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("custom_schools_unique").on(table.city, table.district, table.name),
+]);
+
+export const insertCustomSchoolSchema = createInsertSchema(customSchools).omit({ id: true, createdAt: true }).extend({
+  city: z.string().trim().min(1, "請選擇縣市"),
+  district: z.string().trim().min(1, "請選擇行政區"),
+  name: z.string().trim().min(1, "請輸入學校名稱"),
+});
+export type CustomSchool = typeof customSchools.$inferSelect;
+export type InsertCustomSchool = z.infer<typeof insertCustomSchoolSchema>;
+
 export const contactBooks = pgTable("contact_books", {
   id: serial("id").primaryKey(),
   bookingId: integer("booking_id").references(() => bookings.id),

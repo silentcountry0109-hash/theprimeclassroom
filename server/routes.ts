@@ -9,7 +9,8 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import twilio from "twilio";
 import { users } from "@shared/models/auth";
-import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema, registrationGiftSettingSchema } from "@shared/schema";
+import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema, registrationGiftSettingSchema, insertCustomSchoolSchema } from "@shared/schema";
+import { getSchools } from "@shared/taiwan-schools";
 import { eq, and, or, isNotNull, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 import multer from "multer";
@@ -1362,6 +1363,15 @@ export async function registerRoutes(
       res.json(faqList);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch FAQs" });
+    }
+  });
+
+  app.get("/api/custom-schools", async (_req, res) => {
+    try {
+      const list = await storage.getCustomSchools();
+      res.json(list);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch custom schools" });
     }
   });
 
@@ -4024,6 +4034,47 @@ export async function registerRoutes(
       res.json(contentMap);
     } catch (error) {
       res.status(500).json({ message: "取得網站內容失敗" });
+    }
+  });
+
+  app.get("/api/admin/custom-schools", isAdmin, async (_req, res) => {
+    try {
+      const list = await storage.getCustomSchools();
+      res.json(list);
+    } catch (error) {
+      res.status(500).json({ message: "取得學校清單失敗" });
+    }
+  });
+
+  app.post("/api/admin/custom-schools", isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertCustomSchoolSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message || "資料格式錯誤" });
+      }
+      const { city, district, name } = parsed.data;
+      if (getSchools(city, district).includes(name)) {
+        return res.status(400).json({ message: "此學校已存在於內建清單" });
+      }
+      const existing = await storage.getCustomSchools();
+      if (existing.some((s) => s.city === city && s.district === district && s.name === name)) {
+        return res.status(400).json({ message: "此學校已新增過" });
+      }
+      const created = await storage.createCustomSchool({ city, district, name });
+      res.json(created);
+    } catch (error) {
+      res.status(500).json({ message: "新增學校失敗" });
+    }
+  });
+
+  app.delete("/api/admin/custom-schools/:id", isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "無效的學校編號" });
+      await storage.deleteCustomSchool(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "刪除學校失敗" });
     }
   });
 

@@ -3,6 +3,7 @@ import {
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
   coachDailyRecords, classrooms, notifications, franchiseStudents,
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
+  customSchools,
   textbooks, textbookQuizzes, textbookFiles,
   curriculumUnits, curriculumFiles, curriculumMidtermExams,
   coachReminderLogs,
@@ -27,6 +28,7 @@ import {
   type Notification, type InsertNotification,
   type User,
   type SiteContent,
+  type CustomSchool, type InsertCustomSchool,
   type ContactBook, type InsertContactBook,
   type FavoriteFranchise,
   type CoachDailyRecord,
@@ -186,6 +188,10 @@ export interface IStorage {
   getStudentContactBookHistoryByCoachIds(coachIds: number[], childId: number): Promise<any[]>;
   getCoachDailyRecordByCoachIds(coachIds: number[], date: string): Promise<any>;
   getCoachMonthlyRecordsByCoachIds(coachIds: number[], year: number, month: number): Promise<any[]>;
+
+  getCustomSchools(): Promise<CustomSchool[]>;
+  createCustomSchool(data: InsertCustomSchool): Promise<CustomSchool>;
+  deleteCustomSchool(id: number): Promise<void>;
 
   getAllSiteContent(): Promise<SiteContent[]>;
   getSiteContent(sectionKey: string): Promise<SiteContent | undefined>;
@@ -1847,6 +1853,19 @@ export class DatabaseStorage implements IStorage {
   async updateOrderStatus(id: number, status: string): Promise<Order> {
     const [order] = await db.update(orders).set({ status }).where(eq(orders.id, id)).returning();
     return order;
+  }
+
+  async getCustomSchools(): Promise<CustomSchool[]> {
+    return db.select().from(customSchools).orderBy(asc(customSchools.city), asc(customSchools.district), asc(customSchools.name));
+  }
+
+  async createCustomSchool(data: InsertCustomSchool): Promise<CustomSchool> {
+    const [created] = await db.insert(customSchools).values(data).returning();
+    return created;
+  }
+
+  async deleteCustomSchool(id: number): Promise<void> {
+    await db.delete(customSchools).where(eq(customSchools.id, id));
   }
 
   async getAllSiteContent(): Promise<SiteContent[]> {

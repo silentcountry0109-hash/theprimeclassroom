@@ -424,3 +424,33 @@ export function getDistricts(city: string): string[] {
 export function getSchools(city: string, district: string): string[] {
   return TAIWAN_SCHOOLS[city]?.[district] || [];
 }
+
+export type CustomSchoolLike = { city: string; district: string; name: string };
+
+export function getMergedDistricts(city: string, custom: CustomSchoolLike[] = []): string[] {
+  const result = getDistricts(city);
+  const seen = new Set(result);
+  for (const c of custom) {
+    if (c.city === city && !seen.has(c.district)) {
+      seen.add(c.district);
+      result.push(c.district);
+    }
+  }
+  return result;
+}
+
+export function getMergedSchools(city: string, district: string, custom: CustomSchoolLike[] = []): string[] {
+  const result = [...getSchools(city, district)];
+  const seen = new Set(result);
+  for (const c of custom) {
+    if (c.city === city && c.district === district && !seen.has(c.name)) {
+      seen.add(c.name);
+      result.push(c.name);
+    }
+  }
+  return result;
+}
+
+export function isBuiltInSchool(city: string, district: string, name: string): boolean {
+  return getSchools(city, district).includes(name);
+}

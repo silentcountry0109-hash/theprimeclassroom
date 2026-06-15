@@ -100,7 +100,8 @@ import {
 import type { Child, Booking, Franchise, Coach, Product, CartItem, Order, OrderItem, Notification, CreditPackage, CreditBalance, CreditTransaction, Promotion } from "@shared/schema";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS, TIME_PERIODS } from "@shared/constants";
-import { TAIWAN_CITIES, getDistricts, getSchools } from "@shared/taiwan-schools";
+import { TAIWAN_CITIES, getMergedDistricts, getMergedSchools } from "@shared/taiwan-schools";
+import { useCustomSchools } from "@/hooks/use-custom-schools";
 import avatarBoyPath from "../assets/avatar-boy.png";
 import avatarGirlPath from "../assets/avatar-girl.png";
 
@@ -2903,12 +2904,14 @@ function ChildrenTab() {
     return "";
   }, [schoolCity, schoolDistrict, schoolName]);
 
+  const customSchools = useCustomSchools();
+
   const parseSchoolString = (schoolStr: string) => {
     if (!schoolStr) return { city: "", district: "", name: "" };
     for (const city of TAIWAN_CITIES) {
       if (schoolStr.startsWith(city)) {
         const rest = schoolStr.slice(city.length);
-        const districts = getDistricts(city);
+        const districts = getMergedDistricts(city, customSchools);
         for (const dist of districts) {
           if (rest.startsWith(dist)) {
             const sName = rest.slice(dist.length);
@@ -2920,8 +2923,8 @@ function ChildrenTab() {
     return { city: "", district: "", name: "" };
   };
 
-  const availableDistricts = useMemo(() => schoolCity ? getDistricts(schoolCity) : [], [schoolCity]);
-  const availableSchools = useMemo(() => (schoolCity && schoolDistrict) ? getSchools(schoolCity, schoolDistrict) : [], [schoolCity, schoolDistrict]);
+  const availableDistricts = useMemo(() => schoolCity ? getMergedDistricts(schoolCity, customSchools) : [], [schoolCity, customSchools]);
+  const availableSchools = useMemo(() => (schoolCity && schoolDistrict) ? getMergedSchools(schoolCity, schoolDistrict, customSchools) : [], [schoolCity, schoolDistrict, customSchools]);
 
   const closeDialog = () => {
     setShowAddDialog(false);
