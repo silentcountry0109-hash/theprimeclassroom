@@ -114,10 +114,10 @@ interface AdminStats {
 }
 
 export default function AdminDashboard({ initialTab }: { initialTab?: string } = {}) {
-  const { user, isLoading: authLoading, logout } = useCredentialAuth();
+  const { user, isLoading: authLoading, isFetching, logout } = useCredentialAuth();
   const [activeTab, setActiveTab] = useState(initialTab || "overview");
 
-  if (authLoading) {
+  if (authLoading || (isFetching && !user)) {
     return (
       <div className="min-h-screen bg-washi flex items-center justify-center">
         <Skeleton className="w-32 h-8" />

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { Lock, User, ArrowLeft, Crown, Shield, Eye, EyeOff } from "lucide-react"
 
 export default function HqLogin() {
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const savedHqUsername = localStorage.getItem("rememberedHqUsername") || "";
   const [username, setUsername] = useState(savedHqUsername);
   const [password, setPassword] = useState("");
@@ -39,6 +41,8 @@ export default function HqLogin() {
         } else {
           localStorage.removeItem("rememberedHqUsername");
         }
+        queryClient.setQueryData(["/api/credential-user"], data);
+        await queryClient.invalidateQueries({ queryKey: ["/api/credential-user"] });
         navigate("/admin");
       } else {
         setError("此帳號不是總部管理員帳號");

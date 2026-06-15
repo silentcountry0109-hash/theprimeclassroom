@@ -13,7 +13,7 @@ async function fetchCredentialUser(): Promise<User | null> {
 export function useCredentialAuth() {
   const queryClient = useQueryClient();
 
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading, isFetching } = useQuery<User | null>({
     queryKey: ["/api/credential-user"],
     queryFn: fetchCredentialUser,
     retry: false,
@@ -33,6 +33,7 @@ export function useCredentialAuth() {
   return {
     user,
     isLoading,
+    isFetching,
     isAuthenticated: !!user,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
