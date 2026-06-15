@@ -540,3 +540,17 @@ export const coachReminderLogs = pgTable("coach_reminder_logs", {
 
 export type CoachReminderLog = typeof coachReminderLogs.$inferSelect;
 
+export const popupAds = pgTable("popup_ads", {
+  id: serial("id").primaryKey(),
+  imageUrl: text("image_url").notNull(),
+  linkUrl: text("link_url"),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPopupAdSchema = createInsertSchema(popupAds).omit({ id: true, createdAt: true });
+export type PopupAd = typeof popupAds.$inferSelect;
+export type InsertPopupAd = z.infer<typeof insertPopupAdSchema>;
+

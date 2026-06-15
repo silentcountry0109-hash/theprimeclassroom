@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import twilio from "twilio";
 import { users } from "@shared/models/auth";
-import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema, registrationGiftSettingSchema, insertCustomSchoolSchema } from "@shared/schema";
+import { coaches, franchises, creditPurchases, creditBalances, timeSlots, children, insertTextbookSchema, insertTextbookQuizSchema, insertFranchiseSchema, registrationGiftSettingSchema, insertCustomSchoolSchema, insertPopupAdSchema } from "@shared/schema";
 import { getSchools } from "@shared/taiwan-schools";
 import { eq, and, or, isNotNull, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
@@ -4069,6 +4069,55 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "刪除學校失敗" });
+    }
+  });
+
+  // ── Popup Ads ────────────────────────────────────────────────────────────────
+  app.get("/api/popup-ads", async (req: any, res) => {
+    try {
+      const today = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const ads = await storage.getActivePopupAds(today);
+      res.json(ads);
+    } catch (error) {
+      res.status(500).json({ message: "取得彈窗廣告失敗" });
+    }
+  });
+
+  app.get("/api/admin/popup-ads", isAdmin, async (_req, res) => {
+    try {
+      const ads = await storage.getAllPopupAds();
+      res.json(ads);
+    } catch (error) {
+      res.status(500).json({ message: "取得彈窗廣告失敗" });
+    }
+  });
+
+  app.post("/api/admin/popup-ads", isAdmin, upload.single("image"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "請上傳圖片" });
+      const { linkUrl, startDate, endDate } = req.body;
+      if (!startDate || !endDate) return res.status(400).json({ message: "請填寫檔期" });
+      const imageUrl = await uploadPublicFile(req.file.buffer, req.file.originalname, req.file.mimetype, "popup-ads");
+      const parsed = insertPopupAdSchema.parse({ imageUrl, linkUrl: linkUrl || null, startDate, endDate, isActive: true });
+      const ad = await storage.createPopupAd(parsed);
+      res.json(ad);
+    } catch (error) {
+      console.error("[popup-ads create]", error);
+      res.status(500).json({ message: "新增彈窗廣告失敗" });
+    }
+  });
+
+  app.delete("/api/admin/popup-ads/:id", isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "無效的廣告編號" });
+      const ads = await storage.getAllPopupAds();
+      const ad = ads.find((a) => a.id === id);
+      if (ad) await deletePublicFile(ad.imageUrl);
+      await storage.deletePopupAd(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "刪除彈窗廣告失敗" });
     }
   });
 

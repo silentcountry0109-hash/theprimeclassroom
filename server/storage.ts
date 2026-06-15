@@ -7,11 +7,13 @@ import {
   textbooks, textbookQuizzes, textbookFiles,
   curriculumUnits, curriculumFiles, curriculumMidtermExams,
   coachReminderLogs,
+  popupAds,
   systemSettings,
   REGISTRATION_GIFT_SETTING_KEY,
   DEFAULT_REGISTRATION_GIFT_SETTING,
   registrationGiftSettingSchema,
   type RegistrationGiftSetting,
+  type PopupAd, type InsertPopupAd,
   users,
   type Franchise, type InsertFranchise,
   type Coach, type InsertCoach, type AggregatedCoach,
@@ -341,6 +343,11 @@ export interface IStorage {
   hasCoachReminderLog(coachId: number, date: string, type: string): Promise<boolean>;
   createCoachReminderLog(coachId: number, date: string, type: string): Promise<void>;
   deleteOldCoachReminderLogs(beforeDate: string): Promise<number>;
+
+  getActivePopupAds(today: string): Promise<PopupAd[]>;
+  getAllPopupAds(): Promise<PopupAd[]>;
+  createPopupAd(data: InsertPopupAd): Promise<PopupAd>;
+  deletePopupAd(id: number): Promise<void>;
 
   getFranchiseStatsByDateRange(franchiseId: number, startDate: string, endDate: string): Promise<{
     totalSlots: number;
@@ -3667,6 +3674,29 @@ export class DatabaseStorage implements IStorage {
       .delete(coachReminderLogs)
       .where(lt(coachReminderLogs.date, beforeDate));
     return result.rowCount ?? 0;
+  }
+
+  async getActivePopupAds(today: string): Promise<PopupAd[]> {
+    return db.select().from(popupAds).where(
+      and(
+        eq(popupAds.isActive, true),
+        lte(popupAds.startDate, today),
+        gte(popupAds.endDate, today)
+      )
+    ).orderBy(desc(popupAds.createdAt));
+  }
+
+  async getAllPopupAds(): Promise<PopupAd[]> {
+    return db.select().from(popupAds).orderBy(desc(popupAds.createdAt));
+  }
+
+  async createPopupAd(data: InsertPopupAd): Promise<PopupAd> {
+    const [ad] = await db.insert(popupAds).values(data).returning();
+    return ad;
+  }
+
+  async deletePopupAd(id: number): Promise<void> {
+    await db.delete(popupAds).where(eq(popupAds.id, id));
   }
 
 }

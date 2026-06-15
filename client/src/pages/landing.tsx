@@ -31,7 +31,6 @@ import {
   ChevronRight,
   Star,
   Quote,
-  Phone,
   Mail,
   Clock,
   ArrowRight,
@@ -56,7 +55,8 @@ import {
   ClipboardCheck,
   Trophy,
 } from "lucide-react";
-import type { Coach, AggregatedCoach, Faq, SuccessStory, Franchise } from "@shared/schema";
+import type { Coach, AggregatedCoach, Faq, SuccessStory, Franchise, PopupAd } from "@shared/schema";
+import { SiLine } from "react-icons/si";
 import { createContext, useContext } from "react";
 
 const SiteContentContext = createContext<Record<string, string>>({});
@@ -2328,9 +2328,8 @@ function CTASection() {
 
 function FooterSection() {
   const footerDesc = useSiteContent("footer.description", "讓教學回歸「1 位老師」對「1 位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。");
-  const footerPhone = useSiteContent("footer.phone", "02-1234-5678");
   const footerEmail = useSiteContent("footer.email", "hello@primemath.tw");
-  const footerAddress = useSiteContent("footer.address", "台北市大安區");
+  const footerLineUrl = useSiteContent("footer.lineUrl", "https://line.me/ti/p/@theprime");
 
   return (
     <footer className="bg-foreground text-white/80 py-10 md:py-16 px-4 md:px-6">
@@ -2369,11 +2368,6 @@ function FooterSection() {
                 </a>
               </li>
               <li>
-                <a href="#branches" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-branches">
-                  全台分校
-                </a>
-              </li>
-              <li>
                 <a href="#testimonials" className="text-sm text-white/60 transition-colors hover:text-white" data-testid="footer-link-testimonials">
                   成功案例
                 </a>
@@ -2397,16 +2391,20 @@ function FooterSection() {
             </h4>
             <ul className="space-y-2.5">
               <li className="flex items-center gap-2 text-sm text-white/60">
-                <Phone className="w-4 h-4" />
-                {footerPhone}
-              </li>
-              <li className="flex items-center gap-2 text-sm text-white/60">
                 <Mail className="w-4 h-4" />
                 {footerEmail}
               </li>
-              <li className="flex items-center gap-2 text-sm text-white/60">
-                <MapPin className="w-4 h-4" />
-                {footerAddress}
+              <li>
+                <a
+                  href={footerLineUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-white/60 hover:text-[#06C755] transition-colors"
+                  data-testid="footer-link-line"
+                >
+                  <SiLine className="w-4 h-4" />
+                  加入 LINE 好友
+                </a>
               </li>
             </ul>
           </div>
@@ -2415,8 +2413,7 @@ function FooterSection() {
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col md:flex-row items-center gap-3">
             <p className="text-xs text-white/40">
-              &copy; {new Date().getFullYear()} The Prime 質數教室. All rights
-              reserved.
+              &copy; 2026 The Prime 質數教室｜質數教室股份有限公司. All rights reserved.
             </p>
             <div className="flex items-center gap-3">
               <a
@@ -2687,6 +2684,72 @@ function FloatingCTA() {
   );
 }
 
+function PopupAdModal() {
+  const [ad, setAd] = useState<PopupAd | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("popup_shown")) return;
+    const timer = setTimeout(async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await fetch(`/api/popup-ads?date=${today}`);
+        if (!res.ok) return;
+        const ads: PopupAd[] = await res.json();
+        if (ads.length === 0) return;
+        const picked = ads[Math.floor(Math.random() * ads.length)];
+        setAd(picked);
+        setOpen(true);
+        sessionStorage.setItem("popup_shown", "1");
+      } catch { /* ignore */ }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!open || !ad) return null;
+
+  const handleClose = () => setOpen(false);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={handleClose}
+        >
+          <motion.div
+            className="relative max-w-lg w-full rounded-2xl overflow-hidden shadow-2xl"
+            initial={{ scale: 0.85, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.85, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+              onClick={handleClose}
+              data-testid="button-close-popup-ad"
+              aria-label="關閉廣告"
+            >
+              <XCircle className="w-5 h-5" />
+            </button>
+            {ad.linkUrl ? (
+              <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer" onClick={handleClose}>
+                <img src={ad.imageUrl} alt="活動廣告" className="w-full h-auto block" />
+              </a>
+            ) : (
+              <img src={ad.imageUrl} alt="活動廣告" className="w-full h-auto block" />
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export default function LandingPage() {
   const { data: siteContentData = {} } = useQuery<Record<string, string>>({
     queryKey: ["/api/site-content"],
@@ -2695,6 +2758,7 @@ export default function LandingPage() {
   return (
     <SiteContentContext.Provider value={siteContentData}>
       <SplashScreen />
+      <PopupAdModal />
       <FloatingCTA />
       <div className="min-h-screen">
         <Navbar />
@@ -2708,8 +2772,8 @@ export default function LandingPage() {
         <ClassFlowSection />
         <LearningMapSection />
         <TextbookSection />
-        <BranchLocationsSection />
         <CoachesSection />
+        <TestimonialsSection />
         <WaveDivider from="#FAF9F6" to="#ffffff" />
         <FAQSection />
         <WaveDivider from="#ffffff" to="#FAF9F6" />

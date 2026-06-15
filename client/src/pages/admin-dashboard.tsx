@@ -99,7 +99,7 @@ import {
   UserX,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode, RegistrationGiftSetting } from "@shared/schema";
+import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode, RegistrationGiftSetting, PopupAd } from "@shared/schema";
 import { Search as SearchIcon } from "lucide-react";
 import type { User } from "@shared/models/auth";
 import { TAIWAN_DISTRICTS, CITIES, DAY_LABELS } from "@shared/constants";
@@ -144,6 +144,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string } =
     { id: "announcements", label: "公告管理", icon: Megaphone },
     { id: "shop", label: "商城管理", icon: ShoppingBag },
     { id: "credits", label: "點數管理", icon: Coins },
+    { id: "popup-ads", label: "彈窗廣告", icon: ImageIcon },
     { id: "site-editor", label: "官網編輯", icon: Globe },
     { id: "tools", label: "系統工具", icon: RotateCcw },
   ];
@@ -216,6 +217,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string } =
             {activeTab === "announcements" && <AnnouncementsTab />}
             {activeTab === "shop" && <ShopManagementTab />}
             {activeTab === "credits" && <CreditsManagementTab />}
+            {activeTab === "popup-ads" && <PopupAdsTab />}
             {activeTab === "site-editor" && <SiteEditorTab />}
             {activeTab === "tools" && <SystemToolsTab />}
           </main>
@@ -4176,9 +4178,8 @@ const SITE_CONTENT_SECTIONS: SiteContentSection[] = [
     label: "頁尾資訊",
     fields: [
       { key: "footer.description", label: "品牌描述", multiline: true },
-      { key: "footer.phone", label: "聯絡電話" },
       { key: "footer.email", label: "電子信箱" },
-      { key: "footer.address", label: "地址" },
+      { key: "footer.lineUrl", label: "LINE 加入好友連結" },
     ],
   },
   {
@@ -4300,12 +4301,153 @@ const DEFAULT_VALUES: Record<string, string> = {
   "branches.title": "全台分校地圖",
   "branches.description": "精選展示 6 大核心城市，全台 10+ 縣市均有服務據點，讓每個孩子都能就近找到優質師資",
   "footer.description": "讓教學回歸「1 位老師」對「1 位學生」的學習體驗。我們致力於為每一位國小學生提供最專業的數學個別指導。",
-  "footer.phone": "02-1234-5678",
   "footer.email": "hello@primemath.tw",
-  "footer.address": "台北市大安區",
+  "footer.lineUrl": "https://line.me/ti/p/@theprime",
   "privacy_policy": DEFAULT_PRIVACY_POLICY,
   "refund_policy": DEFAULT_REFUND_POLICY,
 };
+
+function PopupAdsTab() {
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const { data: ads = [], isLoading } = useQuery<PopupAd[]>({
+    queryKey: ["/api/admin/popup-ads"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/popup-ads/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/popup-ads"] });
+      toast({ title: "已刪除廣告" });
+    },
+    onError: () => toast({ title: "刪除失敗", variant: "destructive" }),
+  });
+
+  async function handleUpload() {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return toast({ title: "請選擇圖片", variant: "destructive" });
+    if (!startDate || !endDate) return toast({ title: "請填寫檔期", variant: "destructive" });
+    if (endDate < startDate) return toast({ title: "結束日不可早於開始日", variant: "destructive" });
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      form.append("startDate", startDate);
+      form.append("endDate", endDate);
+      if (linkUrl) form.append("linkUrl", linkUrl);
+      const res = await fetch("/api/admin/popup-ads", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "上傳失敗");
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/popup-ads"] });
+      toast({ title: "廣告已新增" });
+      setLinkUrl("");
+      setStartDate("");
+      setEndDate("");
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (e: any) {
+      toast({ title: e.message || "上傳失敗", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-1">彈窗廣告管理</h2>
+        <p className="text-sm text-muted-foreground">上傳廣告圖片並設定檔期，首頁訪客開啟時會隨機顯示有效廣告（每個 session 只彈一次）。</p>
+      </div>
+
+      {/* Upload form */}
+      <div className="border rounded-xl p-6 bg-white space-y-4 max-w-xl">
+        <h3 className="font-semibold text-foreground">新增廣告</h3>
+        <div>
+          <Label className="mb-1.5 block">廣告圖片 *</Label>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-input file:text-sm file:bg-background file:text-foreground cursor-pointer"
+            data-testid="input-popup-ad-image"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="mb-1.5 block">開始日期 *</Label>
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} data-testid="input-popup-ad-start" />
+          </div>
+          <div>
+            <Label className="mb-1.5 block">結束日期 *</Label>
+            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} data-testid="input-popup-ad-end" />
+          </div>
+        </div>
+        <div>
+          <Label className="mb-1.5 block">點擊連結（選填）</Label>
+          <Input placeholder="https://..." value={linkUrl} onChange={e => setLinkUrl(e.target.value)} data-testid="input-popup-ad-link" />
+        </div>
+        <Button onClick={handleUpload} disabled={uploading} data-testid="button-popup-ad-upload">
+          <Upload className="w-4 h-4 mr-2" />
+          {uploading ? "上傳中..." : "新增廣告"}
+        </Button>
+      </div>
+
+      {/* Ads list */}
+      <div>
+        <h3 className="font-semibold text-foreground mb-3">廣告列表（{ads.length} 則）</h3>
+        {isLoading ? (
+          <div className="space-y-3">{[0,1,2].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
+        ) : ads.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">尚無廣告，請先新增。</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {ads.map(ad => {
+              const today = new Date().toISOString().slice(0, 10);
+              const isLive = ad.isActive && ad.startDate <= today && ad.endDate >= today;
+              return (
+                <div key={ad.id} className="border rounded-xl overflow-hidden bg-white flex flex-col" data-testid={`card-popup-ad-${ad.id}`}>
+                  <div className="relative">
+                    <img src={ad.imageUrl} alt="廣告預覽" className="w-full h-40 object-cover" />
+                    <span className={`absolute top-2 left-2 text-xs font-medium px-2 py-0.5 rounded-full ${isLive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {isLive ? "▶ 投放中" : "已過期"}
+                    </span>
+                  </div>
+                  <div className="p-3 flex-1 flex flex-col gap-1">
+                    <p className="text-xs text-muted-foreground">📅 {ad.startDate} ～ {ad.endDate}</p>
+                    {ad.linkUrl && <p className="text-xs text-tiffany truncate">🔗 {ad.linkUrl}</p>}
+                  </div>
+                  <div className="px-3 pb-3">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => deleteMutation.mutate(ad.id)}
+                      disabled={deleteMutation.isPending}
+                      className="w-full"
+                      data-testid={`button-delete-popup-ad-${ad.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                      刪除
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function SiteEditorTab() {
   const { toast } = useToast();
