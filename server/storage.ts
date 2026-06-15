@@ -48,7 +48,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
-import { eq, and, ne, sql, desc, inArray, gte, lte, asc, gt, lt } from "drizzle-orm";
+import { eq, and, ne, sql, desc, inArray, gte, lte, asc, gt, lt, getTableColumns } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { sendLineMessage, sendLineFlexMessage, buildAdminCancelFlex } from "./line";
@@ -205,6 +205,7 @@ export interface IStorage {
   getCoachSlotsByUserId(userId: string, year: number, month: number): Promise<any[]>;
   getStudentContactBookHistory(coachId: number, childId: number): Promise<any[]>;
   getStudentContactBookHistoryByCoachIds(coachIds: number[], childId: number): Promise<any[]>;
+  getStudentContactBookHistoryByFranchiseIds(franchiseIds: number[], childId: number): Promise<any[]>;
   getCoachDailyRecordByCoachIds(coachIds: number[], date: string): Promise<any>;
   getCoachMonthlyRecordsByCoachIds(coachIds: number[], year: number, month: number): Promise<any[]>;
 
@@ -2418,6 +2419,23 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(contactBooks.createdAt));
+  }
+
+  async getStudentContactBookHistoryByFranchiseIds(franchiseIds: number[], childId: number): Promise<any[]> {
+    if (franchiseIds.length === 0) return [];
+    return db.select({
+        ...getTableColumns(contactBooks),
+        coachName: coaches.name,
+      })
+      .from(contactBooks)
+      .innerJoin(coaches, eq(contactBooks.coachId, coaches.id))
+      .where(
+        and(
+          eq(contactBooks.childId, childId),
+          inArray(coaches.franchiseId, franchiseIds)
+        )
+      )
+      .orderBy(desc(contactBooks.lessonDate), desc(contactBooks.createdAt));
   }
 
   async getCoachDailyRecordByCoachIds(coachIds: number[], date: string): Promise<any> {

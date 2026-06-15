@@ -3665,7 +3665,7 @@ export async function registerRoutes(
   app.get("/api/coach/students/:childId/history", isCoach, async (req: any, res) => {
     try {
       const childId = parseInt(req.params.childId);
-      const history = await storage.getStudentContactBookHistoryByCoachIds(req.coachIds, childId);
+      const history = await storage.getStudentContactBookHistoryByFranchiseIds(req.coachFranchiseIds, childId);
       res.json(history);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch history" });
