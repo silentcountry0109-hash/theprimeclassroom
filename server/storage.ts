@@ -387,7 +387,7 @@ export class DatabaseStorage implements IStorage {
       .select({ coach: coaches, franchiseName: franchises.name })
       .from(coaches)
       .leftJoin(franchises, eq(coaches.franchiseId, franchises.id))
-      .where(eq(coaches.isCertified, true))
+      .where(and(eq(coaches.isCertified, true), ne(coaches.isActive, false)))
       .orderBy(asc(coaches.id));
 
     // 以 union-find 合併「同一個人」：兩筆只要共享 userId 或 姓名 任一者即視為同一人。
@@ -573,7 +573,7 @@ export class DatabaseStorage implements IStorage {
       const franchiseCoaches = await db
         .select()
         .from(coaches)
-        .where(eq(coaches.franchiseId, franchise.id));
+        .where(and(eq(coaches.franchiseId, franchise.id), ne(coaches.isActive, false)));
 
       const todayStr = new Date().toISOString().split("T")[0];
       const nextSlot = await db
@@ -617,7 +617,7 @@ export class DatabaseStorage implements IStorage {
     const franchiseCoaches = await db
       .select()
       .from(coaches)
-      .where(eq(coaches.franchiseId, id));
+      .where(and(eq(coaches.franchiseId, id), ne(coaches.isActive, false)));
 
     const todayStr = new Date().toISOString().split("T")[0];
     const slots = await db
