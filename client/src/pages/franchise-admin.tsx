@@ -1853,7 +1853,7 @@ function CoachesTab() {
   const [uploadingCoachId, setUploadingCoachId] = useState<number | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [pendingUploadCoachId, setPendingUploadCoachId] = useState<number | null>(null);
-  const [lineFilter, setLineFilter] = useState<"all" | "bound" | "unbound">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   type EnrichedCoach = Coach & { accountUsername: string | null; lineUserId: string | null };
   const { data: coaches = [], isLoading } = useQuery<EnrichedCoach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
@@ -2112,18 +2112,18 @@ function CoachesTab() {
 
       {!isLoading && coaches.length > 0 && (
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-xs text-muted-foreground">LINE 篩選：</span>
-          {(["all", "bound", "unbound"] as const).map((f) => (
+          <span className="text-xs text-muted-foreground">狀態篩選：</span>
+          {(["all", "active", "inactive"] as const).map((f) => (
             <button
               key={f}
-              onClick={() => setLineFilter(f)}
-              data-testid={`filter-line-${f}`}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors ${lineFilter === f ? "bg-tiffany text-white border-tiffany" : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany"}`}
+              onClick={() => setStatusFilter(f)}
+              data-testid={`filter-status-${f}`}
+              className={`text-xs px-3 py-1 rounded-full border transition-colors ${statusFilter === f ? "bg-tiffany text-white border-tiffany" : "bg-white text-muted-foreground border-gray-200 hover:border-tiffany"}`}
             >
-              {f === "all" ? "全部" : f === "bound" ? "已綁定 LINE" : "尚未綁定"}
+              {f === "all" ? "全部" : f === "active" ? "啟用" : "停用"}
               {f !== "all" && (
                 <span className="ml-1 opacity-70">
-                  ({coaches.filter(c => f === "bound" ? !!c.lineUserId : !c.lineUserId).length})
+                  ({coaches.filter(c => f === "active" ? c.isActive !== false : c.isActive === false).length})
                 </span>
               )}
             </button>
@@ -2161,13 +2161,13 @@ function CoachesTab() {
           }}
         />
         {(() => {
-          const filteredCoaches = lineFilter === "all" ? coaches : coaches.filter(c => lineFilter === "bound" ? !!c.lineUserId : !c.lineUserId);
+          const filteredCoaches = statusFilter === "all" ? coaches : coaches.filter(c => statusFilter === "active" ? c.isActive !== false : c.isActive === false);
           return (
             <>
               {filteredCoaches.length === 0 && (
                 <div className="text-center py-10 bg-white rounded-md border border-gray-100 mb-3" data-testid="coaches-filter-empty">
                   <p className="text-sm text-muted-foreground">
-                    {lineFilter === "bound" ? "目前沒有已綁定 LINE 的老師" : "所有老師都已綁定 LINE"}
+                    {statusFilter === "active" ? "目前沒有啟用的老師" : "目前沒有停用的老師"}
                   </p>
                 </div>
               )}
