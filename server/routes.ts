@@ -18,7 +18,6 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { generateCoachHeadshotFromBuffer } from "./gemini-image";
-import { generateFranchiseDescription } from "./gemini-text";
 import { objectStorageClient } from "./replit_integrations/object_storage";
 
 interface PgUniqueViolation {
@@ -2391,36 +2390,6 @@ export async function registerRoutes(
       res.json(franchise);
     } catch (error) {
       res.status(500).json({ message: "Failed to update franchise" });
-    }
-  });
-
-  app.post("/api/franchise-admin/generate-description", isFranchiseAdmin, async (req: any, res) => {
-    try {
-      const franchise = await storage.getFranchise(req.franchiseId);
-      if (!franchise) return res.status(404).json({ message: "找不到分校資料" });
-      const body = req.body as {
-        name?: string;
-        city?: string;
-        district?: string;
-        address?: string;
-        nearbySchools?: string[];
-        tags?: string[];
-      };
-      const description = await generateFranchiseDescription({
-        name: body.name || franchise.name || "",
-        city: body.city ?? franchise.city ?? undefined,
-        district: body.district ?? franchise.district ?? undefined,
-        address: body.address ?? franchise.address ?? undefined,
-        nearbySchools: Array.isArray(body.nearbySchools) ? body.nearbySchools : (franchise.nearbySchools as string[]) || [],
-        tags: Array.isArray(body.tags) ? body.tags : (franchise.tags as string[]) || [],
-        maxSeats: franchise.maxSeats || undefined,
-      });
-      if (!description) {
-        return res.status(503).json({ message: "AI 服務暫時無法使用，請稍後再試" });
-      }
-      res.json({ description });
-    } catch (error) {
-      res.status(500).json({ message: "生成失敗，請稍後再試" });
     }
   });
 

@@ -76,8 +76,6 @@ import {
   ClipboardList,
   ChevronsUpDown,
   Bell,
-  Sparkles,
-  Loader2,
   Pencil,
   MessageSquare,
   UserCheck,
@@ -961,27 +959,6 @@ function FranchiseInfoTab() {
     },
   });
 
-  const generateDescMutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        name: franchise?.name ?? "",
-        city: franchise?.city ?? undefined,
-        district: franchise?.district ?? undefined,
-        address: franchise?.address ?? undefined,
-        nearbySchools,
-        tags,
-      };
-      const res = await apiRequest("POST", "/api/franchise-admin/generate-description", payload);
-      return res.json() as Promise<{ description: string }>;
-    },
-    onSuccess: (data) => {
-      setDescription(data.description);
-      toast({ title: "✨ 已自動生成分校介紹", description: "請確認內容後再儲存" });
-    },
-    onError: (err: Error) => {
-      toast({ title: "生成失敗", description: err.message, variant: "destructive" });
-    },
-  });
 
   if (isLoading) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-md" />)}</div>;
   if (!franchise) return <p className="text-muted-foreground">無法取得分校資訊</p>;
@@ -1092,25 +1069,7 @@ function FranchiseInfoTab() {
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="02-xxxx-xxxx" data-testid="input-franchise-info-phone" />
           </div>
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <Label>分校介紹</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-xs gap-1 text-tiffany border-tiffany/40 hover:bg-tiffany/10"
-                disabled={generateDescMutation.isPending}
-                onClick={() => generateDescMutation.mutate()}
-                data-testid="button-generate-description"
-              >
-                {generateDescMutation.isPending ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3 h-3" />
-                )}
-                {generateDescMutation.isPending ? "生成中…" : "AI 自動生成"}
-              </Button>
-            </div>
+            <Label className="mb-1.5 block">分校介紹</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="撰寫分校特色..." rows={4} data-testid="input-franchise-info-description" />
           </div>
           <div>
