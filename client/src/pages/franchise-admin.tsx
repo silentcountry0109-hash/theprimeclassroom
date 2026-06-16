@@ -25,6 +25,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -866,6 +871,9 @@ function FranchiseInfoTab() {
   const [newSpecialOpenTime, setNewSpecialOpenTime] = useState("09:00");
   const [newSpecialCloseTime, setNewSpecialCloseTime] = useState("21:00");
   const [newSpecialNote, setNewSpecialNote] = useState("");
+  const [highlightedSpecialDates, setHighlightedSpecialDates] = useState<Set<string>>(new Set());
+  const specialSectionRef = useRef<HTMLDivElement>(null);
+  const specialListRef = useRef<HTMLDivElement>(null);
   const dayOrder = ["1", "2", "3", "4", "5", "6", "0"];
 
   const startEdit = () => {
@@ -929,6 +937,10 @@ function FranchiseInfoTab() {
       return;
     }
     setSpecialHours([...specialHours, ...added].sort((a, b) => a.date.localeCompare(b.date)));
+    const addedDates = new Set(added.map((a) => a.date));
+    setHighlightedSpecialDates(addedDates);
+    setTimeout(() => setHighlightedSpecialDates(new Set()), 2000);
+    setTimeout(() => specialListRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
     const description = added.length === 1
       ? `已加入 ${added[0].date}`
       : `已加入 ${added.length} 天（${added[0].date} ～ ${added[added.length - 1].date}）`;
@@ -956,6 +968,7 @@ function FranchiseInfoTab() {
       toast({ title: "分校資訊已更新" });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/my-franchise"] });
       setEditing(false);
+      setTimeout(() => specialSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
     },
   });
 
@@ -1040,23 +1053,26 @@ function FranchiseInfoTab() {
             </div>
             {(() => {
               const special = (franchise.businessHours as BusinessHoursPayload)?.special;
-              if (!special || special.length === 0) return null;
               return (
-                <div className="mt-3 pt-3 border-t border-gray-100">
+                <div ref={specialSectionRef} className="mt-3 pt-3 border-t border-gray-100">
                   <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" />特殊節日</p>
-                  <div className="space-y-1">
-                    {special.map((s: SpecialDayEntry, i: number) => (
-                      <div key={i} className="flex items-center gap-3 text-sm" data-testid={`display-special-hours-${s.date}`}>
-                        <span className="font-medium text-foreground w-24">{s.date}</span>
-                        {s.isOpen ? (
-                          <span className="text-muted-foreground">{s.openTime} - {s.closeTime}</span>
-                        ) : (
-                          <span className="text-coral text-xs">休息</span>
-                        )}
-                        {s.note && <span className="text-xs text-muted-foreground">（{s.note}）</span>}
-                      </div>
-                    ))}
-                  </div>
+                  {(!special || special.length === 0) ? (
+                    <p className="text-xs text-muted-foreground italic">尚無特殊節日設定</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {special.map((s: SpecialDayEntry, i: number) => (
+                        <div key={i} className="flex items-center gap-3 text-sm" data-testid={`display-special-hours-${s.date}`}>
+                          <span className="font-medium text-foreground w-24">{s.date}</span>
+                          {s.isOpen ? (
+                            <span className="text-muted-foreground">{s.openTime} - {s.closeTime}</span>
+                          ) : (
+                            <span className="text-coral text-xs">休息</span>
+                          )}
+                          {s.note && <span className="text-xs text-muted-foreground">（{s.note}）</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -1148,27 +1164,38 @@ function FranchiseInfoTab() {
           </div>
           <div className="border-t border-gray-100 pt-4">
             <Label className="flex items-center gap-1 mb-3"><CalendarDays className="w-3.5 h-3.5" />特殊節日設定</Label>
-            {specialHours.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {specialHours.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-md px-3 py-2 text-sm" data-testid={`special-hours-entry-${s.date}`}>
-                    <span className="font-medium w-24 shrink-0">{s.date}</span>
-                    {s.isOpen ? (
-                      <span className="text-muted-foreground">{s.openTime} - {s.closeTime}</span>
-                    ) : (
-                      <span className="text-coral text-xs">休息</span>
-                    )}
-                    {s.note && <span className="text-xs text-muted-foreground flex-1">（{s.note}）</span>}
-                    <button
-                      type="button"
-                      onClick={() => setSpecialHours(specialHours.filter((_, idx) => idx !== i))}
-                      className="ml-auto text-gray-400 hover:text-red-500"
-                      data-testid={`button-remove-special-${s.date}`}
-                    >&times;</button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div ref={specialListRef} className="mb-3">
+              <p className="text-xs text-muted-foreground mb-2">
+                已排定 <span className="font-semibold text-foreground">{specialHours.length}</span> 筆特殊節日
+              </p>
+              {specialHours.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">尚無特殊節日，請由下方表單新增</p>
+              ) : (
+                <div className="space-y-2">
+                  {specialHours.map((s, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors duration-1000 ${highlightedSpecialDates.has(s.date) ? "bg-tiffany/20" : "bg-gray-50"}`}
+                      data-testid={`special-hours-entry-${s.date}`}
+                    >
+                      <span className="font-medium w-24 shrink-0">{s.date}</span>
+                      {s.isOpen ? (
+                        <span className="text-muted-foreground">{s.openTime} - {s.closeTime}</span>
+                      ) : (
+                        <span className="text-coral text-xs">休息</span>
+                      )}
+                      {s.note && <span className="text-xs text-muted-foreground flex-1">（{s.note}）</span>}
+                      <button
+                        type="button"
+                        onClick={() => setSpecialHours(specialHours.filter((_, idx) => idx !== i))}
+                        className="ml-auto text-gray-400 hover:text-red-500"
+                        data-testid={`button-remove-special-${s.date}`}
+                      >&times;</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="bg-gray-50/70 rounded-md p-3 space-y-2">
               <p className="text-xs text-muted-foreground mb-1">新增特殊日期</p>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1216,9 +1243,18 @@ function FranchiseInfoTab() {
                   data-testid="input-special-note"
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSpecialDay(); } }}
                 />
-                <Button type="button" size="sm" variant="outline" onClick={addSpecialDay} disabled={!newSpecialDate} data-testid="button-add-special-day">
-                  新增
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={!newSpecialDate ? 0 : -1} className="inline-flex">
+                      <Button type="button" size="sm" variant="outline" onClick={addSpecialDay} disabled={!newSpecialDate} data-testid="button-add-special-day">
+                        新增
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!newSpecialDate && (
+                    <TooltipContent side="top">請先填寫開始日期</TooltipContent>
+                  )}
+                </Tooltip>
               </div>
             </div>
           </div>
