@@ -104,4 +104,4 @@ APP_BASE_URL = "https://www.theprimeclassroom.com"
 
 [postMerge]
 path = "scripts/post-merge.sh"
-timeoutMs = 20000
+timeoutMs = 60000
