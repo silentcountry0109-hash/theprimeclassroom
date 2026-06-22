@@ -4250,7 +4250,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/credit-packages", isAdmin, async (req: any, res) => {
     try {
-      const { name, credits, bonusCredits, bonusExpiryDays, price, expiryDays, description, isActive, sortOrder } = req.body;
+      const { name, credits, bonusCredits, bonusExpiryDays, price, expiryDays, description, isActive, sortOrder, isRestricted, allowedList } = req.body;
       if (!name || !credits) return res.status(400).json({ message: "請填寫方案名稱與堂數" });
       const finalPrice = price && price > 0 ? price : credits * CREDIT_REFUND_UNIT_PRICE;
       const pkg = await storage.createCreditPackage({
@@ -4263,6 +4263,8 @@ export async function registerRoutes(
         description: description || null,
         isActive: isActive !== false,
         sortOrder: sortOrder || 0,
+        isRestricted: isRestricted === true,
+        allowedList: isRestricted && Array.isArray(allowedList) ? allowedList.map((s: string) => s.trim()).filter(Boolean) : null,
       });
       res.json(pkg);
     } catch (error) {
@@ -4278,6 +4280,11 @@ export async function registerRoutes(
         // 保留現值，不主動清空
       } else if (!data.bonusExpiryDays) {
         data.bonusExpiryDays = null;
+      }
+      if (data.isRestricted === true) {
+        data.allowedList = Array.isArray(data.allowedList) ? data.allowedList.map((s: string) => s.trim()).filter(Boolean) : [];
+      } else if (data.isRestricted === false) {
+        data.allowedList = null;
       }
       const pkg = await storage.updateCreditPackage(id, data);
       res.json(pkg);
@@ -4770,10 +4777,15 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/credit-packages", async (_req, res) => {
+  app.get("/api/credit-packages", async (req: any, res) => {
     try {
-      const packages = await storage.getActiveCreditPackages();
-      const activePromotions = await storage.getActivePromotions();
+      const parentId = getSessionUserId(req);
+      const [allActive, activePromotions] = await Promise.all([
+        parentId ? storage.getActiveCreditPackagesForParent(parentId) : storage.getActiveCreditPackages(),
+        storage.getActivePromotions(),
+      ]);
+      // Unauthenticated callers (and non-parent sessions) must never see restricted packages
+      const packages = parentId ? allActive : allActive.filter(p => !(p as any).isRestricted);
       res.json({ packages, promotions: activePromotions });
     } catch (error) {
       res.status(500).json({ message: "取得堂數方案失敗" });

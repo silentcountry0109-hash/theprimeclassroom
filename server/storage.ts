@@ -269,6 +269,7 @@ export interface IStorage {
 
   getCreditPackages(): Promise<CreditPackage[]>;
   getActiveCreditPackages(): Promise<CreditPackage[]>;
+  getActiveCreditPackagesForParent(parentId: string): Promise<CreditPackage[]>;
   createCreditPackage(data: InsertCreditPackage): Promise<CreditPackage>;
   updateCreditPackage(id: number, data: Partial<InsertCreditPackage>): Promise<CreditPackage>;
 
@@ -2712,6 +2713,26 @@ export class DatabaseStorage implements IStorage {
 
   async getActiveCreditPackages(): Promise<CreditPackage[]> {
     return db.select().from(creditPackages).where(eq(creditPackages.isActive, true)).orderBy(creditPackages.sortOrder, creditPackages.id);
+  }
+
+  async getActiveCreditPackagesForParent(parentId: string): Promise<CreditPackage[]> {
+    const all = await db.select().from(creditPackages).where(eq(creditPackages.isActive, true)).orderBy(creditPackages.sortOrder, creditPackages.id);
+    const nonRestricted = all.filter(p => !p.isRestricted);
+    const restricted = all.filter(p => p.isRestricted);
+    if (restricted.length === 0) return nonRestricted;
+
+    // Fetch the parent's children studentCodes to check whitelist
+    const parentChildren = await db.select({ studentCode: children.studentCode }).from(children).where(eq(children.parentId, parentId));
+    const studentCodes = parentChildren.map(c => c.studentCode).filter(Boolean) as string[];
+
+    const accessible = restricted.filter(pkg => {
+      const list = pkg.allowedList ?? [];
+      if (list.includes(parentId)) return true;
+      if (studentCodes.some(code => list.includes(code))) return true;
+      return false;
+    });
+
+    return [...nonRestricted, ...accessible].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
   }
 
   async createCreditPackage(data: InsertCreditPackage): Promise<CreditPackage> {

@@ -319,6 +319,8 @@ export const creditPackages = pgTable("credit_packages", {
   description: text("description"),
   isActive: boolean("is_active").default(true).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
+  isRestricted: boolean("is_restricted").default(false).notNull(),
+  allowedList: text("allowed_list").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

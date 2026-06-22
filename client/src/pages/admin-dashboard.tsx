@@ -3434,25 +3434,39 @@ function CreditPackagesSection() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<CreditPackage | null>(null);
-  const [form, setForm] = useState({ name: "", credits: 0, bonusCredits: 0, bonusExpiryDays: null as number | null, price: 0, expiryDays: null as number | null, description: "", isActive: true, sortOrder: 0 });
+  const [form, setForm] = useState({ name: "", credits: 0, bonusCredits: 0, bonusExpiryDays: null as number | null, price: 0, expiryDays: null as number | null, description: "", isActive: true, sortOrder: 0, isRestricted: false, allowedList: [] as string[] });
   const [priceTouched, setPriceTouched] = useState(false);
+  const [allowedInput, setAllowedInput] = useState("");
 
   const { data: packages = [], isLoading } = useQuery<CreditPackage[]>({
     queryKey: ["/api/admin/credit-packages"],
   });
 
   const resetForm = () => {
-    setForm({ name: "", credits: 0, bonusCredits: 0, bonusExpiryDays: null, price: 0, expiryDays: null, description: "", isActive: true, sortOrder: 0 });
+    setForm({ name: "", credits: 0, bonusCredits: 0, bonusExpiryDays: null, price: 0, expiryDays: null, description: "", isActive: true, sortOrder: 0, isRestricted: false, allowedList: [] });
     setPriceTouched(false);
+    setAllowedInput("");
     setEditing(null);
   };
 
   const openAdd = () => { resetForm(); setShowDialog(true); };
   const openEdit = (pkg: CreditPackage) => {
     setEditing(pkg);
-    setForm({ name: pkg.name, credits: pkg.credits, bonusCredits: pkg.bonusCredits || 0, bonusExpiryDays: (pkg as any).bonusExpiryDays ?? null, price: pkg.price, expiryDays: pkg.expiryDays, description: pkg.description || "", isActive: pkg.isActive, sortOrder: pkg.sortOrder });
+    setForm({ name: pkg.name, credits: pkg.credits, bonusCredits: pkg.bonusCredits || 0, bonusExpiryDays: (pkg as any).bonusExpiryDays ?? null, price: pkg.price, expiryDays: pkg.expiryDays, description: pkg.description || "", isActive: pkg.isActive, sortOrder: pkg.sortOrder, isRestricted: (pkg as any).isRestricted ?? false, allowedList: (pkg as any).allowedList ?? [] });
     setPriceTouched(true);
+    setAllowedInput("");
     setShowDialog(true);
+  };
+
+  const addAllowedEntries = (raw: string) => {
+    const entries = raw.split(/[\n,，]+/).map(s => s.trim()).filter(Boolean);
+    if (entries.length === 0) return;
+    setForm(prev => ({ ...prev, allowedList: [...new Set([...prev.allowedList, ...entries])] }));
+    setAllowedInput("");
+  };
+
+  const removeAllowedEntry = (entry: string) => {
+    setForm(prev => ({ ...prev, allowedList: prev.allowedList.filter(e => e !== entry) }));
   };
 
   const saveMutation = useMutation({
@@ -3498,6 +3512,12 @@ function CreditPackagesSection() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium text-foreground" data-testid={`text-package-name-${pkg.id}`}>{pkg.name}</p>
                     {!pkg.isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-muted-foreground">停用</span>}
+                    {(pkg as any).isRestricted && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 flex items-center gap-1" data-testid={`badge-restricted-${pkg.id}`}>
+                        <Lock className="w-2.5 h-2.5" />
+                        限定・{((pkg as any).allowedList ?? []).length} 筆名單
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
                     <span data-testid={`text-package-credits-${pkg.id}`}>{pkg.credits} 堂{pkg.bonusCredits > 0 ? ` + 贈 ${pkg.bonusCredits} 堂` : ""}</span>
@@ -3517,7 +3537,7 @@ function CreditPackagesSection() {
       )}
 
       <Dialog open={showDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowDialog(open); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "編輯堂數方案" : "新增堂數方案"}</DialogTitle>
           </DialogHeader>
@@ -3564,6 +3584,54 @@ function CreditPackagesSection() {
               <Label>啟用狀態</Label>
               <Switch checked={form.isActive} onCheckedChange={(checked) => setForm({ ...form, isActive: checked })} data-testid="switch-package-active" />
               <span className="text-sm text-muted-foreground">{form.isActive ? "啟用中" : "已停用"}</span>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Lock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <Label className="flex-1">限定名單模式</Label>
+                <Switch checked={form.isRestricted} onCheckedChange={(checked) => setForm({ ...form, isRestricted: checked, allowedList: checked ? form.allowedList : [] })} data-testid="switch-package-restricted" />
+                <span className="text-sm text-muted-foreground">{form.isRestricted ? "開啟" : "關閉"}</span>
+              </div>
+              {form.isRestricted && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-3">
+                  <p className="text-xs text-amber-700">開啟後，此方案只對白名單內的家長或學生顯示。可輸入家長 userId 或學號（studentCode），混合使用。</p>
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={allowedInput}
+                      onChange={(e) => setAllowedInput(e.target.value)}
+                      placeholder={"逐筆輸入，或以逗號/換行分隔多筆\n例：user_abc123\nSTU001, STU002"}
+                      className="text-xs min-h-[60px] resize-none flex-1"
+                      data-testid="textarea-allowed-input"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          addAllowedEntries(allowedInput);
+                        }
+                      }}
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => addAllowedEntries(allowedInput)} className="self-end whitespace-nowrap" data-testid="button-add-allowed">
+                      新增
+                    </Button>
+                  </div>
+                  {form.allowedList.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5" data-testid="list-allowed-entries">
+                      {form.allowedList.map((entry) => (
+                        <span key={entry} className="inline-flex items-center gap-1 text-[11px] bg-white border border-amber-300 text-amber-800 px-2 py-0.5 rounded-full" data-testid={`tag-allowed-${entry}`}>
+                          {entry}
+                          <button type="button" onClick={() => removeAllowedEntry(entry)} className="hover:text-red-500 transition-colors" data-testid={`button-remove-allowed-${entry}`}>
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {form.allowedList.length === 0 && (
+                    <p className="text-xs text-amber-600 italic">白名單為空，目前無任何家長可看到此方案</p>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">共 {form.allowedList.length} 筆名單</p>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
