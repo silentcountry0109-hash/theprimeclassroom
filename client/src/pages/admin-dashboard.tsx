@@ -97,8 +97,25 @@ import {
   Link2,
   UserCheck,
   UserX,
+  Download,
+  Filter,
+  BarChart2,
+  List,
+  RefreshCw,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import type { Faq, SuccessStory, Franchise, Coach, Announcement, TimeSlot, Product, Order, OrderItem, CreditPackage, Promotion, CouponCode, RegistrationGiftSetting, PopupAd } from "@shared/schema";
 import { Search as SearchIcon } from "lucide-react";
 import type { User } from "@shared/models/auth";
@@ -2956,7 +2973,7 @@ interface CreditSalesStats {
 }
 
 function CreditsManagementTab() {
-  const [subTab, setSubTab] = useState<"packages" | "promotions" | "coupons" | "wallets" | "ecpay">("packages");
+  const [subTab, setSubTab] = useState<"packages" | "promotions" | "coupons" | "wallets" | "ecpay" | "parent-transactions" | "purchase-stats" | "consumption-stats">("packages");
 
   const subTabs = [
     { id: "packages" as const, label: "堂數方案", icon: Package },
@@ -2964,6 +2981,9 @@ function CreditsManagementTab() {
     { id: "coupons" as const, label: "優惠碼", icon: Ticket },
     { id: "wallets" as const, label: "家長點數", icon: Wallet },
     { id: "ecpay" as const, label: "線上付款", icon: CreditCard },
+    { id: "parent-transactions" as const, label: "家長消費紀錄", icon: List },
+    { id: "purchase-stats" as const, label: "購買點數統計", icon: TrendingUp },
+    { id: "consumption-stats" as const, label: "課消點數統計", icon: BarChart2 },
   ];
 
   const { data: salesStats, isLoading: statsLoading } = useQuery<CreditSalesStats>({
@@ -3030,6 +3050,9 @@ function CreditsManagementTab() {
       {subTab === "coupons" && <CouponsSection />}
       {subTab === "wallets" && <ParentWalletsSection />}
       {subTab === "ecpay" && <EcpayPurchasesSection />}
+      {subTab === "parent-transactions" && <ParentTransactionsSection />}
+      {subTab === "purchase-stats" && <PurchaseStatsSection />}
+      {subTab === "consumption-stats" && <ConsumptionStatsSection />}
     </div>
   );
 }
@@ -5074,6 +5097,657 @@ function SystemToolsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ─── 共用：時間快捷選擇器 ────────────────────────────────────────────────────
+type DatePreset = "today" | "week" | "month" | "quarter" | "year" | "custom";
+
+function getPresetRange(preset: DatePreset): { start: string; end: string } {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = fmt(now);
+  if (preset === "today") return { start: today, end: today };
+  if (preset === "week") {
+    const day = now.getDay();
+    const mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7));
+    return { start: fmt(mon), end: today };
+  }
+  if (preset === "month") {
+    return { start: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, end: today };
+  }
+  if (preset === "quarter") {
+    const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    return { start: fmt(qStart), end: today };
+  }
+  if (preset === "year") {
+    return { start: `${now.getFullYear()}-01-01`, end: today };
+  }
+  return { start: "", end: "" };
+}
+
+// ─── 家長消費紀錄 ─────────────────────────────────────────────────────────────
+type TxType = "purchase" | "deduct" | "gift" | "refund";
+
+interface ParentTxItem {
+  id: number;
+  time: string;
+  parent_name: string;
+  parent_username: string | null;
+  student_name: string | null;
+  tx_type: TxType;
+  credits: number;
+  amount: number | null;
+  note: string | null;
+  franchise_name: string | null;
+  parent_id: string;
+  source: string;
+}
+
+interface ParentTxSubtotals {
+  totalPurchaseCredits: number;
+  totalDeductCredits: number;
+  totalGiftCredits: number;
+  totalRefundCredits: number;
+  totalAmount: number;
+}
+
+interface ParentTxResponse {
+  items: ParentTxItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  subtotals: ParentTxSubtotals;
+}
+
+const TX_TYPE_LABELS: Record<TxType | string, { label: string; color: string }> = {
+  purchase: { label: "購買", color: "text-green-700 bg-green-50" },
+  deduct: { label: "課消", color: "text-orange-700 bg-orange-50" },
+  gift: { label: "贈點", color: "text-blue-700 bg-blue-50" },
+  refund: { label: "退款", color: "text-red-700 bg-red-50" },
+};
+
+const TX_TYPES = [
+  { id: "purchase", label: "購買" },
+  { id: "deduct", label: "課消" },
+  { id: "gift", label: "贈點" },
+  { id: "refund", label: "退款" },
+] as const;
+
+const PAGE_SIZE = 50;
+
+function ParentTransactionsSection() {
+  const { data: franchises = [] } = useQuery<Franchise[]>({ queryKey: ["/api/franchises"] });
+  const [preset, setPreset] = useState<DatePreset>("month");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [search, setSearch] = useState("");
+  const [franchiseId, setFranchiseId] = useState("all");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+
+  const { start, end } = preset === "custom"
+    ? { start: customStart, end: customEnd }
+    : getPresetRange(preset);
+
+  const toggleType = (t: string) => {
+    setSelectedTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+    setPage(1);
+  };
+
+  const params = new URLSearchParams();
+  if (start) params.set("startDate", start);
+  if (end) params.set("endDate", end);
+  if (franchiseId !== "all") params.set("franchiseId", franchiseId);
+  if (selectedTypes.length > 0) params.set("type", selectedTypes.join(","));
+  if (search.trim()) params.set("search", search.trim());
+  params.set("page", String(page));
+  params.set("pageSize", String(PAGE_SIZE));
+
+  const { data, isLoading } = useQuery<ParentTxResponse>({
+    queryKey: ["/api/admin/parent-transactions", start, end, franchiseId, selectedTypes.join(","), search, page],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/parent-transactions?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("取得失敗");
+      return res.json();
+    },
+  });
+
+  const items = data?.items ?? [];
+  const subtotals = data?.subtotals;
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const presets: { id: DatePreset; label: string }[] = [
+    { id: "today", label: "今日" },
+    { id: "week", label: "本週" },
+    { id: "month", label: "本月" },
+    { id: "quarter", label: "本季" },
+    { id: "year", label: "本年" },
+    { id: "custom", label: "自訂" },
+  ];
+
+  const exportParams = new URLSearchParams(params);
+  exportParams.delete("page");
+  exportParams.delete("pageSize");
+  const handleExport = () => {
+    window.open(`/api/admin/parent-transactions/export?${exportParams}`, "_blank");
+  };
+
+  const creditSign = (item: ParentTxItem) => {
+    if (item.tx_type === "purchase" || item.tx_type === "gift") return `+${Math.abs(item.credits)}`;
+    return `-${Math.abs(item.credits)}`;
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">家長消費紀錄</h2>
+          <p className="text-xs text-muted-foreground">跨時段搜尋所有購買與課消明細</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={handleExport} data-testid="button-tx-export">
+          <Download className="w-4 h-4 mr-1.5" />匯出 CSV
+        </Button>
+      </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-4 mb-4 space-y-3">
+        <div className="flex gap-2 flex-wrap">
+          {presets.map(p => (
+            <Button
+              key={p.id}
+              size="sm"
+              variant={preset === p.id ? "default" : "outline"}
+              onClick={() => { setPreset(p.id); setPage(1); }}
+              data-testid={`button-tx-preset-${p.id}`}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        {preset === "custom" && (
+          <div className="flex items-center gap-2 text-sm">
+            <Input
+              type="date"
+              value={customStart}
+              onChange={e => { setCustomStart(e.target.value); setPage(1); }}
+              className="h-8 w-36 text-xs"
+              data-testid="input-tx-start-date"
+            />
+            <span className="text-muted-foreground">–</span>
+            <Input
+              type="date"
+              value={customEnd}
+              onChange={e => { setCustomEnd(e.target.value); setPage(1); }}
+              className="h-8 w-36 text-xs"
+              data-testid="input-tx-end-date"
+            />
+          </div>
+        )}
+        <div className="flex gap-2 flex-wrap items-center">
+          <div className="relative">
+            <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              placeholder="搜尋家長姓名"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              className="h-8 pl-7 text-xs w-44"
+              data-testid="input-tx-search"
+            />
+          </div>
+          <Select value={franchiseId} onValueChange={v => { setFranchiseId(v); setPage(1); }}>
+            <SelectTrigger className="h-8 text-xs w-36" data-testid="select-tx-franchise">
+              <SelectValue placeholder="全部分校" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部分校</SelectItem>
+              {franchises.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <div className="flex gap-1 flex-wrap" data-testid="filter-tx-types">
+            {TX_TYPES.map(t => (
+              <Button
+                key={t.id}
+                size="sm"
+                variant={selectedTypes.includes(t.id) ? "default" : "outline"}
+                className="h-7 text-xs px-2.5"
+                onClick={() => toggleType(t.id)}
+                data-testid={`button-tx-type-${t.id}`}
+              >
+                {t.label}
+              </Button>
+            ))}
+            {selectedTypes.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs px-2 text-muted-foreground"
+                onClick={() => { setSelectedTypes([]); setPage(1); }}
+                data-testid="button-tx-type-clear"
+              >
+                清除
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {subtotals && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="bg-white rounded-md border border-gray-100 p-3" data-testid="stat-tx-purchase">
+            <p className="text-xs text-muted-foreground mb-1">購買堂數</p>
+            <p className="text-lg font-bold text-green-600">+{subtotals.totalPurchaseCredits}</p>
+          </div>
+          <div className="bg-white rounded-md border border-gray-100 p-3" data-testid="stat-tx-deduct">
+            <p className="text-xs text-muted-foreground mb-1">課消堂數</p>
+            <p className="text-lg font-bold text-orange-600">-{subtotals.totalDeductCredits}</p>
+          </div>
+          <div className="bg-white rounded-md border border-gray-100 p-3" data-testid="stat-tx-gift">
+            <p className="text-xs text-muted-foreground mb-1">贈點堂數</p>
+            <p className="text-lg font-bold text-blue-600">+{subtotals.totalGiftCredits}</p>
+          </div>
+          <div className="bg-white rounded-md border border-gray-100 p-3" data-testid="stat-tx-amount">
+            <p className="text-xs text-muted-foreground mb-1">總購買金額</p>
+            <p className="text-lg font-bold text-foreground">NT$ {subtotals.totalAmount.toLocaleString()}</p>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && (
+        <p className="text-xs text-muted-foreground mb-2" data-testid="text-tx-total">共 {total} 筆紀錄</p>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-12 text-sm text-muted-foreground" data-testid="text-tx-empty">
+          此篩選條件下無消費紀錄
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse" data-testid="table-parent-transactions">
+            <thead>
+              <tr className="border-b border-gray-100 text-muted-foreground text-xs">
+                <th className="text-left py-2 px-3 font-medium">時間</th>
+                <th className="text-left py-2 px-3 font-medium">家長</th>
+                <th className="text-left py-2 px-3 font-medium">學生</th>
+                <th className="text-center py-2 px-3 font-medium">類型</th>
+                <th className="text-right py-2 px-3 font-medium">點數</th>
+                <th className="text-right py-2 px-3 font-medium">金額</th>
+                <th className="text-left py-2 px-3 font-medium">方案/備註</th>
+                <th className="text-left py-2 px-3 font-medium">分校</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => {
+                const badge = TX_TYPE_LABELS[item.tx_type] ?? { label: item.tx_type, color: "text-gray-600 bg-gray-50" };
+                return (
+                  <tr key={`${item.source}-${item.id}-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50" data-testid={`row-tx-${idx}`}>
+                    <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {item.time ? new Date(item.time).toLocaleString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-"}
+                    </td>
+                    <td className="py-2 px-3">
+                      <div className="font-medium text-foreground text-xs">{item.parent_name}</div>
+                      {item.parent_username && <div className="text-[10px] text-muted-foreground">{item.parent_username}</div>}
+                    </td>
+                    <td className="py-2 px-3 text-xs text-foreground">{item.student_name || "-"}</td>
+                    <td className="py-2 px-3 text-center">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${badge.color}`}>{badge.label}</span>
+                    </td>
+                    <td className="py-2 px-3 text-right font-medium text-xs">
+                      <span className={item.tx_type === "purchase" || item.tx_type === "gift" ? "text-green-600" : "text-red-600"}>
+                        {creditSign(item)}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-right text-xs text-foreground">
+                      {item.amount != null ? `NT$ ${item.amount.toLocaleString()}` : "-"}
+                    </td>
+                    <td className="py-2 px-3 text-xs text-muted-foreground max-w-[160px] truncate">{item.note || "-"}</td>
+                    <td className="py-2 px-3 text-xs text-muted-foreground">{item.franchise_name || "-"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="flex items-center justify-between mt-3">
+            <p className="text-xs text-muted-foreground">
+              共 {total} 筆紀錄，目前顯示第 {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} 筆
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs px-2"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => p - 1)}
+                  data-testid="button-tx-prev-page"
+                >
+                  上一頁
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs px-2"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => p + 1)}
+                  data-testid="button-tx-next-page"
+                >
+                  下一頁
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 購買點數統計 ─────────────────────────────────────────────────────────────
+interface PurchaseStatsData {
+  timeSeries: { date: string; revenue: number; credits: number; purchases: number }[];
+  packageRanking: { name: string; count: number; totalCredits: number; totalRevenue: number }[];
+  franchiseBreakdown: { franchiseName: string; online: number; manual: number; gift: number; onlineAmount: number; manualAmount: number }[];
+  summary: { totalPurchases: number; totalCredits: number; totalRevenue: number; avgAmount: number };
+}
+
+function PurchaseStatsSection() {
+  const [preset, setPreset] = useState<DatePreset>("month");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [granularity, setGranularity] = useState<"daily" | "weekly">("daily");
+
+  const { start, end } = preset === "custom"
+    ? { start: customStart, end: customEnd }
+    : getPresetRange(preset);
+
+  const params = new URLSearchParams();
+  if (start) params.set("startDate", start);
+  if (end) params.set("endDate", end);
+  params.set("granularity", granularity);
+
+  const { data, isLoading } = useQuery<PurchaseStatsData>({
+    queryKey: ["/api/admin/credit-purchase-stats", start, end, granularity],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/credit-purchase-stats?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("取得失敗");
+      return res.json();
+    },
+  });
+
+  const presets: { id: DatePreset; label: string }[] = [
+    { id: "week", label: "本週" },
+    { id: "month", label: "本月" },
+    { id: "quarter", label: "本季" },
+    { id: "year", label: "本年" },
+    { id: "custom", label: "自訂" },
+  ];
+
+  const formatDate = (d: string) => d ? d.slice(5) : "";
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-base font-semibold text-foreground mb-0.5">購買點數統計</h2>
+        <p className="text-xs text-muted-foreground">依時間段彙總購買趨勢與方案銷售分析</p>
+      </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-4">
+        <div className="flex gap-2 flex-wrap mb-3">
+          {presets.map(p => (
+            <Button key={p.id} size="sm" variant={preset === p.id ? "default" : "outline"} onClick={() => setPreset(p.id)} data-testid={`button-ps-preset-${p.id}`}>
+              {p.label}
+            </Button>
+          ))}
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant={granularity === "daily" ? "default" : "outline"} onClick={() => setGranularity("daily")} data-testid="button-ps-daily">日</Button>
+            <Button size="sm" variant={granularity === "weekly" ? "default" : "outline"} onClick={() => setGranularity("weekly")} data-testid="button-ps-weekly">週</Button>
+          </div>
+        </div>
+        {preset === "custom" && (
+          <div className="flex items-center gap-2 text-sm">
+            <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 w-36 text-xs" data-testid="input-ps-start" />
+            <span className="text-muted-foreground">–</span>
+            <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 w-36 text-xs" data-testid="input-ps-end" />
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-4">{[1,2,3].map(i => <Skeleton key={i} className="h-32 w-full" />)}</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ps-revenue">
+              <p className="text-xs text-muted-foreground mb-1">總收入</p>
+              <p className="text-lg font-bold text-green-600">NT$ {(data?.summary.totalRevenue ?? 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ps-credits">
+              <p className="text-xs text-muted-foreground mb-1">總購買堂數</p>
+              <p className="text-lg font-bold text-tiffany">{(data?.summary.totalCredits ?? 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ps-purchases">
+              <p className="text-xs text-muted-foreground mb-1">購買筆數</p>
+              <p className="text-lg font-bold text-foreground">{(data?.summary.totalPurchases ?? 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-ps-avg">
+              <p className="text-xs text-muted-foreground mb-1">平均每筆金額</p>
+              <p className="text-lg font-bold text-foreground">NT$ {(data?.summary.avgAmount ?? 0).toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-md border border-gray-100 p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-4">購買金額走勢</h3>
+            {(data?.timeSeries ?? []).length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">此區間無資料</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={data?.timeSeries ?? []} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 10 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10 }} tickFormatter={(v) => `NT$${(v/1000).toFixed(0)}k`} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      name === "revenue" ? `NT$ ${value.toLocaleString()}` : value,
+                      name === "revenue" ? "收入" : name === "credits" ? "堂數" : "筆數",
+                    ]}
+                    labelFormatter={(label) => `日期：${label}`}
+                  />
+                  <Legend formatter={(v) => v === "revenue" ? "收入" : v === "credits" ? "堂數" : "筆數"} />
+                  <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#81D8D0" strokeWidth={2} dot={false} />
+                  <Line yAxisId="right" type="monotone" dataKey="credits" stroke="#FFB7B2" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="bg-white rounded-md border border-gray-100 p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-4">方案銷售排行</h3>
+            {(data?.packageRanking ?? []).length === 0 ? (
+              <div className="text-center py-6 text-sm text-muted-foreground">此區間無資料</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="table-package-ranking">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-muted-foreground text-xs">
+                      <th className="text-left py-2 px-3 font-medium">方案名稱</th>
+                      <th className="text-right py-2 px-3 font-medium">販售筆數</th>
+                      <th className="text-right py-2 px-3 font-medium">總堂數</th>
+                      <th className="text-right py-2 px-3 font-medium">總收入</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data?.packageRanking ?? []).map((pkg, i) => (
+                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50" data-testid={`row-pkg-${i}`}>
+                        <td className="py-2 px-3 font-medium text-foreground">{pkg.name}</td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">{pkg.count}</td>
+                        <td className="py-2 px-3 text-right text-tiffany font-medium">{pkg.totalCredits}</td>
+                        <td className="py-2 px-3 text-right text-green-600 font-medium">NT$ {pkg.totalRevenue.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {(data?.franchiseBreakdown ?? []).length > 0 && (
+            <div className="bg-white rounded-md border border-gray-100 p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-4">各分校加點來源</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={data?.franchiseBreakdown ?? []} margin={{ top: 4, right: 16, left: 0, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="franchiseName" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" interval={0} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend formatter={(v) => v === "online" ? "線上付款" : v === "manual" ? "手動加點" : "贈點"} />
+                  <Bar dataKey="online" stackId="a" fill="#81D8D0" />
+                  <Bar dataKey="manual" stackId="a" fill="#FFB7B2" />
+                  <Bar dataKey="gift" stackId="a" fill="#FFF9E5" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── 課消點數統計 ─────────────────────────────────────────────────────────────
+interface ConsumptionStatsData {
+  timeSeries: { date: string; deducts: number; refunds: number; deductCredits: number; refundCredits: number }[];
+  franchiseBreakdown: { franchiseName: string; deducts: number; refunds: number; deductCredits: number }[];
+  summary: { totalDeducts: number; totalRefunds: number; totalDeductCredits: number; totalRefundCredits: number; totalPurchaseCredits: number; completionRate: number };
+}
+
+function ConsumptionStatsSection() {
+  const [preset, setPreset] = useState<DatePreset>("month");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [granularity, setGranularity] = useState<"daily" | "weekly">("daily");
+
+  const { start, end } = preset === "custom"
+    ? { start: customStart, end: customEnd }
+    : getPresetRange(preset);
+
+  const params = new URLSearchParams();
+  if (start) params.set("startDate", start);
+  if (end) params.set("endDate", end);
+  params.set("granularity", granularity);
+
+  const { data, isLoading } = useQuery<ConsumptionStatsData>({
+    queryKey: ["/api/admin/credit-consumption-stats", start, end, granularity],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/credit-consumption-stats?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("取得失敗");
+      return res.json();
+    },
+  });
+
+  const presets: { id: DatePreset; label: string }[] = [
+    { id: "week", label: "本週" },
+    { id: "month", label: "本月" },
+    { id: "quarter", label: "本季" },
+    { id: "year", label: "本年" },
+    { id: "custom", label: "自訂" },
+  ];
+
+  const formatDate = (d: string) => d ? d.slice(5) : "";
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-base font-semibold text-foreground mb-0.5">課消點數統計</h2>
+        <p className="text-xs text-muted-foreground">依時間段彙總課消量、分校對比與完課率</p>
+      </div>
+
+      <div className="bg-white rounded-md border border-gray-100 p-4">
+        <div className="flex gap-2 flex-wrap mb-3">
+          {presets.map(p => (
+            <Button key={p.id} size="sm" variant={preset === p.id ? "default" : "outline"} onClick={() => setPreset(p.id)} data-testid={`button-cs-preset-${p.id}`}>
+              {p.label}
+            </Button>
+          ))}
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant={granularity === "daily" ? "default" : "outline"} onClick={() => setGranularity("daily")} data-testid="button-cs-daily">日</Button>
+            <Button size="sm" variant={granularity === "weekly" ? "default" : "outline"} onClick={() => setGranularity("weekly")} data-testid="button-cs-weekly">週</Button>
+          </div>
+        </div>
+        {preset === "custom" && (
+          <div className="flex items-center gap-2 text-sm">
+            <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 w-36 text-xs" data-testid="input-cs-start" />
+            <span className="text-muted-foreground">–</span>
+            <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 w-36 text-xs" data-testid="input-cs-end" />
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-4">{[1,2,3].map(i => <Skeleton key={i} className="h-32 w-full" />)}</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-cs-deducts">
+              <p className="text-xs text-muted-foreground mb-1">總課消堂數</p>
+              <p className="text-lg font-bold text-orange-600">{(data?.summary.totalDeductCredits ?? 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-cs-rate">
+              <p className="text-xs text-muted-foreground mb-1">完課率</p>
+              <p className="text-lg font-bold text-tiffany">{data?.summary.completionRate ?? 0}%</p>
+              <p className="text-[10px] text-muted-foreground">課消/購買</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-100 p-4" data-testid="stat-cs-refunds">
+              <p className="text-xs text-muted-foreground mb-1">取消回沖堂數</p>
+              <p className="text-lg font-bold text-blue-600">{(data?.summary.totalRefundCredits ?? 0).toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-md border border-gray-100 p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-4">課消堂數走勢</h3>
+            {(data?.timeSeries ?? []).length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">此區間無資料</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={data?.timeSeries ?? []} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [value, name === "deductCredits" ? "課消堂數" : "回沖堂數"]}
+                    labelFormatter={(label) => `日期：${label}`}
+                  />
+                  <Legend formatter={(v) => v === "deductCredits" ? "課消堂數" : "回沖堂數"} />
+                  <Line type="monotone" dataKey="deductCredits" stroke="#FFB7B2" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="refundCredits" stroke="#81D8D0" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {(data?.franchiseBreakdown ?? []).length > 0 && (
+            <div className="bg-white rounded-md border border-gray-100 p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-4">各分校課消對比</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={data?.franchiseBreakdown ?? []} margin={{ top: 4, right: 16, left: 0, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="franchiseName" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" interval={0} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v: number, name: string) => [v, name === "deducts" ? "課消次數" : "回沖次數"]} />
+                  <Legend formatter={(v) => v === "deducts" ? "課消次數" : "回沖次數"} />
+                  <Bar dataKey="deducts" fill="#FFB7B2" />
+                  <Bar dataKey="refunds" fill="#81D8D0" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

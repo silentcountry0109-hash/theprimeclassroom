@@ -5294,5 +5294,422 @@ export async function registerRoutes(
   });
   // === END 暫時測試路由 ===
 
+  // ─── 家長消費紀錄 ────────────────────────────────────────────────────────────
+  app.get("/api/admin/parent-transactions", isAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate, franchiseId, type, search, page, pageSize } = req.query;
+      const sd = typeof startDate === "string" && startDate ? startDate : null;
+      const ed = typeof endDate === "string" && endDate ? endDate : null;
+      const fid = typeof franchiseId === "string" && franchiseId ? parseInt(franchiseId) : null;
+      // type may be comma-separated list of types e.g. "purchase,deduct"
+      const typeFilters: string[] = typeof type === "string" && type
+        ? type.split(",").map(t => t.trim()).filter(Boolean)
+        : [];
+      const searchStr = typeof search === "string" && search ? search.trim().toLowerCase() : null;
+      const pageNum = Math.max(1, parseInt(typeof page === "string" ? page : "1") || 1);
+      const pageSizeNum = Math.min(200, Math.max(10, parseInt(typeof pageSize === "string" ? pageSize : "50") || 50));
+
+      // Helper: is a type included in the filter (or no filter active)?
+      const wantsPurchaseTypes = typeFilters.length === 0 || typeFilters.some(t => t === "purchase" || t === "refund");
+      const wantsTxTypes = typeFilters.length === 0 || typeFilters.some(t => t === "deduct" || t === "gift" || t === "refund");
+
+      // Purchase records from credit_purchases
+      // When franchise filter is active, map purchase to franchise via parent's latest booking
+      const purchaseRows = wantsPurchaseTypes ? await db.execute(sql`
+        SELECT
+          cp.id as id,
+          cp.created_at as time,
+          COALESCE(TRIM(u.first_name || ' ' || u.last_name), u.username, cp.parent_id) as parent_name,
+          u.username as parent_username,
+          NULL::text as student_name,
+          CASE WHEN cp.payment_status = 'refunded' THEN 'refund' ELSE 'purchase' END as tx_type,
+          cp.credits as credits,
+          cp.final_amount as amount,
+          COALESCE(pkg.name, cp.payment_method) as note,
+          f.name as franchise_name,
+          cp.parent_id as parent_id
+        FROM credit_purchases cp
+        LEFT JOIN users u ON cp.parent_id = u.id
+        LEFT JOIN credit_packages pkg ON cp.package_id = pkg.id
+        LEFT JOIN (
+          SELECT DISTINCT ON (b.parent_id) b.parent_id, ts.franchise_id
+          FROM bookings b JOIN time_slots ts ON b.slot_id = ts.id
+          ORDER BY b.parent_id, b.created_at DESC
+        ) latest_b ON latest_b.parent_id = cp.parent_id
+        LEFT JOIN franchises f ON f.id = latest_b.franchise_id
+        WHERE cp.payment_status IN ('paid', 'refunded')
+          ${sd ? sql`AND cp.created_at >= ${sd}::timestamptz` : sql``}
+          ${ed ? sql`AND cp.created_at < (${ed}::date + interval '1 day')` : sql``}
+          ${searchStr ? sql`AND (LOWER(COALESCE(u.first_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.last_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.username,'')) LIKE ${'%' + searchStr + '%'})` : sql``}
+          ${fid ? sql`AND latest_b.franchise_id = ${fid}` : sql``}
+          ${typeFilters.length > 0 ? (
+            typeFilters.includes("purchase") && !typeFilters.includes("refund") ? sql`AND cp.payment_status = 'paid'` :
+            !typeFilters.includes("purchase") && typeFilters.includes("refund") ? sql`AND cp.payment_status = 'refunded'` :
+            sql``
+          ) : sql``}
+        ORDER BY cp.created_at DESC
+      `) : { rows: [] };
+
+      // Transaction records from credit_transactions
+      const txRows = wantsTxTypes ? await db.execute(sql`
+        SELECT
+          ct.id as id,
+          ct.created_at as time,
+          COALESCE(TRIM(u.first_name || ' ' || u.last_name), u.username, ct.parent_id) as parent_name,
+          u.username as parent_username,
+          c.name as student_name,
+          ct.type as tx_type,
+          ct.credits as credits,
+          NULL::integer as amount,
+          ct.description as note,
+          f.name as franchise_name,
+          ct.parent_id as parent_id
+        FROM credit_transactions ct
+        LEFT JOIN users u ON ct.parent_id = u.id
+        LEFT JOIN bookings b ON ct.booking_id = b.id
+        LEFT JOIN children c ON b.child_id = c.id
+        LEFT JOIN time_slots ts ON b.slot_id = ts.id
+        LEFT JOIN franchises f ON ts.franchise_id = f.id
+        WHERE ct.type IN ('deduct', 'gift', 'refund')
+          ${sd ? sql`AND ct.created_at >= ${sd}::timestamptz` : sql``}
+          ${ed ? sql`AND ct.created_at < (${ed}::date + interval '1 day')` : sql``}
+          ${searchStr ? sql`AND (LOWER(COALESCE(u.first_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.last_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.username,'')) LIKE ${'%' + searchStr + '%'})` : sql``}
+          ${fid ? sql`AND ts.franchise_id = ${fid}` : sql``}
+          ${typeFilters.length > 0 ? sql`AND ct.type = ANY(${typeFilters.filter(t => t !== "purchase")})` : sql``}
+        ORDER BY ct.created_at DESC
+      `) : { rows: [] };
+
+      const allItems = [
+        ...purchaseRows.rows.map((r: any) => ({ ...r, source: "purchase" })),
+        ...txRows.rows.map((r: any) => ({ ...r, source: "transaction" })),
+      ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+      // Compute subtotals over ALL filtered items (not just current page)
+      const subtotals = {
+        totalPurchaseCredits: allItems.filter(i => i.tx_type === "purchase").reduce((s, i) => s + (i.credits || 0), 0),
+        totalDeductCredits: allItems.filter(i => i.tx_type === "deduct").reduce((s, i) => s + Math.abs(i.credits || 0), 0),
+        totalGiftCredits: allItems.filter(i => i.tx_type === "gift").reduce((s, i) => s + (i.credits || 0), 0),
+        totalRefundCredits: allItems.filter(i => i.tx_type === "refund").reduce((s, i) => s + Math.abs(i.credits || 0), 0),
+        totalAmount: allItems.filter(i => i.tx_type === "purchase").reduce((s, i) => s + (i.amount || 0), 0),
+      };
+
+      const total = allItems.length;
+      const pagedItems = allItems.slice((pageNum - 1) * pageSizeNum, pageNum * pageSizeNum);
+
+      res.json({ items: pagedItems, total, page: pageNum, pageSize: pageSizeNum, subtotals });
+    } catch (error: any) {
+      console.error("parent-transactions error:", error);
+      res.status(500).json({ message: "取得消費紀錄失敗" });
+    }
+  });
+
+  app.get("/api/admin/parent-transactions/export", isAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate, franchiseId, type, search } = req.query;
+      const sd = typeof startDate === "string" && startDate ? startDate : null;
+      const ed = typeof endDate === "string" && endDate ? endDate : null;
+      const fid = typeof franchiseId === "string" && franchiseId ? parseInt(franchiseId) : null;
+      const typeFilters: string[] = typeof type === "string" && type
+        ? type.split(",").map(t => t.trim()).filter(Boolean)
+        : [];
+      const searchStr = typeof search === "string" && search ? search.trim().toLowerCase() : null;
+      const wantsPurchaseTypes = typeFilters.length === 0 || typeFilters.some(t => t === "purchase" || t === "refund");
+      const wantsTxTypes = typeFilters.length === 0 || typeFilters.some(t => t === "deduct" || t === "gift" || t === "refund");
+
+      const purchaseRows = wantsPurchaseTypes ? await db.execute(sql`
+        SELECT cp.created_at as time,
+          COALESCE(TRIM(u.first_name || ' ' || u.last_name), u.username, cp.parent_id) as parent_name,
+          NULL::text as student_name,
+          CASE WHEN cp.payment_status = 'refunded' THEN '退款' ELSE '購買' END as tx_type_label,
+          cp.credits as credits, cp.final_amount as amount,
+          COALESCE(pkg.name, cp.payment_method) as note, f.name as franchise_name
+        FROM credit_purchases cp
+        LEFT JOIN users u ON cp.parent_id = u.id
+        LEFT JOIN credit_packages pkg ON cp.package_id = pkg.id
+        LEFT JOIN (
+          SELECT DISTINCT ON (b.parent_id) b.parent_id, ts.franchise_id
+          FROM bookings b JOIN time_slots ts ON b.slot_id = ts.id
+          ORDER BY b.parent_id, b.created_at DESC
+        ) latest_b ON latest_b.parent_id = cp.parent_id
+        LEFT JOIN franchises f ON f.id = latest_b.franchise_id
+        WHERE cp.payment_status IN ('paid', 'refunded')
+          ${sd ? sql`AND cp.created_at >= ${sd}::timestamptz` : sql``}
+          ${ed ? sql`AND cp.created_at < (${ed}::date + interval '1 day')` : sql``}
+          ${searchStr ? sql`AND (LOWER(COALESCE(u.first_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.last_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.username,'')) LIKE ${'%' + searchStr + '%'})` : sql``}
+          ${fid ? sql`AND latest_b.franchise_id = ${fid}` : sql``}
+          ${typeFilters.length > 0 ? (
+            typeFilters.includes("purchase") && !typeFilters.includes("refund") ? sql`AND cp.payment_status = 'paid'` :
+            !typeFilters.includes("purchase") && typeFilters.includes("refund") ? sql`AND cp.payment_status = 'refunded'` :
+            sql``
+          ) : sql``}
+      `) : { rows: [] };
+
+      const txRows = wantsTxTypes ? await db.execute(sql`
+        SELECT ct.created_at as time,
+          COALESCE(TRIM(u.first_name || ' ' || u.last_name), u.username, ct.parent_id) as parent_name,
+          c.name as student_name,
+          CASE ct.type WHEN 'deduct' THEN '課消' WHEN 'gift' THEN '贈點' WHEN 'refund' THEN '退款' ELSE ct.type END as tx_type_label,
+          ct.credits as credits, NULL::integer as amount, ct.description as note, f.name as franchise_name
+        FROM credit_transactions ct
+        LEFT JOIN users u ON ct.parent_id = u.id
+        LEFT JOIN bookings b ON ct.booking_id = b.id
+        LEFT JOIN children c ON b.child_id = c.id
+        LEFT JOIN time_slots ts ON b.slot_id = ts.id
+        LEFT JOIN franchises f ON ts.franchise_id = f.id
+        WHERE ct.type IN ('deduct', 'gift', 'refund')
+          ${sd ? sql`AND ct.created_at >= ${sd}::timestamptz` : sql``}
+          ${ed ? sql`AND ct.created_at < (${ed}::date + interval '1 day')` : sql``}
+          ${searchStr ? sql`AND (LOWER(COALESCE(u.first_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.last_name,'')) LIKE ${'%' + searchStr + '%'} OR LOWER(COALESCE(u.username,'')) LIKE ${'%' + searchStr + '%'})` : sql``}
+          ${fid ? sql`AND ts.franchise_id = ${fid}` : sql``}
+          ${typeFilters.length > 0 ? sql`AND ct.type = ANY(${typeFilters.filter(t => t !== "purchase")})` : sql``}
+      `) : { rows: [] };
+
+      const allItems = [
+        ...purchaseRows.rows,
+        ...txRows.rows,
+      ].sort((a: any, b: any) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+      const header = ["時間", "家長姓名", "學生", "交易類型", "點數", "金額", "方案/備註", "分校"];
+      const rows = allItems.map((i: any) => [
+        i.time ? new Date(i.time).toLocaleString("zh-TW") : "",
+        i.parent_name || "",
+        i.student_name || "",
+        i.tx_type_label || "",
+        i.credits != null ? String(i.credits) : "",
+        i.amount != null ? String(i.amount) : "",
+        i.note || "",
+        i.franchise_name || "",
+      ]);
+      const csvContent = [header, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const bom = "\uFEFF";
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="parent-transactions.csv"`);
+      res.send(bom + csvContent);
+    } catch (error: any) {
+      console.error("parent-transactions export error:", error);
+      res.status(500).json({ message: "匯出失敗" });
+    }
+  });
+
+  // ─── 購買點數統計 ─────────────────────────────────────────────────────────────
+  app.get("/api/admin/credit-purchase-stats", isAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate, granularity = "daily" } = req.query;
+      const sd = typeof startDate === "string" && startDate ? startDate : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const ed = typeof endDate === "string" && endDate ? endDate : new Date().toISOString().slice(0, 10);
+      const isWeekly = granularity === "weekly";
+
+      const tsBucket = isWeekly
+        ? sql`date_trunc('week', cp.created_at AT TIME ZONE 'Asia/Taipei')::date`
+        : sql`(cp.created_at AT TIME ZONE 'Asia/Taipei')::date`;
+
+      const timeSeriesRows = await db.execute(sql`
+        SELECT
+          ${tsBucket} as bucket,
+          SUM(cp.final_amount) as revenue,
+          SUM(cp.credits) as credits,
+          COUNT(*) as purchases
+        FROM credit_purchases cp
+        WHERE cp.payment_status = 'paid'
+          AND cp.created_at >= ${sd}::timestamptz
+          AND cp.created_at < (${ed}::date + interval '1 day')
+        GROUP BY bucket
+        ORDER BY bucket ASC
+      `);
+
+      const packageRows = await db.execute(sql`
+        SELECT
+          COALESCE(pkg.name, '手動加點') as name,
+          COUNT(*) as count,
+          SUM(cp.credits) as total_credits,
+          SUM(cp.final_amount) as total_revenue
+        FROM credit_purchases cp
+        LEFT JOIN credit_packages pkg ON cp.package_id = pkg.id
+        WHERE cp.payment_status IN ('paid')
+          AND cp.created_at >= ${sd}::timestamptz
+          AND cp.created_at < (${ed}::date + interval '1 day')
+        GROUP BY COALESCE(pkg.name, '手動加點')
+        ORDER BY total_revenue DESC
+      `);
+
+      const franchiseRows = await db.execute(sql`
+        SELECT
+          f.name as franchise_name,
+          COUNT(*) FILTER (WHERE cp.payment_method = 'ecpay') as online_count,
+          COUNT(*) FILTER (WHERE cp.payment_method = 'manual') as manual_count,
+          COUNT(*) FILTER (WHERE cp.payment_method NOT IN ('ecpay','manual')) as gift_count,
+          SUM(cp.final_amount) FILTER (WHERE cp.payment_method = 'ecpay') as online_amount,
+          SUM(cp.final_amount) FILTER (WHERE cp.payment_method = 'manual') as manual_amount
+        FROM credit_purchases cp
+        LEFT JOIN users u ON cp.parent_id = u.id
+        LEFT JOIN (
+          SELECT DISTINCT ON (b.parent_id) b.parent_id, ts.franchise_id
+          FROM bookings b JOIN time_slots ts ON b.slot_id = ts.id
+          ORDER BY b.parent_id, b.created_at DESC
+        ) latest_booking ON latest_booking.parent_id = cp.parent_id
+        LEFT JOIN franchises f ON f.id = latest_booking.franchise_id
+        WHERE cp.payment_status IN ('paid')
+          AND cp.created_at >= ${sd}::timestamptz
+          AND cp.created_at < (${ed}::date + interval '1 day')
+        GROUP BY f.name
+        ORDER BY SUM(cp.final_amount) DESC NULLS LAST
+        LIMIT 20
+      `);
+
+      const summaryRows = await db.execute(sql`
+        SELECT
+          COUNT(*) as total_purchases,
+          SUM(cp.credits) as total_credits,
+          SUM(cp.final_amount) as total_revenue,
+          ROUND(AVG(cp.final_amount)) as avg_amount
+        FROM credit_purchases cp
+        WHERE cp.payment_status IN ('paid')
+          AND cp.created_at >= ${sd}::timestamptz
+          AND cp.created_at < (${ed}::date + interval '1 day')
+      `);
+
+      const summary = summaryRows.rows[0] as any || {};
+
+      res.json({
+        timeSeries: timeSeriesRows.rows.map((r: any) => ({
+          date: r.bucket ? String(r.bucket).slice(0, 10) : "",
+          revenue: Number(r.revenue) || 0,
+          credits: Number(r.credits) || 0,
+          purchases: Number(r.purchases) || 0,
+        })),
+        packageRanking: packageRows.rows.map((r: any) => ({
+          name: r.name,
+          count: Number(r.count) || 0,
+          totalCredits: Number(r.total_credits) || 0,
+          totalRevenue: Number(r.total_revenue) || 0,
+        })),
+        franchiseBreakdown: franchiseRows.rows.map((r: any) => ({
+          franchiseName: r.franchise_name || "未知分校",
+          online: Number(r.online_count) || 0,
+          manual: Number(r.manual_count) || 0,
+          gift: Number(r.gift_count) || 0,
+          onlineAmount: Number(r.online_amount) || 0,
+          manualAmount: Number(r.manual_amount) || 0,
+        })),
+        summary: {
+          totalPurchases: Number(summary.total_purchases) || 0,
+          totalCredits: Number(summary.total_credits) || 0,
+          totalRevenue: Number(summary.total_revenue) || 0,
+          avgAmount: Number(summary.avg_amount) || 0,
+        },
+      });
+    } catch (error: any) {
+      console.error("credit-purchase-stats error:", error);
+      res.status(500).json({ message: "取得購買統計失敗" });
+    }
+  });
+
+  // ─── 課消點數統計 ─────────────────────────────────────────────────────────────
+  app.get("/api/admin/credit-consumption-stats", isAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate, granularity = "daily" } = req.query;
+      const sd = typeof startDate === "string" && startDate ? startDate : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const ed = typeof endDate === "string" && endDate ? endDate : new Date().toISOString().slice(0, 10);
+      const isWeekly = granularity === "weekly";
+
+      const tsBucket = isWeekly
+        ? sql`date_trunc('week', ct.created_at AT TIME ZONE 'Asia/Taipei')::date`
+        : sql`(ct.created_at AT TIME ZONE 'Asia/Taipei')::date`;
+
+      const timeSeriesRows = await db.execute(sql`
+        SELECT
+          ${tsBucket} as bucket,
+          COUNT(*) FILTER (WHERE ct.type = 'deduct') as deducts,
+          COUNT(*) FILTER (WHERE ct.type = 'refund') as refunds,
+          SUM(ABS(ct.credits)) FILTER (WHERE ct.type = 'deduct') as deduct_credits,
+          SUM(ABS(ct.credits)) FILTER (WHERE ct.type = 'refund') as refund_credits
+        FROM credit_transactions ct
+        WHERE ct.type IN ('deduct', 'refund')
+          AND ct.created_at >= ${sd}::timestamptz
+          AND ct.created_at < (${ed}::date + interval '1 day')
+        GROUP BY bucket
+        ORDER BY bucket ASC
+      `);
+
+      const franchiseRows = await db.execute(sql`
+        SELECT
+          f.name as franchise_name,
+          COUNT(*) FILTER (WHERE ct.type = 'deduct') as deducts,
+          COUNT(*) FILTER (WHERE ct.type = 'refund') as refunds,
+          SUM(ABS(ct.credits)) FILTER (WHERE ct.type = 'deduct') as deduct_credits
+        FROM credit_transactions ct
+        JOIN bookings b ON ct.booking_id = b.id
+        JOIN time_slots ts ON b.slot_id = ts.id
+        JOIN franchises f ON ts.franchise_id = f.id
+        WHERE ct.type IN ('deduct', 'refund')
+          AND ct.created_at >= ${sd}::timestamptz
+          AND ct.created_at < (${ed}::date + interval '1 day')
+        GROUP BY f.name
+        ORDER BY deducts DESC NULLS LAST
+        LIMIT 20
+      `);
+
+      const summaryRows = await db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE ct.type = 'deduct') as total_deducts,
+          COUNT(*) FILTER (WHERE ct.type = 'refund') as total_refunds,
+          SUM(ABS(ct.credits)) FILTER (WHERE ct.type = 'deduct') as total_deduct_credits,
+          SUM(ABS(ct.credits)) FILTER (WHERE ct.type = 'refund') as total_refund_credits
+        FROM credit_transactions ct
+        WHERE ct.type IN ('deduct', 'refund')
+          AND ct.created_at >= ${sd}::timestamptz
+          AND ct.created_at < (${ed}::date + interval '1 day')
+      `);
+
+      const purchaseSummaryRows = await db.execute(sql`
+        SELECT SUM(cp.credits) as total_purchase_credits
+        FROM credit_purchases cp
+        WHERE cp.payment_status = 'paid'
+          AND cp.created_at >= ${sd}::timestamptz
+          AND cp.created_at < (${ed}::date + interval '1 day')
+      `);
+
+      const summary = summaryRows.rows[0] as any || {};
+      const purchaseSummary = purchaseSummaryRows.rows[0] as any || {};
+      const totalDeducts = Number(summary.total_deducts) || 0;
+      const totalRefunds = Number(summary.total_refunds) || 0;
+      const totalDeductCredits = Number(summary.total_deduct_credits) || 0;
+      const totalRefundCredits = Number(summary.total_refund_credits) || 0;
+      const totalPurchaseCredits = Number(purchaseSummary.total_purchase_credits) || 0;
+      const completionRate = totalPurchaseCredits > 0
+        ? Math.round((totalDeductCredits / totalPurchaseCredits) * 100)
+        : 0;
+
+      res.json({
+        timeSeries: timeSeriesRows.rows.map((r: any) => ({
+          date: r.bucket ? String(r.bucket).slice(0, 10) : "",
+          deducts: Number(r.deducts) || 0,
+          refunds: Number(r.refunds) || 0,
+          deductCredits: Number(r.deduct_credits) || 0,
+          refundCredits: Number(r.refund_credits) || 0,
+        })),
+        franchiseBreakdown: franchiseRows.rows.map((r: any) => ({
+          franchiseName: r.franchise_name || "未知分校",
+          deducts: Number(r.deducts) || 0,
+          refunds: Number(r.refunds) || 0,
+          deductCredits: Number(r.deduct_credits) || 0,
+        })),
+        summary: {
+          totalDeducts,
+          totalRefunds,
+          totalDeductCredits,
+          totalRefundCredits,
+          totalPurchaseCredits,
+          completionRate,
+        },
+      });
+    } catch (error: any) {
+      console.error("credit-consumption-stats error:", error);
+      res.status(500).json({ message: "取得課消統計失敗" });
+    }
+  });
+
   return httpServer;
 }
