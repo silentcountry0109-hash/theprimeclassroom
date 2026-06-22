@@ -1851,6 +1851,9 @@ function CoachesTab() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   type EnrichedCoach = Coach & { accountUsername: string | null; lineUserId: string | null };
+  const [usernameDialogCoach, setUsernameDialogCoach] = useState<EnrichedCoach | null>(null);
+  const [newUsername, setNewUsername] = useState("");
+
   const { data: coaches = [], isLoading } = useQuery<EnrichedCoach[]>({ queryKey: ["/api/franchise-admin/coaches"] });
 
   const uploadPhotoMutation = useMutation({
@@ -2093,6 +2096,26 @@ function CoachesTab() {
     },
   });
 
+  const updateUsernameMutation = useMutation({
+    mutationFn: async ({ coachId, username }: { coachId: number; username: string }) => {
+      const res = await apiRequest("PATCH", `/api/franchise-admin/coaches/${coachId}/account-username`, { newUsername: username });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "修改帳號名稱失敗");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "帳號名稱已更新" });
+      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
+      setUsernameDialogCoach(null);
+      setNewUsername("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "修改失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
@@ -2215,6 +2238,18 @@ function CoachesTab() {
                   {coach.userId ? (
                     <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-1" data-testid={`coach-account-status-${coach.id}`}>
                       <ShieldCheck className="w-3 h-3" />{coach.accountUsername || "帳號已建立"}
+                      <button
+                        className="ml-0.5 text-green-500 hover:text-green-700 transition-colors"
+                        title="修改帳號名稱"
+                        data-testid={`button-edit-username-coach-${coach.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUsernameDialogCoach(coach);
+                          setNewUsername(coach.accountUsername || "");
+                        }}
+                      >
+                        <Pencil className="w-2.5 h-2.5" />
+                      </button>
                     </span>
                   ) : (
                     <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" data-testid={`coach-account-status-${coach.id}`}>
@@ -2310,6 +2345,47 @@ function CoachesTab() {
         })()}
         </>
       )}
+
+      <Dialog open={!!usernameDialogCoach} onOpenChange={(open) => { if (!open) { setUsernameDialogCoach(null); setNewUsername(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>修改帳號名稱</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">老師：{usernameDialogCoach?.name}</p>
+            <div>
+              <Label>新帳號名稱</Label>
+              <Input
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="例：林老師@prime"
+                className="mt-1"
+                data-testid="input-new-username"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && usernameDialogCoach && newUsername.trim()) {
+                    updateUsernameMutation.mutate({ coachId: usernameDialogCoach.id, username: newUsername.trim() });
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">不可包含空白字元，且不得與其他帳號重複。</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setUsernameDialogCoach(null); setNewUsername(""); }} data-testid="button-cancel-username-edit">
+              取消
+            </Button>
+            <Button
+              disabled={!newUsername.trim() || updateUsernameMutation.isPending}
+              onClick={() => {
+                if (usernameDialogCoach) updateUsernameMutation.mutate({ coachId: usernameDialogCoach.id, username: newUsername.trim() });
+              }}
+              data-testid="button-confirm-username-edit"
+            >
+              {updateUsernameMutation.isPending ? "更新中…" : "確認修改"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowDialog(open); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

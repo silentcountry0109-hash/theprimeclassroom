@@ -3338,10 +3338,36 @@ export async function registerRoutes(
       const coach = await storage.getCoach(coachId);
       if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
       if (!coach.userId) return res.status(400).json({ message: "此老師尚未連結帳號" });
+      await db.update(users).set({ phone: null, updatedAt: new Date() }).where(eq(users.id, coach.userId));
       await storage.updateCoach(coachId, { userId: null } as any);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "解除連結失敗" });
+    }
+  });
+
+  app.patch("/api/franchise-admin/coaches/:id/account-username", isFranchiseAdmin, async (req: any, res) => {
+    try {
+      const coachId = parseInt(req.params.id);
+      const { newUsername } = req.body;
+      if (!newUsername || typeof newUsername !== "string" || newUsername.trim().length === 0) {
+        return res.status(400).json({ message: "帳號名稱不可為空" });
+      }
+      if (/\s/.test(newUsername)) {
+        return res.status(400).json({ message: "帳號名稱不可包含空白字元" });
+      }
+      const trimmed = newUsername.trim();
+      const coach = await storage.getCoach(coachId);
+      if (!coach || coach.franchiseId !== req.franchiseId) return res.status(403).json({ message: "Forbidden" });
+      if (!coach.userId) return res.status(400).json({ message: "此老師尚未連結帳號" });
+      const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, trimmed));
+      if (existing && existing.id !== coach.userId) {
+        return res.status(409).json({ message: "此帳號名稱已被使用，請換一個" });
+      }
+      await db.update(users).set({ username: trimmed, updatedAt: new Date() }).where(eq(users.id, coach.userId));
+      res.json({ success: true, username: trimmed });
+    } catch (error) {
+      res.status(500).json({ message: "修改帳號名稱失敗" });
     }
   });
 
