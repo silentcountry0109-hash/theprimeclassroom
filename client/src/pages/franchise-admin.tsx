@@ -3174,6 +3174,11 @@ function TimeSlotsTab() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          {slot.bookedSeats > 0 && (
+                            <Button variant="outline" size="icon" onClick={() => setStudentsSlot(slot)} data-testid={`button-view-students-cal-${slot.id}`} title="查看已預約學生">
+                              <Users className="w-4 h-4 text-tiffany" />
+                            </Button>
+                          )}
                           {!isSlotExpired(slot) && (
                             <Button variant="outline" size="icon" onClick={() => openMbFromSlot(slot)} data-testid={`button-manual-book-cal-${slot.id}`} title="臨時加課">
                               <UserPlus className="w-4 h-4 text-tiffany" />
