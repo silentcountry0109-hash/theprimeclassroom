@@ -2854,8 +2854,15 @@ function TimeSlotsTab() {
   };
 
   const [filterCoachId, setFilterCoachId] = useState<number | null>(null);
+  const [filterStartDate, setFilterStartDate] = useState<string>("");
+  const [filterEndDate, setFilterEndDate] = useState<string>("");
 
-  const filteredSlots = filterCoachId ? slots.filter((s) => s.coachId === filterCoachId) : slots;
+  const filteredSlots = slots.filter((s) => {
+    if (filterCoachId && s.coachId !== filterCoachId) return false;
+    if (filterStartDate && s.date < filterStartDate) return false;
+    if (filterEndDate && s.date > filterEndDate) return false;
+    return true;
+  });
 
   const sortedSlots = [...filteredSlots].sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
@@ -2924,6 +2931,21 @@ function TimeSlotsTab() {
               ))}
             </SelectContent>
           </Select>
+          <Input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            className="h-8 text-xs w-[130px] px-2"
+            data-testid="input-filter-start-date"
+          />
+          <span className="text-muted-foreground text-xs">～</span>
+          <Input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            className="h-8 text-xs w-[130px] px-2"
+            data-testid="input-filter-end-date"
+          />
           <div className="flex bg-gray-100 rounded-lg p-0.5" data-testid="view-mode-toggle">
             <button
               onClick={() => setViewMode("list")}
