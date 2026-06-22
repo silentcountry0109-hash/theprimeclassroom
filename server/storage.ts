@@ -463,13 +463,21 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateCoach(id: number, data: Partial<InsertCoach>): Promise<Coach> {
+  async updateCoach(id: number, data: Partial<InsertCoach>): Promise<{ coach: Coach; syncedFranchisesCount: number }> {
     return db.transaction(async (tx) => {
       const [updated] = await tx.update(coaches).set(data).where(eq(coaches.id, id)).returning();
       if (data.phone !== undefined && updated?.userId) {
         await tx.update(users).set({ phone: data.phone }).where(eq(users.id, updated.userId));
       }
-      return updated;
+      let syncedFranchisesCount = 0;
+      if (data.name !== undefined && updated?.userId) {
+        const result = await tx.update(coaches)
+          .set({ name: data.name })
+          .where(and(eq(coaches.userId, updated.userId), ne(coaches.id, id)))
+          .returning({ id: coaches.id });
+        syncedFranchisesCount = result.length;
+      }
+      return { coach: updated, syncedFranchisesCount };
     });
   }
 

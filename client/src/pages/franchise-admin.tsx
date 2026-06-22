@@ -1988,8 +1988,12 @@ function CoachesTab() {
       const res = await apiRequest("POST", "/api/franchise-admin/coaches", data);
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: editingCoach ? "老師已更新" : "老師已新增" });
+    onSuccess: (data: any) => {
+      const syncedCount = data?.syncedFranchisesCount ?? 0;
+      toast({
+        title: editingCoach ? "老師已更新" : "老師已新增",
+        description: editingCoach && syncedCount > 0 ? `已同步更新 ${syncedCount} 個分校的老師資料` : undefined,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/coaches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/stats"] });
       setShowDialog(false);

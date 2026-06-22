@@ -2135,8 +2135,8 @@ export async function registerRoutes(
 
   app.patch("/api/admin/coaches/:id", isAdmin, async (req, res) => {
     try {
-      const coach = await storage.updateCoach(parseInt(req.params.id), req.body);
-      res.json(coach);
+      const { coach, syncedFranchisesCount } = await storage.updateCoach(parseInt(req.params.id), req.body);
+      res.json({ ...coach, syncedFranchisesCount });
     } catch (error) {
       res.status(500).json({ message: "Failed to update coach" });
     }
@@ -2578,8 +2578,8 @@ export async function registerRoutes(
         if (effectiveType === "percentage" && amt > 100) return res.status(400).json({ message: "抽成比例不可超過 100%" });
         data.compensationAmount = amt;
       }
-      const updated = await storage.updateCoach(parseInt(req.params.id), data);
-      res.json(updated);
+      const { coach: updated, syncedFranchisesCount } = await storage.updateCoach(parseInt(req.params.id), data);
+      res.json({ ...updated, syncedFranchisesCount });
     } catch (error) {
       res.status(500).json({ message: "Failed to update coach" });
     }
@@ -3817,7 +3817,7 @@ export async function registerRoutes(
   app.patch("/api/coach/my-info", isCoach, async (req: any, res) => {
     try {
       const { bio, specialties } = req.body;
-      const updated = await storage.updateCoach(req.coach.id, { bio, specialties });
+      const { coach: updated } = await storage.updateCoach(req.coach.id, { bio, specialties });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "更新資料失敗" });
