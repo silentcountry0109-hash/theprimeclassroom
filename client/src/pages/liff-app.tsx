@@ -975,18 +975,15 @@ function CreditsTab({ openExternal }: { openExternal: (url: string) => void }) {
                     <p className="text-lg font-bold text-tiffany" data-testid={`text-pkg-price-${p.id}`}>${p.price}</p>
                   </div>
                 </div>
+                {/* 刷卡付費即將上線:質數教室獨立金流尚未開通,暫時停用。
+                    恢復:disabled 改回 {purchasingId === p.id}、加回 onClick={() => handlePurchase(p)}、文字改回「立即購買」。 */}
                 <Button
                   className="w-full rounded-full"
-                  style={{ backgroundColor: "#81D8D0", color: "white" }}
-                  disabled={purchasingId === p.id}
-                  onClick={() => handlePurchase(p)}
+                  style={{ cursor: "not-allowed" }}
+                  disabled
                   data-testid={`button-purchase-${p.id}`}
                 >
-                  {purchasingId === p.id ? (
-                    <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />處理中…</>
-                  ) : (
-                    <>立即購買 <ExternalLink className="w-3.5 h-3.5 ml-1.5" /></>
-                  )}
+                  即將上線
                 </Button>
               </div>
             );
@@ -995,7 +992,7 @@ function CreditsTab({ openExternal }: { openExternal: (url: string) => void }) {
       )}
 
       <p className="text-[11px] text-muted-foreground text-center">
-        點擊購買後將在 LINE 外部瀏覽器開啟 ECPay 安全結帳頁面
+        線上刷卡購買即將上線,敬請期待 🙏
       </p>
     </div>
   );

@@ -1512,20 +1512,16 @@ function CreditsTab() {
                 </div>
               )}
 
+              {/* 刷卡付費即將上線:質數教室獨立金流(綠界)尚未開通,暫時停用線上刷卡購買。
+                  恢復方式:disabled 改回 {purchaseMutation.isPending || !canPurchase}、
+                  加回原 onClick(purchaseMutation.mutate)、文字改回「立即購買」。 */}
               <Button
                 className="w-full rounded-full"
-                disabled={purchaseMutation.isPending || !canPurchase}
-                onClick={() => {
-                  if (!selectedPackageId) return;
-                  purchaseMutation.mutate({
-                    packageId: selectedPackageId,
-                    couponCode: couponResult?.coupon?.code,
-                  });
-                }}
-                style={{ backgroundColor: canPurchase ? "#81D8D0" : undefined, color: canPurchase ? "white" : undefined }}
+                disabled
+                style={{ cursor: "not-allowed" }}
                 data-testid="button-purchase-credits"
               >
-                {purchaseMutation.isPending ? "處理中..." : "立即購買"}
+                即將上線
               </Button>
             </div>
           )}
