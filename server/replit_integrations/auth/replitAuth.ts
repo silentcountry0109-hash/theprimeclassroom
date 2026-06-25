@@ -66,6 +66,21 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  passport.serializeUser((user: Express.User, cb) => cb(null, user));
+  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
+
+  // 離開 Replit:沒有 REPL_ID 時跳過 Replit OIDC(本專案的 OIDC 形同虛設,
+  // 登入改由 credential 後台與 LINE OTP 家長兩套 session 機制負責)。
+  // session 與 passport 初始化仍保留,確保兩套登入正常運作。
+  if (!process.env.REPL_ID) {
+    app.get("/api/logout", (req: any, res) => {
+      const done = () => res.redirect("/");
+      if (req.session) req.session.destroy(done);
+      else done();
+    });
+    return;
+  }
+
   const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
@@ -98,9 +113,6 @@ export async function setupAuth(app: Express) {
       registeredStrategies.add(strategyName);
     }
   };
-
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);

@@ -54,3 +54,5 @@ attached_assets/
 *.zip
 screenshots/
 exports/
+gcs-service-account.json
+*-service-account.json

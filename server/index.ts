@@ -1,3 +1,4 @@
+import "dotenv/config"; // 離開 Replit 後,從 .env 載入環境變數(必須最先執行)
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -412,7 +413,8 @@ app.use((req, res, next) => {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
+      // SO_REUSEPORT 僅 Linux(Replit/Cloud Run)支援;macOS 會丟 ENOTSUP,本機開發停用
+      reusePort: process.platform === "linux",
     },
     () => {
       log(`serving on port ${port}`);
