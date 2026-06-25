@@ -1,0 +1,44 @@
+name: Deploy to Cloud Run
+
+# push 到 main 就自動 build + 部署到 Cloud Run(keyless,使用 Workload Identity Federation)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # 也可在 GitHub 介面手動觸發
+
+permissions:
+  contents: read
+  id-token: write # 取得 OIDC token 換取 GCP 存取(免金鑰)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: theprime-classroom
+          workload_identity_provider: projects/372687564455/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: gh-deployer@theprime-classroom.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy theprime \
+            --source . \
+            --project=theprime-classroom \
+            --region=asia-east1 \
+            --service-account=theprime-app@theprime-classroom.iam.gserviceaccount.com \
+            --add-cloudsql-instances=theprime-classroom:asia-east1:theprime-db \
+            --allow-unauthenticated \
+            --min-instances=1 \
+            --max-instances=4 \
+            --memory=1Gi \
+            --cpu=1 \
+            --timeout=300 \
+            --quiet \
+            --set-env-vars="NODE_ENV=production,TZ=Asia/Taipei,GCS_PROJECT_ID=theprime-classroom,DEFAULT_OBJECT_STORAGE_BUCKET_ID=theprime-classroom-objstore,PUBLIC_OBJECT_SEARCH_PATHS=/theprime-classroom-objstore/public,PRIVATE_OBJECT_DIR=/theprime-classroom-objstore/.private,LINE_MESSAGING_CHANNEL_ID=2009852161,ECPAY_MERCHANT_ID=2000132,ECPAY_IS_SANDBOX=true" \
+            --set-secrets="SESSION_SECRET=SESSION_SECRET:latest,DATABASE_URL=DATABASE_URL:latest,LINE_CHANNEL_ID=LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=LINE_CHANNEL_SECRET:latest,LINE_CHANNEL_ACCESS_TOKEN=LINE_CHANNEL_ACCESS_TOKEN:latest,LINE_MESSAGING_CHANNEL_SECRET=LINE_MESSAGING_CHANNEL_SECRET:latest,TWILIO_ACCOUNT_SID=TWILIO_ACCOUNT_SID:latest,TWILIO_AUTH_TOKEN=TWILIO_AUTH_TOKEN:latest,TWILIO_VERIFY_SERVICE_SID=TWILIO_VERIFY_SERVICE_SID:latest,MITAKE_USERNAME=MITAKE_USERNAME:latest,MITAKE_PASSWORD=MITAKE_PASSWORD:latest,ECPAY_HASH_KEY=ECPAY_HASH_KEY:latest,ECPAY_HASH_IV=ECPAY_HASH_IV:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest"

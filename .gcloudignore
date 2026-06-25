@@ -1,0 +1,18 @@
+# 上傳到 Cloud Build 時排除的項目(容器內會自行 npm ci 與 build)
+.git
+node_modules
+dist
+.env
+.env.*
+*.env
+gcs-service-account.json
+*-service-account.json
+.claude
+.agents
+.canvas
+screenshots
+exports
+test-results
+*.tar.gz
+*.zip
+.DS_Store
