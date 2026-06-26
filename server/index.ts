@@ -143,6 +143,19 @@ app.use((req, res, next) => {
     }
   }, 60 * 1000);
 
+  // ─── 定期校正 booked_seats 計數器,自我修復與真實預約數的漂移 ───
+  // 只修正衍生計數器(不動預約/金流),避免計數器虛高造成「誤判額滿擋預約」與通知誤報學生數。
+  async function runBookedSeatsReconcile(tag = "interval") {
+    try {
+      const fixed = await storage.reconcileSlotBookedSeats();
+      if (fixed > 0) log(`[ReconcileSeats:${tag}] 校正 ${fixed} 個時段的 booked_seats`);
+    } catch (e) {
+      log(`[ReconcileSeats:${tag}] 失敗: ${e}`);
+    }
+  }
+  runBookedSeatsReconcile("startup");
+  setInterval(() => runBookedSeatsReconcile("interval"), 15 * 60 * 1000);
+
   // ─── 上課前 2 小時提醒 cron job ───────────────────────────────────────────
   const notifiedBookingIds = new Set<number>();
 
@@ -252,8 +265,8 @@ app.use((req, res, next) => {
   async function runCoachDailySummary() {
     try {
       const { db } = await import("./db");
-      const { timeSlots: timeSlotsTable, coaches: coachesTable, users: usersTable } = await import("@shared/schema");
-      const { eq, and } = await import("drizzle-orm");
+      const { timeSlots: timeSlotsTable, coaches: coachesTable, users: usersTable, bookings: bookingsTable } = await import("@shared/schema");
+      const { eq, and, inArray, sql } = await import("drizzle-orm");
       const { storage: storageInst } = await import("./storage");
 
       // 取得台灣「明天」日期字串（依據 UTC+8 固定偏移計算，不依賴 server 時區）
@@ -302,6 +315,19 @@ app.use((req, res, next) => {
         return;
       }
 
+      // 以「真實有效預約數」為準(不依賴 booked_seats 計數器,避免計數器漂移造成誤報學生數)
+      const slotIds = rows.map(r => r.slotId);
+      const activeCountMap = new Map<number, number>();
+      const countRows = await db
+        .select({ slotId: bookingsTable.slotId, cnt: sql<number>`count(*)::int` })
+        .from(bookingsTable)
+        .where(and(
+          inArray(bookingsTable.slotId, slotIds),
+          inArray(bookingsTable.status, ["confirmed", "checked_in", "absent", "completed"]),
+        ))
+        .groupBy(bookingsTable.slotId);
+      for (const c of countRows) activeCountMap.set(c.slotId, Number(c.cnt));
+
       // 以老師分組
       const byCoach = new Map<number, typeof rows>();
       for (const row of rows) {
@@ -323,7 +349,12 @@ app.use((req, res, next) => {
         const firstRow = coachSlots[0];
         if (!firstRow.coachUserId) continue;
 
-        const totalStudents = coachSlots.reduce((sum, s) => sum + (s.bookedSeats || 0), 0);
+        const totalStudents = coachSlots.reduce((sum, s) => sum + (activeCountMap.get(s.slotId) || 0), 0);
+        // 真實沒有任何有效預約就不發,避免「通知說有學生、行事曆卻空的」誤報
+        if (totalStudents === 0) {
+          log(`[CoachDailySummary] coachId=${coachId} 明日 ${coachSlots.length} 堂課但無有效預約，略過通知`);
+          continue;
+        }
 
         const notifMsg = `明日（${tomorrowLabel}）有 ${coachSlots.length} 堂課，共 ${totalStudents} 位學生`;
 
@@ -341,7 +372,7 @@ app.use((req, res, next) => {
           if (coachUser?.lineUserId) {
             const flex = buildCoachDailySummaryFlex({
               date: tomorrowLabel,
-              slots: coachSlots.map(s => ({ startTime: s.startTime, endTime: s.endTime, bookedSeats: s.bookedSeats || 0 })),
+              slots: coachSlots.map(s => ({ startTime: s.startTime, endTime: s.endTime, bookedSeats: activeCountMap.get(s.slotId) || 0 })),
             });
             await sendLineFlexMessage(coachUser.lineUserId, flex.altText, flex.contents);
           }

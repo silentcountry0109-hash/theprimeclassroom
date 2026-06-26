@@ -241,6 +241,7 @@ export interface IStorage {
   getSlotBookings(slotId: number): Promise<any[]>;
   getSlotStudentList(slotId: number): Promise<any[]>;
   cancelSlotBookingsAndNotify(slotId: number): Promise<void>;
+  reconcileSlotBookedSeats(): Promise<number>;
 
   createNotification(data: InsertNotification): Promise<Notification>;
   getNotificationsByUser(userId: string): Promise<Notification[]>;
@@ -699,7 +700,8 @@ export class DatabaseStorage implements IStorage {
   async deleteChild(id: number): Promise<void> {
     const childBookings = await db.select().from(bookings).where(eq(bookings.childId, id));
     for (const booking of childBookings) {
-      if (booking.status === "confirmed") {
+      // 凡仍佔位的狀態(與 booked_seats 計數口徑一致)都要回補容量,避免刪學生後計數器虛高
+      if (["confirmed", "checked_in", "absent", "completed"].includes(booking.status)) {
         await db
           .update(timeSlots)
           .set({ bookedSeats: sql`GREATEST(${timeSlots.bookedSeats} - 1, 0)` })
@@ -2692,6 +2694,29 @@ export class DatabaseStorage implements IStorage {
         await db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id));
       }
     }
+  }
+
+  /**
+   * 將所有時段的 booked_seats 快取校正為「真實有效預約數」(confirmed/checked_in/absent/completed)。
+   * 僅更新對不上的列,只動 booked_seats 這個衍生計數器,不更動任何預約/金流資料。
+   * 回傳被修正的時段數。用於自我修復計數器與真實預約的漂移。
+   */
+  async reconcileSlotBookedSeats(): Promise<number> {
+    const result = await db.execute(sql`
+      UPDATE time_slots ts
+      SET booked_seats = sub.cnt
+      FROM (
+        SELECT s.id,
+          COUNT(b.id) FILTER (
+            WHERE b.status IN ('confirmed','checked_in','absent','completed')
+          ) AS cnt
+        FROM time_slots s
+        LEFT JOIN bookings b ON b.slot_id = s.id
+        GROUP BY s.id
+      ) sub
+      WHERE ts.id = sub.id AND ts.booked_seats <> sub.cnt
+    `);
+    return result.rowCount ?? 0;
   }
 
   async createNotification(data: InsertNotification): Promise<Notification> {
