@@ -2675,7 +2675,7 @@ export class DatabaseStorage implements IStorage {
           const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, b.parentId));
           if (parentUser?.lineUserId) {
             const newBalance = await this.getParentBalance(b.parentId);
-            const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+            const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
             const flex = buildAdminCancelFlex({
               childName: b.childName || "孩子",
               date: slot.date,

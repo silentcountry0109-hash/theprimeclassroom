@@ -1530,7 +1530,7 @@ export async function registerRoutes(
             const [coachRec] = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, slot.coachId));
             coachName = coachRec?.name || "";
           }
-          const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+          const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
           const flex = buildBookingSuccessFlex({
             childName,
             date: slotDateStr,
@@ -1545,7 +1545,7 @@ export async function registerRoutes(
 
         // 點數不足提醒
         if (parentUser?.lineUserId && newBalance <= 1) {
-          const appBase2 = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+          const appBase2 = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
           const creditFlex = newBalance === 0
             ? buildNoCreditsFlex({ childName, topUpUrl: `${appBase2}/dashboard?tab=shop` })
             : buildLowCreditsFlex({ childName, remainingCredits: newBalance, topUpUrl: `${appBase2}/dashboard?tab=shop` });
@@ -1656,7 +1656,7 @@ export async function registerRoutes(
               })
             );
             const moreCount = Math.max(0, successSlotIds.length - 5);
-            const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+            const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
             const recurringFlex = buildRecurringBookingFlex({
               childName,
               totalCount: successSlotIds.length,
@@ -2788,7 +2788,7 @@ export async function registerRoutes(
             }
             const previousSlotStr = `${previousDate} ${previousStartTime}–${previousEndTime}`;
             const newSlotStr = `${updated.date} ${updated.startTime}–${updated.endTime}`;
-            const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+            const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
 
             const changeParts: string[] = [];
             if (scheduleChanged) changeParts.push(`時段（${previousSlotStr} → ${newSlotStr}）`);
@@ -3226,7 +3226,7 @@ export async function registerRoutes(
             const [childRec] = await db.select({ name: children.name }).from(children).where(eq(children.id, parseInt(childId)));
             childDisplayName = childRec?.name || "孩子";
           }
-          const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+          const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
           const flex = buildManualBookingFlex({
             childName: childDisplayName || "孩子",
             date: slot.date,
@@ -5043,8 +5043,8 @@ export async function registerRoutes(
     ? "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5"
     : "https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5";
 
-  const domain = process.env.REPLIT_DOMAINS
-    ? process.env.REPLIT_DOMAINS.split(",")[0]
+  const domain = process.env.APP_BASE_URL
+    ? new URL(process.env.APP_BASE_URL).host
     : "localhost:5000";
 
   // In-memory store for ECPay launch tokens (one-time use, 15-min TTL)

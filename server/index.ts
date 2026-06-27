@@ -236,7 +236,7 @@ app.use((req, res, next) => {
             franchiseName = frRow?.name || "教室";
           }
 
-          const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+          const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
           const flex = buildPreClassReminderFlex({
             childName,
             date: targetDateStr,

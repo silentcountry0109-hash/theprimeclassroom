@@ -676,7 +676,7 @@ function HeroSection() {
       >
         <span className="text-xs text-muted-foreground/60">不想搜尋？</span>
         <a
-          href="/api/login"
+          href="/parent-login"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-tiffany hover:underline underline-offset-2"
           data-testid="link-hero-direct-cta"
         >
@@ -2313,7 +2313,7 @@ function CTASection() {
                 立即預約
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
-              <a href="/api/login" data-testid="link-login-cta">
+              <a href="/parent-login" data-testid="link-login-cta">
                 <Button variant="outline" className="rounded-full px-8 py-3 text-sm">
                   家長登入
                 </Button>
@@ -2434,7 +2434,7 @@ function FooterSection() {
             </div>
           </div>
           <a
-            href="/api/login"
+            href="/franchise-login"
             className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-tiffany transition-colors border border-white/15 rounded-full px-5 py-2 hover:border-tiffany/40"
             data-testid="link-franchise-admin"
           >

@@ -201,7 +201,7 @@ export async function sendLineReply(replyToken: string, message: string): Promis
 }
 
 const BASE = process.env.APP_BASE_URL
-  || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  || "https://www.theprimeclassroom.com";
 
 function infoRow(label: string, value: string, valueColor = "#2C2C2C", strikethrough = false): object {
   return {
@@ -1112,7 +1112,7 @@ export function buildCoachNewBookingFlex(params: {
   dashboardUrl?: string;
   isNewStudent?: boolean;
 }): { altText: string; contents: object } {
-  const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
   const isNew = !!params.isNewStudent;
   const headerColor = isNew ? "#FF8A7A" : "#4FBDB4";
   const headerTitle = isNew ? "🆕  新生第一堂課" : "📚  新課程預約";
@@ -1194,7 +1194,7 @@ export function buildCoachCancelFlex(params: {
   location: string;
   dashboardUrl?: string;
 }): { altText: string; contents: object } {
-  const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
   return {
     altText: `❌ 學生取消預約：${params.childName} ${params.date} ${params.time}`,
     contents: {
@@ -1264,7 +1264,7 @@ export function buildCoachDailySummaryFlex(params: {
   slots: Array<{ startTime: string; endTime: string; bookedSeats: number }>;
   dashboardUrl?: string;
 }): { altText: string; contents: object } {
-  const appBase = process.env.APP_BASE_URL || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://the-prime-math.replit.app");
+  const appBase = process.env.APP_BASE_URL || "https://www.theprimeclassroom.com";
   const totalStudents = params.slots.reduce((sum, s) => sum + (s.bookedSeats || 0), 0);
   const slotRows = [...params.slots]
     .sort((a, b) => a.startTime.localeCompare(b.startTime))

@@ -27,6 +27,15 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  // 讓 session cookie 在 apex 與 www 之間共用,避免「在 apex 起手、OAuth callback 回 www」時
+  // cookie 掉失導致 state 對不上(line_state)。由 APP_BASE_URL 推導上層網域(去掉開頭 www.):
+  // 例如 https://www.theprimeclassroom.com → .theprimeclassroom.com。APP_BASE_URL 未設時維持 host-only。
+  let cookieDomain: string | undefined;
+  try {
+    const host = new URL(process.env.APP_BASE_URL || "").hostname;
+    const base = host.replace(/^www\./, "");
+    if (base.includes(".")) cookieDomain = `.${base}`;
+  } catch { /* APP_BASE_URL 未設或非法,維持 host-only cookie */ }
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -35,6 +44,8 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: true,
+      sameSite: "lax",
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
       maxAge: sessionTtl,
     },
   });
