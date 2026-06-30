@@ -28,6 +28,7 @@ import PaymentResult from "@/pages/payment-result";
 import PrivacyPage from "@/pages/privacy";
 import RefundPage from "@/pages/refund";
 import LiffApp from "@/pages/liff-app";
+import Maintenance from "@/pages/maintenance";
 import { useLocation } from "wouter";
 
 function LoadingScreen() {
@@ -267,6 +268,25 @@ function HomePage() {
 }
 
 function Router() {
+  const { data: maint, isLoading: maintLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/maintenance"],
+    staleTime: 60_000,
+  });
+  if (maintLoading) return <LoadingScreen />;
+  if (maint?.enabled) {
+    // 維修模式:家長入口 → 維修頁;主任/總部/老師後台照常運作
+    return (
+      <Switch>
+        <Route path="/franchise-login" component={FranchiseLogin} />
+        <Route path="/hq-login" component={HqLogin} />
+        <Route path="/coach-login" component={FranchiseLogin} />
+        <Route path="/admin" component={AdminDashboard} />
+        <Route path="/franchise-admin" component={FranchiseAdminDashboard} />
+        <Route path="/coach-dashboard" component={CoachDashboard} />
+        <Route component={Maintenance} />
+      </Switch>
+    );
+  }
   return (
     <Switch>
       <Route path="/" component={HomePage} />

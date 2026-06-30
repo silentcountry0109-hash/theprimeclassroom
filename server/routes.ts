@@ -4013,6 +4013,14 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/maintenance", async (_req, res) => {
+    try {
+      res.json({ enabled: await storage.getMaintenanceMode() });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
   app.get("/api/site-content", async (_req, res) => {
     try {
       const content = await storage.getAllSiteContent();

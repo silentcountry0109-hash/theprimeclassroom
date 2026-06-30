@@ -3723,6 +3723,18 @@ export class DatabaseStorage implements IStorage {
     return validated;
   }
 
+  async getMaintenanceMode(): Promise<boolean> {
+    const [row] = await db.select().from(systemSettings).where(eq(systemSettings.key, "maintenance_mode"));
+    return row?.value === true;
+  }
+
+  async setMaintenanceMode(enabled: boolean): Promise<boolean> {
+    await db.insert(systemSettings)
+      .values({ key: "maintenance_mode", value: enabled })
+      .onConflictDoUpdate({ target: systemSettings.key, set: { value: enabled, updatedAt: new Date() } });
+    return enabled;
+  }
+
   async deleteOldCoachReminderLogs(beforeDate: string): Promise<number> {
     const result = await db
       .delete(coachReminderLogs)
