@@ -274,14 +274,10 @@ function Router() {
   });
   if (maintLoading) return <LoadingScreen />;
   if (maint?.enabled) {
-    // 維修模式:家長入口 → 維修頁;主任/總部/老師後台照常運作
+    // 維修模式:只剩「老師登入 + 老師後台(看教材)」;家長/主任/總部一律維修頁
     return (
       <Switch>
-        <Route path="/franchise-login" component={FranchiseLogin} />
-        <Route path="/hq-login" component={HqLogin} />
         <Route path="/coach-login" component={FranchiseLogin} />
-        <Route path="/admin" component={AdminDashboard} />
-        <Route path="/franchise-admin" component={FranchiseAdminDashboard} />
         <Route path="/coach-dashboard" component={CoachDashboard} />
         <Route component={Maintenance} />
       </Switch>
