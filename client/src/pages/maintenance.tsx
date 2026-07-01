@@ -19,7 +19,7 @@ export default function Maintenance() {
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", margin: "0 auto 22px",
           }}
         >
-          <div style={{ ...serif, fontSize: 30, letterSpacing: "0.04em", color: "#2F8F86", lineHeight: 1 }}>7／1</div>
+          <div style={{ ...serif, fontSize: 30, letterSpacing: "0.04em", color: "#2F8F86", lineHeight: 1 }}>7／3</div>
           <div style={{ fontSize: 11, letterSpacing: "0.14em", color: "#5FA9A2", marginTop: 5 }}>重新開放</div>
         </div>
 
@@ -38,7 +38,7 @@ export default function Maintenance() {
 
         <div style={{ fontSize: 15, lineHeight: 1.95, color: "#54514A", marginTop: 18 }}>
           系統將在{" "}
-          <span style={{ ...serif, color: "#D08378", fontSize: 17, letterSpacing: "0.02em" }}>7／1</span>{" "}
+          <span style={{ ...serif, color: "#D08378", fontSize: 17, letterSpacing: "0.02em" }}>7／3</span>{" "}
           重新開放,<br />您的一切資訊將會正確且正常上線。
         </div>
 
