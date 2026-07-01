@@ -236,12 +236,11 @@ function BookTab() {
   const selectedFranchise = franchises.find((f) => f.id === selectedFranchiseId);
   const availableSlots = useMemo(() => {
     if (!detail?.slots) return [];
-    const todayTw = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
-    const threeDaysFromNow = new Date(todayTw + "T00:00:00+08:00");
-    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+    // 預約截止 = 課程開始前 4 小時(與後端一致)
+    const cutoff = Date.now() + 4 * 60 * 60 * 1000;
     return detail.slots
       .filter((s) => s.booked < s.capacity)
-      .filter((s) => new Date(s.date + "T00:00:00+08:00") >= threeDaysFromNow)
+      .filter((s) => new Date(`${s.date}T${s.startTime}:00+08:00`).getTime() >= cutoff)
       .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
   }, [detail]);
 
@@ -322,7 +321,7 @@ function BookTab() {
           </div>
         ) : availableSlots.length === 0 ? (
           <div className="bg-white rounded-xl border p-6 text-center text-sm text-muted-foreground">
-            目前沒有可預約的時段（需於 3 天前預約）
+            目前沒有可預約的時段（課程開始前 4 小時截止預約）
           </div>
         ) : (
           <div className="space-y-2">
@@ -411,7 +410,7 @@ function BookTab() {
           >
             {bookMutation.isPending ? "預約中…" : "確認預約（扣 1 堂）"}
           </Button>
-          <p className="text-[11px] text-center text-muted-foreground">需於上課日 3 天前預約</p>
+          <p className="text-[11px] text-center text-muted-foreground">預約與取消皆須於課程開始 4 小時前完成</p>
         </>
       )}
 

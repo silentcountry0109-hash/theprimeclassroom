@@ -120,9 +120,8 @@ describe("isCoach middleware — 批次守衛測試（教練 API）", () => {
   const coachEndpoints: Array<{ method: HttpMethod; path: string; label: string }> = [
     { method: "get",   path: "/api/coach/calendar/2026/5",         label: "GET /api/coach/calendar/:year/:month" },
     { method: "get",   path: "/api/coach/slots/1/students",         label: "GET /api/coach/slots/:slotId/students" },
-    { method: "patch", path: "/api/coach/bookings/1/check-in",      label: "PATCH /api/coach/bookings/:id/check-in" },
     { method: "patch", path: "/api/coach/bookings/1/absent",        label: "PATCH /api/coach/bookings/:id/absent" },
-    { method: "patch", path: "/api/coach/bookings/1/uncheck-in",    label: "PATCH /api/coach/bookings/:id/uncheck-in" },
+    { method: "patch", path: "/api/coach/bookings/1/unmark-absent", label: "PATCH /api/coach/bookings/:id/unmark-absent" },
     { method: "get",   path: "/api/coach/daily-record/2026-05-07",  label: "GET /api/coach/daily-record/:date" },
     { method: "get",   path: "/api/coach/monthly-records/2026/5",   label: "GET /api/coach/monthly-records/:year/:month" },
     { method: "get",   path: "/api/coach/overdue-tasks",            label: "GET /api/coach/overdue-tasks" },

@@ -342,10 +342,9 @@ export default function CoachDashboard() {
               有過去未完成的課堂紀錄
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground -mt-1">以下日期的點名或聯絡簿尚未完成，請點擊日期補填：</p>
+          <p className="text-sm text-muted-foreground -mt-1">以下日期的聯絡簿尚未完成，請點擊日期補填：</p>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {overdueTasks.map((t) => {
-              const needsCheckIn = t.checkedInSlots < t.totalSlots;
               const needsContactBook = t.contactBookSlots < t.totalSlots;
               const [, mo, d] = t.date.split("-").map(Number);
               const label = `${mo} 月 ${d} 日`;
@@ -363,7 +362,6 @@ export default function CoachDashboard() {
                 >
                   <span className="text-sm font-medium text-amber-900">{label}</span>
                   <div className="flex gap-1.5">
-                    {needsCheckIn && <span className="text-[11px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">點名未完成</span>}
                     {needsContactBook && <span className="text-[11px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">聯絡簿未完成</span>}
                   </div>
                 </button>
@@ -544,37 +542,9 @@ function CalendarTab({ coachId, initialDate, onInitialDateConsumed }: { coachId:
   );
 }
 
-function useCheckInAvailability(slotDate: string, slotStartTime: string, slotEndTime: string) {
-  const [canCheckIn, setCanCheckIn] = useState(false);
-  const [isSlotEnded, setIsSlotEnded] = useState(false);
-  const [minutesUntilCheckIn, setMinutesUntilCheckIn] = useState(0);
-
-  useEffect(() => {
-    const check = () => {
-      const now = new Date();
-      const slotStart = new Date(`${slotDate}T${slotStartTime}:00+08:00`);
-      const slotEnd = new Date(`${slotDate}T${slotEndTime}:00+08:00`);
-      const earliest = new Date(slotStart.getTime() - 15 * 60 * 1000);
-
-      setIsSlotEnded(now > slotEnd);
-      setCanCheckIn(now >= earliest);
-      if (now < earliest) {
-        setMinutesUntilCheckIn(Math.ceil((earliest.getTime() - now.getTime()) / 60000));
-      } else {
-        setMinutesUntilCheckIn(0);
-      }
-    };
-    check();
-    const interval = setInterval(check, 30000);
-    return () => clearInterval(interval);
-  }, [slotDate, slotStartTime, slotEndTime]);
-
-  return { canCheckIn, isSlotEnded, minutesUntilCheckIn };
-}
-
+// 點名功能已移除:出席以預約為準,課消於課前 4 小時鎖定。
+// 「今日未出席」改由聯絡簿(ContactBookDialog)操作,標記後同步通知家長。
 function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; selectedDate: string; onOpenContactBook: () => void }) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
   const { data: students = [], isLoading, isError: studentsError } = useQuery<any[]>({
     queryKey: ["/api/coach/slots", slot.id, "students"],
     staleTime: 0,
@@ -582,58 +552,6 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     retry: 1,
-  });
-
-  const { canCheckIn, isSlotEnded, minutesUntilCheckIn } = useCheckInAvailability(
-    slot.date || selectedDate, slot.startTime, slot.endTime
-  );
-
-  const checkInMutation = useMutation({
-    mutationFn: async (bookingId: number) => {
-      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/check-in`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
-      toast({ title: "點名成功", description: "學生已標記為出席" });
-    },
-    onError: (error: any) => {
-      toast({ title: "點名失敗", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const uncheckInMutation = useMutation({
-    mutationFn: async (bookingId: number) => {
-      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/uncheck-in`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
-      toast({ title: "已取消", description: "學生狀態已恢復為待點名" });
-    },
-    onError: (error: any) => {
-      toast({ title: "操作失敗", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const absentMutation = useMutation({
-    mutationFn: async (bookingId: number) => {
-      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/absent`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
-      toast({ title: "已標記未到", description: "學生已標記為缺席" });
-    },
-    onError: (error: any) => {
-      toast({ title: "標記未到失敗", description: error.message, variant: "destructive" });
-    },
   });
 
   return (
@@ -651,18 +569,6 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
           {slot.bookedSeats}/{slot.maxSeats}
         </div>
       </div>
-
-      {!canCheckIn && !isSlotEnded && minutesUntilCheckIn > 0 && students.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg mb-3" data-testid={`notice-checkin-wait-${slot.id}`}>
-          <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>
-            {minutesUntilCheckIn > 60
-              ? `尚需 ${Math.floor(minutesUntilCheckIn / 60)} 小時 ${minutesUntilCheckIn % 60} 分鐘才可點名`
-              : `尚需 ${minutesUntilCheckIn} 分鐘才可點名（上課前 15 分鐘開放）`
-            }
-          </span>
-        </div>
-      )}
 
       {isLoading ? (
         <Skeleton className="h-8 w-full" />
@@ -687,102 +593,17 @@ function SlotCard({ slot, selectedDate, onOpenContactBook }: { slot: any; select
                 <span className="text-[10px] text-muted-foreground/70 font-mono">{s.childStudentCode}</span>
               )}
               <span className="ml-auto flex items-center gap-1">
-                {s.status === "checked_in" ? (
-                  <>
-                    <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-checked-in-${s.bookingId}`}>
-                      <CheckCircle className="w-3 h-3" />
-                      已到
-                    </span>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button
-                          className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
-                          data-testid={`button-uncheck-${s.bookingId}`}
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                        </button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>確定要取消點名嗎？</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {s.childName} 的出席狀態將恢復為「待點名」，請確認是否為誤點。
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>返回</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => uncheckInMutation.mutate(s.bookingId)}
-                            className="bg-red-500 hover:bg-red-600"
-                            data-testid={`button-confirm-uncheck-${s.bookingId}`}
-                          >
-                            確認取消點名
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                ) : s.status === "absent" ? (
-                  <>
-                    <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full" data-testid={`badge-absent-${s.bookingId}`}>
-                      <UserX className="w-3 h-3" />
-                      未到
-                    </span>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button
-                          className="text-muted-foreground/50 hover:text-red-400 transition-colors p-0.5"
-                          data-testid={`button-unmark-absent-${s.bookingId}`}
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                        </button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>確定要取消未到標記嗎？</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {s.childName} 的狀態將恢復為「待點名」，請確認是否為誤標。
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>返回</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => uncheckInMutation.mutate(s.bookingId)}
-                            className="bg-red-500 hover:bg-red-600"
-                            data-testid={`button-confirm-unmark-absent-${s.bookingId}`}
-                          >
-                            確認取消
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-xs border-tiffany/30 text-tiffany hover:bg-tiffany/5"
-                      onClick={() => checkInMutation.mutate(s.bookingId)}
-                      disabled={checkInMutation.isPending || absentMutation.isPending || !canCheckIn}
-                      data-testid={`button-check-in-${s.bookingId}`}
-                    >
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      已到
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-xs border-red-300 text-red-500 hover:bg-red-50"
-                      onClick={() => absentMutation.mutate(s.bookingId)}
-                      disabled={checkInMutation.isPending || absentMutation.isPending || !canCheckIn}
-                      data-testid={`button-absent-${s.bookingId}`}
-                    >
-                      <UserX className="w-3 h-3 mr-1" />
-                      未到
-                    </Button>
-                  </div>
-                )}
+                {s.status === "absent" ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full" data-testid={`badge-absent-${s.bookingId}`}>
+                    <UserX className="w-3 h-3" />
+                    未到
+                  </span>
+                ) : s.status === "completed" ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full" data-testid={`badge-completed-${s.bookingId}`}>
+                    <CheckCircle className="w-3 h-3" />
+                    已完成
+                  </span>
+                ) : null}
               </span>
             </div>
           ))}
@@ -824,7 +645,7 @@ function DailyProgressCard({ coachId, date }: { coachId: number; date: string })
     if (prevIsComplete.current === false && record.isComplete === true) {
       toast({
         title: "今日課程紀錄已全部完成",
-        description: "點名與聯絡簿均已完成，辛苦了！",
+        description: "聯絡簿均已完成，辛苦了！",
       });
     }
     prevIsComplete.current = record.isComplete;
@@ -833,7 +654,6 @@ function DailyProgressCard({ coachId, date }: { coachId: number; date: string })
   if (isLoading) return <Skeleton className="h-16 w-full rounded-xl" />;
   if (!record || record.totalSlots === 0) return null;
 
-  const checkInPercent = Math.round((record.checkedInSlots / record.totalSlots) * 100);
   const contactBookPercent = Math.round((record.contactBookSlots / record.totalSlots) * 100);
 
   return (
@@ -851,32 +671,19 @@ function DailyProgressCard({ coachId, date }: { coachId: number; date: string })
           </>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-muted-foreground">點名進度</span>
-            <span className={record.checkedInSlots === record.totalSlots ? "text-green-600 font-medium" : "text-amber-600 font-medium"} data-testid="text-checkin-progress">
-              {record.checkedInSlots}/{record.totalSlots}
-            </span>
-          </div>
-          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${record.checkedInSlots === record.totalSlots ? "bg-green-500" : "bg-amber-400"}`} style={{ width: `${checkInPercent}%` }} />
-          </div>
+      <div>
+        <div className="flex items-center justify-between text-xs mb-1">
+          <span className="text-muted-foreground">聯絡簿進度</span>
+          <span className={record.contactBookSlots === record.totalSlots ? "text-green-600 font-medium" : "text-amber-600 font-medium"} data-testid="text-contactbook-progress">
+            {record.contactBookSlots}/{record.totalSlots}
+          </span>
         </div>
-        <div>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-muted-foreground">聯絡簿進度</span>
-            <span className={record.contactBookSlots === record.totalSlots ? "text-green-600 font-medium" : "text-amber-600 font-medium"} data-testid="text-contactbook-progress">
-              {record.contactBookSlots}/{record.totalSlots}
-            </span>
-          </div>
-          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${record.contactBookSlots === record.totalSlots ? "bg-green-500" : "bg-amber-400"}`} style={{ width: `${contactBookPercent}%` }} />
-          </div>
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${record.contactBookSlots === record.totalSlots ? "bg-green-500" : "bg-amber-400"}`} style={{ width: `${contactBookPercent}%` }} />
         </div>
       </div>
       {!record.isComplete && (
-        <p className="text-[10px] text-amber-600/80 mt-2">請務必在當天完成所有點名與聯絡簿填寫</p>
+        <p className="text-[10px] text-amber-600/80 mt-2">請務必在當天完成所有聯絡簿填寫</p>
       )}
     </div>
   );
@@ -1210,6 +1017,39 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
     ...students.filter((s: any) => s.status === "absent"),
   ];
 
+  // 今日未出席:標記缺席 + 後端同步以聯絡簿管道發 LINE 通知家長(課消已鎖定不退堂)
+  const absentMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/absent`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
+      toast({ title: "已標記未出席", description: "家長將收到未出席通知" });
+    },
+    onError: (error: any) => {
+      toast({ title: "標記失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const unmarkAbsentMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      await apiRequest("PATCH", `/api/coach/bookings/${bookingId}/unmark-absent`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/slots", slot.id, "students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/daily-record"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/overdue-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/monthly-records"] });
+      toast({ title: "已取消未出席標記" });
+    },
+    onError: (error: any) => {
+      toast({ title: "操作失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
   const effectiveActiveId = activeStudentId ?? sortedStudents[0]?.childId ?? null;
 
   const saveMutation = useMutation({
@@ -1346,11 +1186,55 @@ function ContactBookDialog({ slot, coachId, onClose }: { slot: any; coachId: num
               </div>
 
               {currentStudent.status === "absent" ? (
-                <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-3 text-sm text-red-600" data-testid={`absent-notice-${currentStudent.childId}`}>
-                  <UserX className="w-4 h-4 flex-shrink-0" />
-                  已標記為未到，無需填寫聯絡簿
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-3 text-sm text-red-600" data-testid={`absent-notice-${currentStudent.childId}`}>
+                    <UserX className="w-4 h-4 flex-shrink-0" />
+                    已標記為未到，無需填寫聯絡簿（家長已收到通知）
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-muted-foreground"
+                    onClick={() => unmarkAbsentMutation.mutate(currentStudent.bookingId)}
+                    disabled={unmarkAbsentMutation.isPending}
+                    data-testid={`button-unmark-absent-${currentStudent.childId}`}
+                  >
+                    誤標了？取消未出席標記
+                  </Button>
                 </div>
               ) : (<>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-red-300 text-red-500 hover:bg-red-50"
+                    disabled={absentMutation.isPending}
+                    data-testid={`button-mark-absent-${currentStudent.childId}`}
+                  >
+                    <UserX className="w-3.5 h-3.5 mr-1.5" />
+                    今日未出席
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>標記 {currentStudent.childName} 今日未出席？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      家長將立即收到 LINE 未出席通知。依規定課消已於課前 4 小時鎖定，堂數不退還。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>返回</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => absentMutation.mutate(currentStudent.bookingId)}
+                      className="bg-red-500 hover:bg-red-600"
+                      data-testid={`button-confirm-absent-${currentStudent.childId}`}
+                    >
+                      確認標記並通知家長
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <TextbookUnitSelector
                 childGrade={currentStudent.childGrade}
                 value={currentData.lessonUnit}
@@ -1834,54 +1718,27 @@ function ManualTab() {
           ),
         },
         {
-          id: "checkin",
-          title: "學生點名 — 標記已到",
-          icon: CheckCircle,
-          keywords: ["點名", "已到", "出席", "簽到", "check in"],
+          id: "attendance",
+          title: "出席規則與未出席標記",
+          icon: UserX,
+          keywords: ["出席", "未到", "缺席", "absent", "沒來", "點名", "課消", "4小時"],
           content: (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                上課前 <strong className="text-foreground">15 分鐘</strong>起，點名功能自動開放。每位學生旁會顯示「已到」和「未到」兩個按鈕。
+                系統不需點名：<strong className="text-foreground">有預約即視為出席</strong>，課消於
+                <strong className="text-foreground">課程開始前 4 小時</strong>鎖定（家長屆時起也無法取消預約）。
               </p>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>當學生到場後，點擊綠色 <strong className="text-foreground">「已到」</strong> 按鈕：</p>
+                <p>若學生當天沒有到場，請在 <strong className="text-foreground">填寫聯絡簿</strong> 時操作：</p>
                 <ul className="space-y-1 ml-4">
-                  <li className="flex gap-2"><span className="text-green-500">✓</span>按鈕變成綠色「已到」標籤</li>
-                  <li className="flex gap-2"><span className="text-green-500">✓</span>右下角出現「點名成功」提示</li>
-                  <li className="flex gap-2"><span className="text-green-500">✓</span>點名進度自動更新</li>
+                  <li className="flex gap-2"><span className="text-red-500 font-bold">•</span>切到該學生的分頁，點擊紅色 <strong className="text-foreground">「今日未出席」</strong> 按鈕</li>
+                  <li className="flex gap-2"><span className="text-red-500 font-bold">•</span>確認後家長會立即收到 LINE 未出席通知（含課消說明）</li>
+                  <li className="flex gap-2"><span className="text-red-500 font-bold">•</span>標記未出席的學生 <strong className="text-foreground">不需要填寫聯絡簿</strong></li>
                 </ul>
               </div>
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">待點名狀態：</p>
-                <img src="/manual/step5-restored.png" alt="待點名狀態" className="rounded-lg border border-gray-200 w-full" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">點名成功：</p>
-                <img src="/manual/step6-checked-in.png" alt="點名成功" className="rounded-lg border border-gray-200 w-full" />
-              </div>
-            </div>
-          ),
-        },
-        {
-          id: "absent",
-          title: "學生點名 — 標記未到",
-          icon: UserX,
-          keywords: ["未到", "缺席", "absent", "沒來", "取消點名"],
-          content: (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                如果學生沒有到場，點擊紅色 <strong className="text-foreground">「未到」</strong> 按鈕：
-              </p>
-              <ul className="space-y-1 ml-4 text-sm text-muted-foreground">
-                <li className="flex gap-2"><span className="text-red-500 font-bold">•</span>按鈕變成紅色「未到」標籤</li>
-                <li className="flex gap-2"><span className="text-red-500 font-bold">•</span>右下角出現「已標記未到」提示</li>
-                <li className="flex gap-2"><span className="text-red-500 font-bold">•</span>標記未到的學生 <strong className="text-foreground">不需要填寫聯絡簿</strong></li>
-              </ul>
-              <img src="/manual/step3-marked-absent.png" alt="標記未到" className="rounded-lg border border-gray-200 w-full" />
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                不小心按錯？點擊「未到」標籤旁的 X 按鈕，確認後即可恢復為待點名狀態。
+                不小心標錯？在該學生分頁點「取消未出席標記」即可恢復。未出席不影響課消（堂數已於課前 4 小時鎖定）。
               </div>
-              <img src="/manual/step4-unmark-dialog.png" alt="取消未到確認對話框" className="rounded-lg border border-gray-200 w-full" />
             </div>
           ),
         },
@@ -1893,7 +1750,7 @@ function ManualTab() {
           content: (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                完成點名後，請為每位 <strong className="text-foreground">已到</strong> 的學生填寫聯絡簿。
+                每堂課後，請為每位 <strong className="text-foreground">出席</strong> 的學生填寫聯絡簿。
               </p>
               <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground">
                 <li>在時段卡片中，點擊 <strong className="text-foreground">「填寫聯絡簿」</strong> 按鈕</li>
@@ -1935,7 +1792,7 @@ function ManualTab() {
           id: "daily-progress",
           title: "每日工作進度",
           icon: ClipboardCheck,
-          keywords: ["工作進度", "完成", "進度條", "點名進度", "聯絡簿進度"],
+          keywords: ["工作進度", "完成", "進度條", "聯絡簿進度"],
           content: (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1950,7 +1807,6 @@ function ManualTab() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    <tr><td className="px-3 py-2 font-medium">點名進度</td><td className="px-3 py-2 text-muted-foreground">所有學生都已標記「已到」或「未到」</td></tr>
                     <tr><td className="px-3 py-2 font-medium">聯絡簿進度</td><td className="px-3 py-2 text-muted-foreground">所有「已到」的學生都已填寫聯絡簿</td></tr>
                   </tbody>
                 </table>
@@ -2092,7 +1948,7 @@ function ManualTab() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     <tr><td className="px-3 py-2 font-medium">排課天數</td><td className="px-3 py-2 text-muted-foreground">該月有安排課程的總天數</td></tr>
-                    <tr><td className="px-3 py-2 font-medium">完成天數</td><td className="px-3 py-2 text-muted-foreground">點名和聯絡簿都已完成的天數</td></tr>
+                    <tr><td className="px-3 py-2 font-medium">完成天數</td><td className="px-3 py-2 text-muted-foreground">聯絡簿都已完成的天數</td></tr>
                     <tr><td className="px-3 py-2 font-medium">完成率</td><td className="px-3 py-2 text-muted-foreground">完成天數 / 排課天數 的百分比</td></tr>
                   </tbody>
                 </table>
@@ -2105,19 +1961,19 @@ function ManualTab() {
           id: "daily-status",
           title: "每日完成狀態",
           icon: CheckCircle,
-          keywords: ["每日", "完成狀態", "未完成", "點名完成", "聯絡簿完成"],
+          keywords: ["每日", "完成狀態", "未完成", "聯絡簿完成"],
           content: (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
                 摘要下方是每日工作明細列表，列出該月每天的完成狀態。
               </p>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex gap-2"><span className="text-amber-400 font-bold">•</span>每一天會顯示兩個指標：<strong className="text-foreground">點名</strong> 和 <strong className="text-foreground">聯絡簿</strong></li>
-                <li className="flex gap-2"><span className="text-amber-400 font-bold">•</span>兩項都完成：顯示綠色 <Badge className="bg-green-100 text-green-700 text-[10px]">完成</Badge></li>
+                <li className="flex gap-2"><span className="text-amber-400 font-bold">•</span>每一天會顯示 <strong className="text-foreground">聯絡簿</strong> 完成指標</li>
+                <li className="flex gap-2"><span className="text-amber-400 font-bold">•</span>完成：顯示綠色 <Badge className="bg-green-100 text-green-700 text-[10px]">完成</Badge></li>
                 <li className="flex gap-2"><span className="text-amber-400 font-bold">•</span>尚未完成：顯示黃色 <Badge className="bg-amber-100 text-amber-700 text-[10px]">未完成</Badge></li>
               </ul>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                請務必在當天完成所有點名與聯絡簿。
+                請務必在當天完成所有聯絡簿。
               </div>
             </div>
           ),
@@ -2263,14 +2119,14 @@ function ManualTab() {
           content: (
             <div className="space-y-4">
               {[
-                { q: "點名按鈕按不了，顯示灰色？", a: "點名功能會在上課前 15 分鐘自動開放。如果按鈕是灰色的，表示還沒到開放時間，請稍候。" },
-                { q: "不小心按錯「已到」或「未到」怎麼辦？", a: "點擊標籤旁邊的 X 按鈕，確認取消後即可恢復為待點名狀態，重新選擇即可。" },
+                { q: "還需要點名嗎？", a: "不需要。有預約即視為出席，課消於課程開始前 4 小時鎖定。若學生沒到場，請在聯絡簿中該學生分頁點「今日未出席」，家長會收到 LINE 通知。" },
+                { q: "不小心標錯「未出席」怎麼辦？", a: "在聯絡簿中切到該學生分頁，點「取消未出席標記」即可恢復。" },
                 { q: "學生沒來上課，需要填聯絡簿嗎？", a: "不需要。標記為「未到」的學生不需要填寫聯絡簿，不會影響每日工作完成度。" },
                 { q: "下課後忘記填聯絡簿怎麼辦？", a: "聯絡簿可以在課程結束後補填。但建議盡早完成，這樣家長才能即時看到上課紀錄。" },
                 { q: "忘記密碼怎麼辦？", a: "請聯繫您的分校主任，主任可以在後台為您重設密碼。" },
                 { q: "可以在手機上操作嗎？", a: "可以。老師系統支援手機瀏覽器，操作方式和電腦版相同。" },
                 { q: "如何查看過去學生的上課紀錄？", a: "切換到「我的學生」分頁，搜尋學生後點擊卡片，即可查看該學生的完整學習歷程。" },
-                { q: "工作記錄的完成率會影響什麼？", a: "完成率反映您每日點名和聯絡簿的完成狀況，建議維持 100% 完成率。" },
+                { q: "工作記錄的完成率會影響什麼？", a: "完成率反映您每日聯絡簿的完成狀況，建議維持 100% 完成率。" },
               ].map((item, i) => (
                 <div key={i} className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="bg-gray-50 px-4 py-2.5">
@@ -2319,7 +2175,7 @@ function ManualTab() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="搜尋功能說明（例如：點名、聯絡簿、密碼...）"
+            placeholder="搜尋功能說明（例如：出席、聯絡簿、密碼...）"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-tiffany/30 focus:border-tiffany transition-colors"

@@ -658,6 +658,59 @@ export function buildContactBookFlex(params: {
   };
 }
 
+// 今日未出席通知(聯絡簿管道發送;課消於課前 4 小時已鎖定,不退堂)
+export function buildAbsenceFlex(params: {
+  childName: string;
+  teacher: string;
+  date: string;
+  time: string;
+}): { altText: string; contents: object } {
+  return {
+    altText: `⚠️ 出席通知：${params.childName} 今日未出席課程`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#C62828",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              { type: "text", text: "⚠️  出席通知", color: "#FFFFFF", size: "sm", weight: "bold", flex: 1 },
+            ],
+          },
+          { type: "text", text: "老師回報孩子未出席今日課程", color: "#FFFFFFBB", size: "xxs", margin: "xs" },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "12px",
+        contents: [
+          infoRow("孩子", params.childName, "#C62828"),
+          separator(),
+          infoRow("📅 日期", params.date),
+          infoRow("🕐 時段", params.time),
+          infoRow("👩‍🏫 老師", params.teacher),
+          separator(),
+          {
+            type: "text",
+            text: "本堂課依規定已完成課消（課程開始前 4 小時鎖定）。若有特殊情況，請直接聯繫教室。",
+            color: "#888888",
+            size: "xs",
+            wrap: true,
+          },
+        ],
+      },
+    },
+  };
+}
+
 export interface CoachWelcomeConfig {
   altText?: string;
   headerTitle?: string;

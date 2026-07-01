@@ -1695,11 +1695,16 @@ function BookingFlowTab() {
     const taiwanStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
     return new Date(taiwanStr + "T00:00:00+08:00");
   };
-  const isSlotTooSoon = (dateStr: string) => {
+  // 預約截止 = 課程開始前 4 小時(與後端 POST /api/bookings 一致)
+  const isSlotTooSoon = (dateStr: string, startTime: string) => {
+    const slotStart = new Date(`${dateStr}T${startTime}:00+08:00`);
+    return slotStart.getTime() - Date.now() < 4 * 60 * 60 * 1000;
+  };
+  // 日期層級:整天已過才視為不可選;當天各時段再依 4 小時個別判斷
+  const isDateTooSoon = (dateStr: string) => {
     const taiwanToday = getTaiwanToday();
     const slotDate = new Date(dateStr + "T00:00:00+08:00");
-    const diffDays = Math.floor((slotDate.getTime() - taiwanToday.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays < 3;
+    return slotDate.getTime() < taiwanToday.getTime();
   };
 
   const slots = detail?.timeSlots || [];
@@ -1707,7 +1712,7 @@ function BookingFlowTab() {
 
   useEffect(() => {
     if (allDates.length > 0 && !autoAdvanced) {
-      const firstBookable = allDates.find((d) => !isSlotTooSoon(d));
+      const firstBookable = allDates.find((d) => !isDateTooSoon(d));
       if (firstBookable) {
         const now = new Date();
         const taiwanStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
@@ -2194,7 +2199,7 @@ function BookingFlowTab() {
               {datesInWeek.length > 0 && (
                 <div className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1">
                   {datesInWeek.map((date) => {
-                    const tooSoon = isSlotTooSoon(date);
+                    const tooSoon = isDateTooSoon(date);
                     return (
                     <button
                       key={date}
@@ -2238,7 +2243,7 @@ function BookingFlowTab() {
                   {filteredSlots.map((slot) => {
                     const available = slot.maxSeats - slot.bookedSeats;
                     const coach = detail.coaches.find((c) => c.id === slot.coachId);
-                    const tooSoon = isSlotTooSoon(slot.date);
+                    const tooSoon = isSlotTooSoon(slot.date, slot.startTime);
                     const canBook = available > 0 && !tooSoon;
                     return (
                       <div
@@ -2306,7 +2311,7 @@ function BookingFlowTab() {
                             style={canBook ? { backgroundColor: "#81D8D0", color: "white" } : {}}
                             data-testid={`button-book-${slot.id}`}
                           >
-                            {tooSoon ? "需提前 3 天" : available > 0 ? "預約" : "已滿"}
+                            {tooSoon ? "已截止" : available > 0 ? "預約" : "已滿"}
                           </Button>
                         </div>
                       </div>
@@ -3449,15 +3454,28 @@ function BookingsTab({ highlightBookingId }: { highlightBookingId?: number | nul
                           </div>
                         </div>
 
-                        {booking.status === "confirmed" && (
-                          <button
-                            onClick={() => setCancelTarget(booking)}
-                            className="text-xs text-muted-foreground hover:text-red-500 transition-colors p-1.5 flex-shrink-0"
-                            data-testid={`button-cancel-booking-${booking.id}`}
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
+                        {booking.status === "confirmed" && (() => {
+                          // 課前 4 小時內鎖定課消:取消按鈕直接禁用(與後端規則一致)
+                          const locked = booking.slotDate && booking.slotStartTime
+                            ? new Date(`${booking.slotDate}T${booking.slotStartTime}:00+08:00`).getTime() - Date.now() < 4 * 60 * 60 * 1000
+                            : false;
+                          return locked ? (
+                            <span
+                              className="text-[10px] text-muted-foreground/60 p-1.5 flex-shrink-0"
+                              data-testid={`text-cancel-locked-${booking.id}`}
+                            >
+                              已鎖定
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setCancelTarget(booking)}
+                              className="text-xs text-muted-foreground hover:text-red-500 transition-colors p-1.5 flex-shrink-0"
+                              data-testid={`button-cancel-booking-${booking.id}`}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

@@ -190,9 +190,8 @@ export interface IStorage {
   getCoachSlots(coachId: number, year: number, month: number): Promise<any[]>;
   getTimeSlot(id: number): Promise<any | undefined>;
   getSlotStudents(slotId: number): Promise<any[]>;
-  checkInBooking(id: number, coachId: number): Promise<void>;
   markAbsentBooking(id: number, coachId: number): Promise<void>;
-  uncheckInBooking(id: number, coachId: number): Promise<void>;
+  unmarkAbsentBooking(id: number, coachId: number): Promise<void>;
   getCoachDailyRecord(coachId: number, date: string): Promise<any>;
   updateCoachDailyRecord(coachId: number, date: string): Promise<CoachDailyRecord>;
   getCoachMonthlyRecords(coachId: number, year: number, month: number): Promise<CoachDailyRecord[]>;
@@ -2048,25 +2047,8 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async checkInBooking(id: number, coachId: number): Promise<void> {
-    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
-    if (!booking) throw new Error("預約不存在");
-    if (!["confirmed", "completed"].includes(booking.status)) throw new Error("此預約狀態無法點名");
-    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
-    if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
-
-    const now = new Date();
-    const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
-    const earliestCheckIn = new Date(slotStart.getTime() - 15 * 60 * 1000);
-
-    if (now < earliestCheckIn) {
-      const startTimeStr = slot.startTime;
-      throw new Error(`尚未到點名時間，請於 ${startTimeStr} 前 15 分鐘再進行點名`);
-    }
-
-    await db.update(bookings).set({ status: "checked_in" }).where(eq(bookings.id, id));
-  }
-
+  // 點名功能已移除:出席以預約為準,課消於課前 4 小時鎖定。
+  // 「未出席」僅供記錄與通知家長(從聯絡簿操作),不影響課消。
   async markAbsentBooking(id: number, coachId: number): Promise<void> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) throw new Error("預約不存在");
@@ -2076,20 +2058,17 @@ export class DatabaseStorage implements IStorage {
 
     const now = new Date();
     const slotStart = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
-    const earliestCheckIn = new Date(slotStart.getTime() - 15 * 60 * 1000);
-
-    if (now < earliestCheckIn) {
-      const startTimeStr = slot.startTime;
-      throw new Error(`尚未到點名時間，請於 ${startTimeStr} 前 15 分鐘再進行點名`);
+    if (now < slotStart) {
+      throw new Error(`課程尚未開始（${slot.startTime}），課程開始後才能標記未出席`);
     }
 
     await db.update(bookings).set({ status: "absent" }).where(eq(bookings.id, id));
   }
 
-  async uncheckInBooking(id: number, coachId: number): Promise<void> {
+  async unmarkAbsentBooking(id: number, coachId: number): Promise<void> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) throw new Error("預約不存在");
-    if (booking.status !== "checked_in" && booking.status !== "absent") throw new Error("只有已點名或已標記未到的預約可以取消");
+    if (booking.status !== "absent") throw new Error("此預約未被標記為未出席");
     const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, booking.slotId));
     if (!slot || slot.coachId !== coachId) throw new Error("此預約不屬於您的時段");
 
@@ -2139,7 +2118,8 @@ export class DatabaseStorage implements IStorage {
     }
 
     const totalSlots = coachSlots.length;
-    const isComplete = checkedInSlots === totalSlots && contactBookSlots === totalSlots;
+    // 點名已移除:完成度僅以聯絡簿為準(checkedInSlots 保留於回傳供舊 UI 相容)
+    const isComplete = contactBookSlots === totalSlots;
 
     const [existing] = await db.select().from(coachDailyRecords)
       .where(and(eq(coachDailyRecords.coachId, coachId), eq(coachDailyRecords.date, date)));
@@ -2361,7 +2341,8 @@ export class DatabaseStorage implements IStorage {
     const totalSlots = perCoach.reduce((s, r) => s + r.totalSlots, 0);
     const checkedInSlots = perCoach.reduce((s, r) => s + r.checkedInSlots, 0);
     const contactBookSlots = perCoach.reduce((s, r) => s + r.contactBookSlots, 0);
-    const isComplete = totalSlots > 0 && checkedInSlots === totalSlots && contactBookSlots === totalSlots;
+    // 點名已移除:完成度僅以聯絡簿為準(與 getCoachDailyRecord 一致)
+    const isComplete = totalSlots > 0 && contactBookSlots === totalSlots;
     return { totalSlots, checkedInSlots, contactBookSlots, isComplete, date };
   }
 
@@ -2386,7 +2367,8 @@ export class DatabaseStorage implements IStorage {
         existing.totalSlots += r.totalSlots;
         existing.checkedInSlots += r.checkedInSlots;
         existing.contactBookSlots += r.contactBookSlots;
-        existing.isComplete = existing.totalSlots > 0 && existing.checkedInSlots === existing.totalSlots && existing.contactBookSlots === existing.totalSlots;
+        // 點名已移除:完成度僅以聯絡簿為準(與 getCoachDailyRecord 一致)
+        existing.isComplete = existing.totalSlots > 0 && existing.contactBookSlots === existing.totalSlots;
       }
     }
     return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));

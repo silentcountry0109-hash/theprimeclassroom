@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage, CREDIT_REFUND_UNIT_PRICE } from "./storage";
 import { authStorage, LineIdAlreadyBoundError } from "./replit_integrations/auth/storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken, buildCoachNewBookingFlex, buildCoachCancelFlex, buildLowCreditsFlex, buildNoCreditsFlex, buildTeacherScheduleChangeFlex } from "./line";
+import { sendLineMessage, sendLineReply, sendLineReplyFlex, sendLineFlexMessage, sendLineFlexMessages, buildBookingSuccessFlex, buildRecurringBookingFlex, buildManualBookingFlex, buildContactBookFlex, buildAbsenceFlex, buildPreClassReminderFlex, buildCourseCancelFlex, buildWelcomeBindingFlex, buildParentWelcomeFlex, buildNewVisitorWelcomeFlex, getLineToken, buildCoachNewBookingFlex, buildCoachCancelFlex, buildLowCreditsFlex, buildNoCreditsFlex, buildTeacherScheduleChangeFlex } from "./line";
 import { seedDatabase } from "./seed";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -1484,12 +1484,11 @@ export async function registerRoutes(
       if (!slot) {
         return res.status(404).json({ message: "時段不存在" });
       }
-      const taiwanTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
-      const taiwanToday = new Date(taiwanTodayStr + "T00:00:00+08:00");
-      const slotDate = new Date(slot.date + "T00:00:00+08:00");
-      const diffDays = Math.round((slotDate.getTime() - taiwanToday.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays < 3) {
-        return res.status(400).json({ message: "需於 3 天前預約課程（最早可預約 3 天後的時段）" });
+      // 預約截止 = 課程開始前 4 小時(與取消門檻一致;過門檻即鎖定課消)。
+      const slotStartAt = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
+      const hoursUntilStart = (slotStartAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      if (hoursUntilStart < 4) {
+        return res.status(400).json({ message: "課程開始前 4 小時內無法預約，請選擇較晚的時段" });
       }
       const balance = await storage.getParentBalance(userId);
       if (balance < 1) {
@@ -1600,8 +1599,6 @@ export async function registerRoutes(
       if (!kids.find((k: any) => k.id === childId)) {
         return res.status(403).json({ message: "無權限為此孩子預約" });
       }
-      const taiwanTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
-      const taiwanToday = new Date(taiwanTodayStr + "T00:00:00+08:00");
       const balance = await storage.getParentBalance(userId);
       if (balance < slotIds.length) {
         return res.status(400).json({ message: `堂數不足（目前剩餘 ${balance} 堂，需要 ${slotIds.length} 堂）`, code: "INSUFFICIENT_CREDITS", currentBalance: balance, required: slotIds.length });
@@ -1626,10 +1623,10 @@ export async function registerRoutes(
             results.push({ slotId, success: false, message: "時段不存在" });
             continue;
           }
-          const slotDate = new Date(slot.date + "T00:00:00+08:00");
-          const diffDays = Math.round((slotDate.getTime() - taiwanToday.getTime()) / (1000 * 60 * 60 * 24));
-          if (diffDays < 3) {
-            results.push({ slotId, success: false, message: "需於 3 天前預約課程" });
+          // 預約截止 = 課程開始前 4 小時(與單筆預約、取消門檻一致)。
+          const slotStartAt = new Date(`${slot.date}T${slot.startTime}:00+08:00`);
+          if ((slotStartAt.getTime() - Date.now()) / (1000 * 60 * 60) < 4) {
+            results.push({ slotId, success: false, message: "課程開始前 4 小時內無法預約" });
             continue;
           }
           // 每筆預約：建立 + 扣 1 點綁同一筆交易，逐筆維持一致（某筆失敗不留殘留）。
@@ -3083,83 +3080,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/franchise-admin/adjust-credits", isFranchiseAdmin, async (req: any, res) => {
-    try {
-      const { parentId, packageId, credits, description } = req.body;
-      if (!parentId) return res.status(400).json({ message: "請選擇家長" });
-
-      const franchise = await storage.getFranchise(req.franchiseId);
-      const franchiseName = franchise?.name || `分校 #${req.franchiseId}`;
-      const adminName = [req.currentUser.lastName, req.currentUser.firstName].filter(Boolean).join("") || req.currentUser.username || "分校主任";
-
-      let paidCredits = credits;
-      let bonusCredits = 0;
-      let expiresAt: Date | null = null;
-      let bonusExpiresAt: Date | null = null;
-      let finalAmount = 0;
-      let pkgId = packageId || null;
-
-      if (packageId) {
-        const packages = await storage.getCreditPackages();
-        const pkg = packages.find(p => p.id === packageId);
-        if (!pkg) return res.status(400).json({ message: "方案不存在" });
-        paidCredits = pkg.credits;
-        bonusCredits = pkg.bonusCredits || 0;
-        finalAmount = pkg.price;
-        if (pkg.expiryDays) expiresAt = new Date(Date.now() + pkg.expiryDays * 86400 * 1000);
-        if (bonusCredits > 0) {
-          bonusExpiresAt = pkg.bonusExpiryDays
-            ? new Date(Date.now() + pkg.bonusExpiryDays * 86400 * 1000)
-            : expiresAt;
-        }
-      }
-
-      if (!paidCredits || paidCredits <= 0) return res.status(400).json({ message: "堂數必須大於 0" });
-
-      const baseDesc = description?.trim() || "分校主任手動加點";
-      const fullDesc = `${baseDesc}｜${franchiseName} · ${adminName}`;
-
-      const purchase = await storage.createCreditPurchase({
-        parentId,
-        packageId: pkgId,
-        credits: paidCredits,
-        originalAmount: finalAmount,
-        discountAmount: 0,
-        finalAmount,
-        paymentMethod: "manual",
-        paymentStatus: "paid",
-        expiresAt,
-      });
-
-      const balance = await storage.addCredits(parentId, purchase.id, paidCredits, expiresAt, "paid");
-      await storage.createCreditTransaction({
-        parentId,
-        type: "franchise_admin_adjust",
-        credits: paidCredits,
-        balanceId: balance.id,
-        purchaseId: purchase.id,
-        description: `${fullDesc}（付費 ${paidCredits} 堂）`,
-      });
-
-      if (bonusCredits > 0) {
-        const bonusBalance = await storage.addCredits(parentId, purchase.id, bonusCredits, bonusExpiresAt, "bonus");
-        await storage.createCreditTransaction({
-          parentId,
-          type: "franchise_admin_adjust",
-          credits: bonusCredits,
-          balanceId: bonusBalance.id,
-          purchaseId: purchase.id,
-          description: `${fullDesc}（加贈 ${bonusCredits} 堂${bonusExpiresAt ? `，${bonusExpiresAt.toLocaleDateString("zh-TW")} 到期` : ""}）`,
-        });
-      }
-
-      const newBalance = await storage.getParentBalance(parentId);
-      res.json({ success: true, purchase, newBalance });
-    } catch (error: any) {
-      console.error("[franchise-admin/adjust-credits] error:", error);
-      res.status(500).json({ message: error.message || "加點失敗" });
-    }
-  });
+  // 分校主任贈點功能已移除(2026-07):加點/調帳一律由總部 /api/admin/adjust-credits 處理。
 
   app.post("/api/franchise-admin/manual-booking", isFranchiseAdmin, async (req: any, res) => {
     try {
@@ -3537,22 +3458,8 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/coach/bookings/:id/check-in", isCoach, async (req: any, res) => {
-    try {
-      const bookingId = parseInt(req.params.id);
-      const booking = await storage.getBooking(bookingId);
-      const slot = booking ? await storage.getTimeSlot(booking.slotId) : null;
-      const effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
-      await storage.checkInBooking(bookingId, effectiveCoachId);
-      if (slot) {
-        await storage.updateCoachDailyRecord(effectiveCoachId, slot.date);
-      }
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message || "點名失敗" });
-    }
-  });
-
+  // 點名功能已移除(出席以預約為準,課消於課前 4 小時鎖定)。
+  // 「未出席」改由聯絡簿操作:標記 + 以聯絡簿管道同步通知家長,不影響課消。
   app.patch("/api/coach/bookings/:id/absent", isCoach, async (req: any, res) => {
     try {
       const bookingId = parseInt(req.params.id);
@@ -3563,25 +3470,43 @@ export async function registerRoutes(
       if (slot) {
         await storage.updateCoachDailyRecord(effectiveCoachId, slot.date);
       }
+      // 通知家長:今日未出席(課消已鎖定不退堂,訊息中一併說明)
+      try {
+        if (booking?.childId && slot) {
+          const [childRow] = await db.select({ parentId: children.parentId, name: children.name }).from(children).where(eq(children.id, booking.childId));
+          if (childRow?.parentId) {
+            const [parentUser] = await db.select({ lineUserId: users.lineUserId }).from(users).where(eq(users.id, childRow.parentId));
+            if (parentUser?.lineUserId) {
+              const flex = buildAbsenceFlex({
+                childName: childRow.name,
+                teacher: req.coach.name,
+                date: slot.date,
+                time: `${slot.startTime}-${slot.endTime}`,
+              });
+              await sendLineFlexMessage(parentUser.lineUserId, flex.altText, flex.contents);
+            }
+          }
+        }
+      } catch (e) { console.error("[LINE] 未出席通知發送失敗:", e); }
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "標記未到失敗" });
     }
   });
 
-  app.patch("/api/coach/bookings/:id/uncheck-in", isCoach, async (req: any, res) => {
+  app.patch("/api/coach/bookings/:id/unmark-absent", isCoach, async (req: any, res) => {
     try {
       const bookingId = parseInt(req.params.id);
       const booking = await storage.getBooking(bookingId);
       const slot = booking ? await storage.getTimeSlot(booking.slotId) : null;
       const effectiveCoachId = slot?.coachId && req.coachIds.includes(slot.coachId) ? slot.coachId : req.coach.id;
-      await storage.uncheckInBooking(bookingId, effectiveCoachId);
+      await storage.unmarkAbsentBooking(bookingId, effectiveCoachId);
       if (slot) {
         await storage.updateCoachDailyRecord(effectiveCoachId, slot.date);
       }
       res.json({ success: true });
     } catch (error: any) {
-      res.status(400).json({ message: error.message || "取消點名失敗" });
+      res.status(400).json({ message: error.message || "取消未到標記失敗" });
     }
   });
 
