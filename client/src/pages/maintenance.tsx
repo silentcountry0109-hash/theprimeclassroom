@@ -44,6 +44,30 @@ export default function Maintenance() {
 
         <div
           style={{
+            background: "#EAF6F4", border: "1px solid #CDEBE7", borderRadius: 14, padding: "18px 20px",
+            margin: "26px 0 0", textAlign: "center",
+          }}
+        >
+          <div style={{ color: "#2F8F86", fontSize: 12.5, letterSpacing: "0.08em", marginBottom: 9 }}>開放提前註冊</div>
+          <div style={{ fontSize: 14.5, lineHeight: 1.9, color: "#3B6B65" }}>
+            想在 7／3 一開放就直接使用嗎？現在起即可先完成{" "}
+            <span style={{ ...serif, color: "#2F8F86" }}>LINE 註冊、綁定手機、新增孩子</span>，<br />
+            屆時孩子的堂數會自動就緒。
+          </div>
+          <a
+            href="/parent-login"
+            data-testid="maintenance-register-cta"
+            style={{
+              display: "inline-block", marginTop: 15, background: "#2F8F86", color: "#FFFFFF",
+              ...serif, fontSize: 15, letterSpacing: "0.08em", padding: "11px 34px", borderRadius: 999, textDecoration: "none",
+            }}
+          >
+            立即前往註冊
+          </a>
+        </div>
+
+        <div
+          style={{
             background: "#FFF9E5", border: "1px solid #F1E6BE", borderRadius: 14, padding: "17px 20px",
             margin: "26px 0 8px", textAlign: "center",
           }}
