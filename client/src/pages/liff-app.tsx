@@ -7,6 +7,8 @@ import { useLiff } from "@/hooks/use-liff";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OverviewTab } from "@/components/parent/tabs/OverviewTab";
+import { ContactBookTab } from "@/components/parent/tabs/ContactBookTab";
 import {
   Home,
   CalendarPlus,
@@ -66,19 +68,6 @@ interface CreditPackage {
   isActive: boolean;
 }
 interface PromotionItem { id: number; title: string; description?: string; }
-interface ContactBookItem {
-  id: number;
-  childId: number;
-  childName?: string;
-  lessonDate: string;
-  lessonUnit: string;
-  coachName: string;
-  homework?: string | null;
-  performance?: string | null;
-  quizScore?: number | null;
-  quizTotal?: number | null;
-  teacherComment?: string | null;
-}
 
 const TABS = [
   { id: "overview", label: "首頁", icon: Home, path: "/liff" },
@@ -91,10 +80,15 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 function getTabFromPath(path: string): TabId {
+  // 別名(圖文選單/深連結用):bookings→schedule、wallet/shop→credits。
+  // bookings 必須先於 book 判斷("/liff/bookings".startsWith("/liff/book") 為真)。
+  if (path.startsWith("/liff/bookings")) return "schedule";
   if (path.startsWith("/liff/book")) return "book";
   if (path.startsWith("/liff/schedule")) return "schedule";
   if (path.startsWith("/liff/contact-book")) return "contact-book";
   if (path.startsWith("/liff/credits")) return "credits";
+  if (path.startsWith("/liff/wallet")) return "credits";
+  if (path.startsWith("/liff/shop")) return "credits";
   return "overview";
 }
 
@@ -109,6 +103,20 @@ function LiffShell({
 }) {
   const [location, setLocation] = useLocation();
   const activeTab = getTabFromPath(location);
+
+  // 共用元件用正規 tab id 導覽;此處對應回 /liff/* 路徑(LIFF 無 children/shop tab)。
+  const liffNavigate = (tab: string) => {
+    const map: Record<string, string> = {
+      overview: "/liff",
+      book: "/liff/book",
+      bookings: "/liff/schedule",
+      credits: "/liff/credits",
+      "contact-book": "/liff/contact-book",
+      children: "/liff",
+      shop: "/liff/credits",
+    };
+    setLocation(map[tab] ?? "/liff");
+  };
 
   return (
     <div className="min-h-screen bg-washi flex flex-col" data-testid="liff-shell">
@@ -130,10 +138,12 @@ function LiffShell({
 
       <main className="flex-1 overflow-y-auto pb-20">
         <div className="max-w-md mx-auto px-4 py-4">
-          {activeTab === "overview" && <OverviewTab user={user} onNav={setLocation} />}
+          {activeTab === "overview" && (
+            <OverviewTab user={user} navigate={liffNavigate} enableShop={false} enableChildrenTab={false} />
+          )}
           {activeTab === "book" && <BookTab />}
           {activeTab === "schedule" && <ScheduleTab />}
-          {activeTab === "contact-book" && <ContactBookTab />}
+          {activeTab === "contact-book" && <ContactBookTab enableLearningSummary={false} />}
           {activeTab === "credits" && <CreditsTab openExternal={openExternal} />}
         </div>
       </main>
@@ -166,117 +176,6 @@ function LiffShell({
   );
 }
 
-function OverviewTab({ user, onNav }: { user: any; onNav: (path: string) => void }) {
-  const { data: bookings = [] } = useQuery<BookingItem[]>({ queryKey: ["/api/bookings"] });
-  const { data: children = [] } = useQuery<Child[]>({ queryKey: ["/api/children"] });
-  const { data: wallet } = useQuery<WalletData>({ queryKey: ["/api/parent/wallet"] });
-
-  const upcoming = bookings
-    .filter((b) => (b.status === "confirmed" || b.status === "checked_in") && b.slotDate)
-    .sort((a, b) => `${a.slotDate} ${a.slotStartTime}`.localeCompare(`${b.slotDate} ${b.slotStartTime}`));
-  const next = upcoming[0];
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground" data-testid="text-overview-greeting">
-          您好，{user.firstName || "家長"}
-        </h1>
-        <p className="text-sm text-muted-foreground">在 LINE 內快速管理孩子的課程</p>
-      </div>
-
-      <div className="bg-gradient-to-br from-tiffany/10 to-tiffany/5 rounded-2xl border border-tiffany/20 p-4" data-testid="card-credits-summary">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">剩餘點數</p>
-            <p className="text-3xl font-bold text-tiffany" data-testid="text-overview-balance">
-              {wallet?.balance ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">堂</p>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => onNav("/liff/credits")}
-            className="rounded-full"
-            style={{ backgroundColor: "#81D8D0", color: "white" }}
-            data-testid="button-overview-buy-credits"
-          >
-            購買點數
-          </Button>
-        </div>
-        {wallet?.expiringBalances?.[0] && (
-          <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1" data-testid="text-overview-expiring">
-            <AlertCircle className="w-3 h-3" />
-            {wallet.expiringBalances[0].credits} 堂將於 {wallet.expiringBalances[0].daysLeft} 天後到期
-          </p>
-        )}
-      </div>
-
-      {next ? (
-        <div className="space-y-2" data-testid="card-upcoming-list">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-tiffany font-medium">近期即將上課</p>
-            <button onClick={() => onNav("/liff/schedule")} className="text-xs text-muted-foreground flex items-center gap-0.5" data-testid="link-view-all-schedule">
-              查看全部 <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-          {upcoming.slice(0, 3).map((b, idx) => (
-            <button
-              key={b.id}
-              onClick={() => onNav("/liff/schedule")}
-              className="w-full text-left bg-white rounded-2xl border border-tiffany/20 p-3.5"
-              data-testid={`card-upcoming-${idx}`}
-            >
-              <p className="text-sm font-semibold text-foreground" data-testid={`text-upcoming-name-${idx}`}>
-                {b.franchiseName || "教室"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {b.slotDate} {b.slotStartTime?.slice(0, 5)}–{b.slotEndTime?.slice(0, 5)}
-                {b.coachName ? ` · ${b.coachName} 老師` : ""}
-              </p>
-              {b.childName && <p className="text-[11px] text-muted-foreground mt-0.5">學生：{b.childName}</p>}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center" data-testid="card-no-upcoming">
-          <CalendarDays className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground mb-3">目前沒有預約的課程</p>
-          <Button
-            size="sm"
-            onClick={() => onNav("/liff/book")}
-            className="rounded-full"
-            style={{ backgroundColor: "#81D8D0", color: "white" }}
-            data-testid="button-overview-book"
-          >
-            立即預約
-          </Button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => onNav("/liff/schedule")}
-          className="bg-white rounded-xl border border-gray-100 p-4 text-left hover:border-tiffany/30 transition"
-          data-testid="card-stat-upcoming"
-        >
-          <CalendarDays className="w-5 h-5 text-tiffany mb-2" />
-          <p className="text-xl font-bold text-foreground">{upcoming.length}</p>
-          <p className="text-xs text-muted-foreground">即將上課</p>
-        </button>
-        <button
-          onClick={() => onNav("/liff/contact-book")}
-          className="bg-white rounded-xl border border-gray-100 p-4 text-left hover:border-tiffany/30 transition"
-          data-testid="card-stat-children"
-        >
-          <BookOpen className="w-5 h-5 text-coral mb-2" />
-          <p className="text-xl font-bold text-foreground">{children.length}</p>
-          <p className="text-xs text-muted-foreground">位孩子</p>
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function BookTab() {
   const { toast } = useToast();
@@ -775,115 +674,6 @@ function ScheduleTab() {
   );
 }
 
-function ContactBookTab() {
-  const { data: children = [] } = useQuery<Child[]>({ queryKey: ["/api/children"] });
-  const { data: books = [], isLoading } = useQuery<ContactBookItem[]>({
-    queryKey: ["/api/parent/contact-books"],
-  });
-  const [selectedChildId, setSelectedChildId] = useState<string>("all");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  const filtered = useMemo(() => {
-    if (selectedChildId === "all") return books;
-    return books.filter((b) => b.childId === parseInt(selectedChildId));
-  }, [books, selectedChildId]);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">聯絡簿</h1>
-          <p className="text-sm text-muted-foreground">老師於課後填寫的學習紀錄</p>
-        </div>
-      </div>
-
-      {children.length > 1 && (
-        <div className="flex gap-1.5 overflow-x-auto pb-1" data-testid="contact-book-child-tabs">
-          <button
-            onClick={() => setSelectedChildId("all")}
-            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full ${
-              selectedChildId === "all"
-                ? "bg-tiffany text-white"
-                : "bg-white text-muted-foreground border border-gray-200"
-            }`}
-            data-testid="tab-child-all"
-          >
-            全部
-          </button>
-          {children.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedChildId(c.id.toString())}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full ${
-                selectedChildId === c.id.toString()
-                  ? "bg-tiffany text-white"
-                  : "bg-white text-muted-foreground border border-gray-200"
-              }`}
-              data-testid={`tab-child-${c.id}`}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-xl border p-8 text-center" data-testid="contact-book-empty">
-          <BookOpen className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">目前還沒有聯絡簿紀錄</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((b) => {
-            const isExpanded = expandedId === b.id;
-            const hasScore = b.quizScore != null && b.quizTotal;
-            return (
-              <button
-                key={b.id}
-                onClick={() => setExpandedId(isExpanded ? null : b.id)}
-                className="w-full text-left bg-white rounded-xl border border-gray-100 p-3.5 transition hover:border-tiffany/30"
-                data-testid={`contact-book-card-${b.id}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground truncate" data-testid={`text-cb-unit-${b.id}`}>
-                      {b.lessonUnit}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {b.lessonDate}{b.childName ? ` · ${b.childName}` : ""}{b.coachName ? ` · ${b.coachName} 老師` : ""}
-                    </p>
-                  </div>
-                  {hasScore && (
-                    <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full flex-shrink-0">
-                      {b.quizScore}/{b.quizTotal}
-                    </span>
-                  )}
-                </div>
-                {isExpanded && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 space-y-2 text-xs" data-testid={`contact-book-expanded-${b.id}`}>
-                    {b.performance && (
-                      <div><span className="font-medium text-foreground">上課表現：</span><span className="text-muted-foreground">{b.performance}</span></div>
-                    )}
-                    {b.homework && (
-                      <div><span className="font-medium text-foreground">作業：</span><span className="text-muted-foreground">{b.homework}</span></div>
-                    )}
-                    {b.teacherComment && (
-                      <div><span className="font-medium text-foreground">老師評語：</span><span className="text-muted-foreground">{b.teacherComment}</span></div>
-                    )}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function CreditsTab({ openExternal }: { openExternal: (url: string) => void }) {
   const { toast } = useToast();
