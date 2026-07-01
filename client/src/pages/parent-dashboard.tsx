@@ -232,6 +232,10 @@ export default function ParentDashboard() {
   const user = credUser || replitUser;
   const isCredentialUser = !!credUser;
 
+  // 維修窗口期(7/1–7/2):dashboard 僅開放「我的孩子」tab,其餘功能 7/3 開放。
+  const { data: maint } = useQuery<{ enabled: boolean }>({ queryKey: ["/api/maintenance"], staleTime: 60_000 });
+  const maintenanceMode = !!maint?.enabled;
+
   useEffect(() => {
     if (!isLoading && user && localStorage.getItem("newlyRegistered") === "true") {
       localStorage.removeItem("newlyRegistered");
@@ -270,6 +274,10 @@ export default function ParentDashboard() {
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (maintenanceMode) setActiveTab("children");
+  }, [maintenanceMode]);
 
   const { data: welcomeChildren = [] } = useQuery<any[]>({
     queryKey: ["/api/children"],
@@ -524,7 +532,7 @@ export default function ParentDashboard() {
 
         <div className="max-w-5xl mx-auto px-4">
           <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
-            {TAB_ITEMS.map((item) => (
+            {(maintenanceMode ? TAB_ITEMS.filter((t) => t.id === "children") : TAB_ITEMS).map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
@@ -544,15 +552,26 @@ export default function ParentDashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
-        {activeTab === "overview" && (
-          <OverviewTab user={typedUser} onNavigate={setActiveTab} />
+        {maintenanceMode ? (
+          <>
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              系統整理中，7/3 全面開放。目前僅開放<strong>註冊、綁定與新增學生</strong>；預約、購買、聯絡簿等功能將於 7/3 開放。
+            </div>
+            <ChildrenTab />
+          </>
+        ) : (
+          <>
+            {activeTab === "overview" && (
+              <OverviewTab user={typedUser} onNavigate={setActiveTab} />
+            )}
+            {activeTab === "book" && <BookingFlowTab />}
+            {activeTab === "children" && <ChildrenTab />}
+            {activeTab === "bookings" && <BookingsTab highlightBookingId={highlightBookingId} />}
+            {activeTab === "credits" && <CreditsTab />}
+            {activeTab === "contact-book" && <ContactBookTab />}
+            {activeTab === "shop" && <ShopTab />}
+          </>
         )}
-        {activeTab === "book" && <BookingFlowTab />}
-        {activeTab === "children" && <ChildrenTab />}
-        {activeTab === "bookings" && <BookingsTab highlightBookingId={highlightBookingId} />}
-        {activeTab === "credits" && <CreditsTab />}
-        {activeTab === "contact-book" && <ContactBookTab />}
-        {activeTab === "shop" && <ShopTab />}
       </main>
     </div>
   );

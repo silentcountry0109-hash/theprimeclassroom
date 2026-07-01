@@ -958,7 +958,7 @@ export async function registerRoutes(
         .set({ phone, lineRegistrationComplete: true, updatedAt: new Date() })
         .where(eq(users.id, userId))
         .returning();
-      if (!updated) return res.status(404).json({ message: "找不到使用者" });
+      if (!updated) return res.status(500).json({ message: "驗證過程發生錯誤，請重新發送驗證碼再試一次，或聯繫客服" });
 
       // 贈送免費體驗堂數（若尚未建立過點數記錄，以 transaction 確保原子性）
       await grantFreeTrialIfNeeded(userId);
@@ -2989,19 +2989,6 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/franchise-admin/students", isFranchiseAdmin, async (req: any, res) => {
-    try {
-      const { name, grade } = req.body;
-      if (!name || typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "學生姓名為必填" });
-      const g = parseInt(grade);
-      if (isNaN(g) || g < 1 || g > 6) return res.status(400).json({ message: "年級必須是 1-6" });
-      const result = await storage.addFranchiseStudent(req.franchiseId, name.trim(), g);
-      res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message || "Failed to add student" });
-    }
-  });
-
   app.patch("/api/franchise-admin/students/:childId", isFranchiseAdmin, async (req: any, res) => {
     try {
       const childId = parseInt(req.params.childId);
@@ -3025,16 +3012,6 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to update student" });
-    }
-  });
-
-  app.delete("/api/franchise-admin/students/:childId", isFranchiseAdmin, async (req: any, res) => {
-    try {
-      const childId = parseInt(req.params.childId);
-      await storage.removeFranchiseStudent(req.franchiseId, childId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message || "Failed to remove student" });
     }
   });
 

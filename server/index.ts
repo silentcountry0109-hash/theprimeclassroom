@@ -59,6 +59,18 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // 上線前健檢:正式環境缺 Twilio 憑證會讓家長全部卡在電話驗證 → 提早在啟動失敗,而非請求時才爆。
+  if (process.env.NODE_ENV === "production") {
+    const missingTwilio = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID"]
+      .filter((k) => !process.env[k]);
+    if (missingTwilio.length > 0) {
+      throw new Error(`[FATAL] 缺少正式環境 Twilio 憑證: ${missingTwilio.join(", ")}(家長電話驗證會全部失敗)`);
+    }
+    if (!process.env.APP_BASE_URL?.includes("www.")) {
+      console.warn(`[WARN] APP_BASE_URL 未含 www.(目前=${process.env.APP_BASE_URL ?? "未設定"});LINE OAuth callback 可能對不上。`);
+    }
+  }
+
   await registerRoutes(httpServer, app);
 
   const { storage } = await import("./storage");

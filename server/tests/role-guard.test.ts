@@ -174,7 +174,6 @@ describe("isFranchiseAdmin middleware — 批次守衛測試（分校管理員 A
     { method: "get",    path: "/api/franchise-admin/classrooms",          label: "GET /api/franchise-admin/classrooms" },
     { method: "post",   path: "/api/franchise-admin/classrooms",          label: "POST /api/franchise-admin/classrooms" },
     { method: "get",    path: "/api/franchise-admin/students",            label: "GET /api/franchise-admin/students" },
-    { method: "post",   path: "/api/franchise-admin/students",            label: "POST /api/franchise-admin/students" },
     { method: "post",   path: "/api/franchise-admin/manual-booking",      label: "POST /api/franchise-admin/manual-booking" },
     { method: "get",    path: "/api/franchise-admin/available-students",  label: "GET /api/franchise-admin/available-students" },
   ];

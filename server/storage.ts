@@ -1,7 +1,7 @@
 import {
   franchises, coaches, children, timeSlots, bookings, faqs, successStories, announcements,
   products, cartItems, orders, orderItems, siteContent, contactBooks, favoriteFranchises,
-  coachDailyRecords, classrooms, notifications, franchiseStudents,
+  coachDailyRecords, classrooms, notifications,
   creditPackages, promotions, couponCodes, creditPurchases, creditBalances, creditTransactions,
   customSchools,
   textbooks, textbookQuizzes, textbookFiles,
@@ -251,11 +251,8 @@ export interface IStorage {
 
   getFranchiseStudents(franchiseId: number): Promise<any[]>;
   searchParentForCredits(query: string): Promise<{ parentId: string; parentName: string; username: string | null; phone: string | null; balance: number; matchedStudent: { name: string; studentCode: string | null } | null } | null>;
-  addFranchiseStudent(franchiseId: number, name: string, grade: number): Promise<any>;
-  removeFranchiseStudent(franchiseId: number, childId: number): Promise<void>;
   getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]>;
   getFranchiseStudentContactBooks(franchiseId: number, childId: number): Promise<any[]>;
-  createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any>;
   createManualBookingExtended(params: {
     slotId: number;
     franchiseId: number;
@@ -909,27 +906,8 @@ export class DatabaseStorage implements IStorage {
       .where(eq(timeSlots.franchiseId, franchiseId))
       .orderBy(children.id, children.name);
 
-    const linkedStudents = await db
-      .select({
-        id: children.id,
-        name: children.name,
-        grade: children.grade,
-        school: children.school,
-        studentCode: children.studentCode,
-        parentId: children.parentId,
-      })
-      .from(franchiseStudents)
-      .innerJoin(children, eq(franchiseStudents.childId, children.id))
-      .where(eq(franchiseStudents.franchiseId, franchiseId));
-
-    const seenIds = new Set<number>();
-    const allStudents = [];
-    for (const s of [...bookingStudents, ...linkedStudents]) {
-      if (!seenIds.has(s.id)) {
-        seenIds.add(s.id);
-        allStudents.push(s);
-      }
-    }
+    // 分校名單改為 booking-derived only；bookingStudents 已用 selectDistinctOn 去重。
+    const allStudents = bookingStudents;
 
     const result = [];
     for (const row of allStudents) {
@@ -996,27 +974,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async addFranchiseStudent(franchiseId: number, name: string, grade: number): Promise<any> {
-    const placeholderParentId = `franchise-${franchiseId}-parent-placeholder`;
-    await db.insert(users).values({
-      id: placeholderParentId,
-      username: `franchise-${franchiseId}-parent`,
-      passwordHash: "nologin",
-      role: "parent",
-      firstName: "教室學生",
-      lastName: "",
-    }).onConflictDoNothing();
-    const child = await this.createChild({ parentId: placeholderParentId, name, grade });
-    await db.insert(franchiseStudents).values({ franchiseId, childId: child.id });
-    return child;
-  }
-
-  async removeFranchiseStudent(franchiseId: number, childId: number): Promise<void> {
-    await db.delete(franchiseStudents).where(
-      and(eq(franchiseStudents.franchiseId, franchiseId), eq(franchiseStudents.childId, childId))
-    );
-  }
-
   async getFranchiseStudentBookings(franchiseId: number, childId: number): Promise<any[]> {
     const results = await db
       .select({
@@ -1071,64 +1028,6 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async createManualBooking(slotId: number, childId: number, franchiseId: number): Promise<any> {
-    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, slotId));
-    if (!slot) throw new Error("時段不存在");
-    if (slot.franchiseId !== franchiseId) throw new Error("此時段不屬於您的分校");
-    if (slot.bookedSeats >= slot.maxSeats) throw new Error("此時段已額滿");
-
-    const now = new Date();
-    const slotEnd = new Date(`${slot.date}T${slot.endTime}:00+08:00`);
-    if (now > slotEnd) throw new Error("此時段已結束，無法加排");
-
-    const existing = await db.select().from(bookings).where(
-      and(
-        eq(bookings.slotId, slotId),
-        eq(bookings.childId, childId),
-        inArray(bookings.status, ["confirmed", "checked_in"])
-      )
-    );
-    if (existing.length > 0) throw new Error("此學生已預約此時段");
-
-    const [child] = await db.select().from(children).where(eq(children.id, childId));
-    if (!child) throw new Error("學生不存在");
-
-    const franchiseBookings = await db
-      .select({ id: bookings.id })
-      .from(bookings)
-      .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
-      .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId)))
-      .limit(1);
-    const linkedStudent = await db
-      .select({ id: franchiseStudents.id })
-      .from(franchiseStudents)
-      .where(and(eq(franchiseStudents.childId, childId), eq(franchiseStudents.franchiseId, franchiseId)))
-      .limit(1);
-    if (franchiseBookings.length === 0 && linkedStudent.length === 0) throw new Error("此學生非本分校學生，無法加排");
-
-    const overlapping = await this.getChildOverlappingBookings(childId, slot.date, slot.startTime, slot.endTime);
-    if (overlapping.length > 0) {
-      const conflict = overlapping[0];
-      throw new Error(`此學生在 ${conflict.date} ${conflict.startTime}-${conflict.endTime} 已有其他預約，時間衝突無法加排`);
-    }
-
-    const [updated] = await db
-      .update(timeSlots)
-      .set({ bookedSeats: sql`LEAST(${timeSlots.bookedSeats} + 1, ${timeSlots.maxSeats})` })
-      .where(and(eq(timeSlots.id, slotId), sql`${timeSlots.bookedSeats} < ${timeSlots.maxSeats}`))
-      .returning();
-    if (!updated) throw new Error("此時段已額滿");
-
-    const [created] = await db.insert(bookings).values({
-      slotId,
-      childId,
-      parentId: child.parentId,
-      status: "confirmed",
-    }).returning();
-
-    return { ...created, childName: child.name };
-  }
-
   async createManualBookingExtended(params: {
     slotId: number;
     franchiseId: number;
@@ -1162,20 +1061,20 @@ export class DatabaseStorage implements IStorage {
           school: walkInSchool?.trim() || null,
         }).returning();
         child = created as any;
-        const existing = await tx.select().from(franchiseStudents)
-          .where(and(eq(franchiseStudents.childId, created.id), eq(franchiseStudents.franchiseId, franchiseId)));
-        if (existing.length === 0) {
-          await tx.insert(franchiseStudents).values({ franchiseId, childId: created.id });
-        }
       } else if (childId) {
+        // franchise_students 已移除;名單改 booking-derived。以「預約歷史」界定分校歸屬:
+        // 允許 (a) 全新學生(全系統尚無任何預約)或 (b) 本校已有預約者;
+        // 阻擋「只在別校有預約」的學生,避免跨校把他人孩子加排並誤扣該家長堂數。
         const [found] = await tx.select().from(children).where(eq(children.id, childId));
         if (!found) throw new Error("學生不存在");
-        const franchiseBookings = await tx.select({ id: bookings.id }).from(bookings)
+        const childBookings = await tx
+          .select({ fid: timeSlots.franchiseId })
+          .from(bookings)
           .innerJoin(timeSlots, eq(bookings.slotId, timeSlots.id))
-          .where(and(eq(bookings.childId, childId), eq(timeSlots.franchiseId, franchiseId))).limit(1);
-        const linked = await tx.select({ id: franchiseStudents.id }).from(franchiseStudents)
-          .where(and(eq(franchiseStudents.childId, childId), eq(franchiseStudents.franchiseId, franchiseId))).limit(1);
-        if (franchiseBookings.length === 0 && linked.length === 0) throw new Error("此學生非本分校學生，無法加排");
+          .where(eq(bookings.childId, childId));
+        if (childBookings.length > 0 && !childBookings.some((b) => b.fid === franchiseId)) {
+          throw new Error("此學生已屬其他分校，無法加排");
+        }
         child = found as any;
       } else {
         throw new Error("請選擇學生或填寫臨時學生資料");
@@ -2532,7 +2431,6 @@ export class DatabaseStorage implements IStorage {
     const allBookingsData = await db.select().from(bookings);
     const allCoachesData = await db.select().from(coaches);
     const allChildrenData = await db.select().from(children);
-    const allFranchiseStudents = await db.select().from(franchiseStudents);
 
     const slotsByFranchise = new Map<number, typeof allSlots>();
     for (const slot of allSlots) {
@@ -2570,11 +2468,16 @@ export class DatabaseStorage implements IStorage {
         return slot && slot.date.startsWith(thisMonth);
       }).length;
 
-      const newStudents = allFranchiseStudents.filter(fs => {
-        if (fs.franchiseId !== f.id) return false;
-        if (!fs.createdAt) return false;
-        return new Date(fs.createdAt).toISOString().substring(0, 7) === thisMonth;
-      }).length;
+      // 本月新生（booking-derived）：本月於本校「首次預約」的 distinct 學生數。
+      const firstBookingByChild = new Map<number, Date>();
+      for (const b of fBookings) {
+        if (!b.createdAt) continue;
+        const d = new Date(b.createdAt);
+        const cur = firstBookingByChild.get(b.childId);
+        if (!cur || d < cur) firstBookingByChild.set(b.childId, d);
+      }
+      const newStudents = Array.from(firstBookingByChild.values())
+        .filter(d => d.toISOString().substring(0, 7) === thisMonth).length;
 
       return {
         franchiseId: f.id,
@@ -3056,11 +2959,12 @@ export class DatabaseStorage implements IStorage {
   async getParentBalance(parentId: string, executor?: DbExecutor): Promise<number> {
     const conn = executor ?? db;
     const now = new Date();
+    // 加總所有未過期桶（含負餘額/欠堂）。負桶代表自校管家轉入的欠堂，會抵扣未來儲值；
+    // 實際扣堂（deductCredits）仍只從正桶扣，故欠堂不會被「消費」掉，等同永久壓低可用餘額直到補滿。
     const [result] = await conn.select({ total: sql<number>`COALESCE(SUM(${creditBalances.remainingCredits}), 0)` })
       .from(creditBalances)
       .where(and(
         eq(creditBalances.parentId, parentId),
-        gt(creditBalances.remainingCredits, 0),
         sql`(${creditBalances.expiresAt} IS NULL OR ${creditBalances.expiresAt} > ${now})`
       ));
     return Number(result.total);

@@ -57,15 +57,6 @@ export const children = pgTable("children", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const franchiseStudents = pgTable("franchise_students", {
-  id: serial("id").primaryKey(),
-  franchiseId: integer("franchise_id").references(() => franchises.id).notNull(),
-  childId: integer("child_id").references(() => children.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  uniqueIndex("franchise_students_unique").on(table.franchiseId, table.childId),
-]);
-
 export const classrooms = pgTable("classrooms", {
   id: serial("id").primaryKey(),
   franchiseId: integer("franchise_id").references(() => franchises.id).notNull(),

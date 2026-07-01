@@ -4114,9 +4114,6 @@ function StudentsTab() {
   const [schoolFilter, setSchoolFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newStudentName, setNewStudentName] = useState("");
-  const [newStudentGrade, setNewStudentGrade] = useState("1");
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
   const [editName, setEditName] = useState("");
   const [editGrade, setEditGrade] = useState("1");
@@ -4126,24 +4123,6 @@ function StudentsTab() {
 
   const { data: students = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/franchise-admin/students"],
-  });
-
-  const addStudentMutation = useMutation({
-    mutationFn: async (data: { name: string; grade: number }) => {
-      const res = await apiRequest("POST", "/api/franchise-admin/students", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/students"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/franchise-admin/available-students"] });
-      toast({ title: "學生已新增" });
-      setShowAddDialog(false);
-      setNewStudentName("");
-      setNewStudentGrade("1");
-    },
-    onError: (err: any) => {
-      toast({ title: "新增失敗", description: err.message, variant: "destructive" });
-    },
   });
 
   const editStudentMutation = useMutation({
@@ -4192,57 +4171,10 @@ function StudentsTab() {
 
   return (
     <div className="max-w-4xl">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">學生管理</h1>
-          <p className="text-sm text-muted-foreground">查看分校所有學生資料、預約紀錄和聯絡簿</p>
-        </div>
-        <Button size="sm" onClick={() => setShowAddDialog(true)} data-testid="button-add-student">
-          <UserPlus className="w-4 h-4 mr-1" />新增學生
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-foreground">學生管理</h1>
+        <p className="text-sm text-muted-foreground">查看分校所有學生資料、預約紀錄和聯絡簿</p>
       </div>
-
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>新增學生</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>姓名</Label>
-              <Input
-                value={newStudentName}
-                onChange={(e) => setNewStudentName(e.target.value)}
-                placeholder="學生姓名"
-                data-testid="input-new-student-name"
-              />
-            </div>
-            <div>
-              <Label>年級</Label>
-              <Select value={newStudentGrade} onValueChange={setNewStudentGrade}>
-                <SelectTrigger data-testid="select-new-student-grade">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6].map((g) => (
-                    <SelectItem key={g} value={g.toString()}>{g}年級</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>取消</Button>
-            <Button
-              onClick={() => addStudentMutation.mutate({ name: newStudentName, grade: parseInt(newStudentGrade) })}
-              disabled={!newStudentName.trim() || addStudentMutation.isPending}
-              data-testid="button-submit-new-student"
-            >
-              {addStudentMutation.isPending ? "新增中..." : "新增"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!editingStudent} onOpenChange={(open) => { if (!open) setEditingStudent(null); }}>
         <DialogContent className="max-w-sm">
