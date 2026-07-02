@@ -274,12 +274,14 @@ function Router() {
   });
   if (maintLoading) return <LoadingScreen />;
   if (maint?.enabled) {
-    // 維修模式:開放「老師端」+「家長註冊/綁定/新增學生」管道(7/1–7/2 催註冊用);
-    // 其餘(首頁/預約/主任/總部…)一律維修頁。家長 dashboard 僅開放「我的孩子」tab(見 parent-dashboard)。
+    // 維修模式:開放「老師端」+「家長註冊/綁定/新增學生」+「主任端」(7/1–7/2 催註冊/現場核對用);
+    // 其餘(首頁/預約/總部…)一律維修頁。家長 dashboard 僅開放「我的孩子」tab(見 parent-dashboard)。
     return (
       <Switch>
         <Route path="/coach-login" component={FranchiseLogin} />
         <Route path="/coach-dashboard" component={CoachDashboard} />
+        <Route path="/franchise-login" component={FranchiseLogin} />
+        <Route path="/franchise-admin" component={FranchiseAdminDashboard} />
         <Route path="/parent-login" component={ParentLogin} />
         <Route path="/parent-register/add-friend" component={ParentRegisterAddFriend} />
         <Route path="/parent-register/verify-phone" component={ParentRegisterVerifyPhone} />
