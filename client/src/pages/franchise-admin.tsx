@@ -4667,7 +4667,11 @@ interface ParentSearchResult {
   phone: string | null;
   balance: number;
   matchedStudent: { name: string; studentCode: string | null } | null;
+  children: { name: string; grade: number; school: string | null }[];
 }
+
+const GRADE_LABELS = ["一", "二", "三", "四", "五", "六"];
+const gradeLabel = (g: number) => (GRADE_LABELS[g - 1] ? `${GRADE_LABELS[g - 1]}年級` : `${g}年級`);
 
 // 分校主任贈點功能已移除(2026-07):加點/調帳一律由總部處理,主任僅可查詢餘額。
 function ParentCreditsTab() {
@@ -4765,6 +4769,15 @@ function ParentCreditsTab() {
                   <span>　學生：{lookupResult.matchedStudent.name}{lookupResult.matchedStudent.studentCode ? `（${lookupResult.matchedStudent.studentCode}）` : ""}</span>
                 )}
               </p>
+              {(lookupResult.children ?? []).length > 0 ? (
+                <p className="text-xs text-foreground mt-1" data-testid={`text-lookup-children-${lookupResult.parentId}`}>
+                  孩子：{lookupResult.children.map((c) => `${c.name}（${gradeLabel(c.grade)}）`).join("、")}
+                </p>
+              ) : (
+                <p className="text-xs font-medium text-amber-600 mt-1" data-testid={`text-lookup-no-children-${lookupResult.parentId}`}>
+                  ⚠ 已綁定但尚未新增孩子
+                </p>
+              )}
             </div>
             <div className="text-right mr-3">
               <p className="text-lg font-bold text-foreground" data-testid={`text-lookup-balance-${lookupResult.parentId}`}>

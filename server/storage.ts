@@ -930,7 +930,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async searchParentForCredits(query: string): Promise<{ parentId: string; parentName: string; username: string | null; phone: string | null; balance: number; matchedStudent: { name: string; studentCode: string | null } | null } | null> {
+  async searchParentForCredits(query: string): Promise<{ parentId: string; parentName: string; username: string | null; phone: string | null; balance: number; matchedStudent: { name: string; studentCode: string | null } | null; children: { name: string; grade: number; school: string | null }[] } | null> {
     const q = query.trim();
     if (!q) return null;
 
@@ -963,6 +963,12 @@ export class DatabaseStorage implements IStorage {
     if (!parent) return null;
 
     const balance = await this.getParentBalance(parent.id);
+    // 名下孩子(不限有無預約)——催綁時供主任核對孩子姓名是否新增正確
+    const kids = await db
+      .select({ name: children.name, grade: children.grade, school: children.school })
+      .from(children)
+      .where(eq(children.parentId, parent.id))
+      .orderBy(asc(children.id));
     return {
       parentId: parent.id,
       parentName: `${parent.lastName || ""}${parent.firstName || ""}`.trim() || parent.username || "未設定",
@@ -970,6 +976,7 @@ export class DatabaseStorage implements IStorage {
       phone: parent.phone,
       balance,
       matchedStudent,
+      children: kids,
     };
   }
 
