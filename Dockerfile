@@ -14,6 +14,11 @@ COPY . .
 ARG VITE_LINE_OA_URL=https://line.me/R/ti/p/@643apwlp
 ENV VITE_LINE_OA_URL=$VITE_LINE_OA_URL
 
+# LIFF app ID(非機密;建於 Login channel 2009943763 底下——與 web OAuth 同 channel,
+# 已註冊家長的 lineUserId 才會一致。切勿另設 LIFF_LOGIN_CHANNEL_ID)
+ARG VITE_LIFF_ID=2009943763-Oor4CAs4
+ENV VITE_LIFF_ID=$VITE_LIFF_ID
+
 # 建置 client(dist/public)與 server(dist/index.cjs)
 RUN npm run build
 
